@@ -174,10 +174,14 @@ impl ChatWidget {
             return;
         }
         if self.slash_command_blocked_by_active_task(cmd, source) {
-            let message = format!(
-                "'/{}' is disabled while a task is in progress.",
-                cmd.command()
-            );
+            let message = if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                format!("任务进行中，暂时不能使用 /{}。", cmd.command())
+            } else {
+                format!(
+                    "'/{}' is disabled while a task is in progress.",
+                    cmd.command()
+                )
+            };
             self.add_to_history(history_cell::new_error_event(message));
             // Retain attachments when the composer has deferred consuming the draft.
             if self.bottom_pane.composer_text().is_empty() {
@@ -238,27 +242,62 @@ impl ChatWidget {
                 self.show_session_checkout_picker(ManagedWorktreeMode::New, /*name*/ None);
             }
             SlashCommand::Archive => {
+                let chinese = crate::i18n::is_chinese(self.local_settings.tui.language);
                 self.bottom_pane.show_selection_view(SelectionViewParams {
-                    title: Some("Archive this session?".to_string()),
+                    title: Some(
+                        if chinese {
+                            "归档此会话？"
+                        } else {
+                            "Archive this session?"
+                        }
+                        .to_string(),
+                    ),
                     subtitle: Some(
                         if self.bottom_pane.is_task_running() {
-                            "This will stop the current turn and archive the session."
+                            if chinese {
+                                "这会停止当前回合并归档会话。"
+                            } else {
+                                "This will stop the current turn and archive the session."
+                            }
                         } else {
-                            "Are you sure? This will archive the current session"
+                            if chinese {
+                                "确认归档当前会话吗？"
+                            } else {
+                                "Are you sure? This will archive the current session"
+                            }
                         }
                         .to_string(),
                     ),
                     footer_hint: Some(standard_popup_hint_line()),
                     items: vec![
                         SelectionItem {
-                            name: "No, don't archive".to_string(),
-                            description: Some("Return to the current session".to_string()),
+                            name: if chinese {
+                                "不归档"
+                            } else {
+                                "No, don't archive"
+                            }
+                            .to_string(),
+                            description: Some(
+                                if chinese {
+                                    "返回当前会话"
+                                } else {
+                                    "Return to the current session"
+                                }
+                                .to_string(),
+                            ),
                             dismiss_on_select: true,
                             ..Default::default()
                         },
                         SelectionItem {
-                            name: "Yes, archive".to_string(),
-                            description: Some("Archive this session now".to_string()),
+                            name: if chinese { "归档" } else { "Yes, archive" }.to_string(),
+                            description: Some(
+                                if chinese {
+                                    "立即归档此会话"
+                                } else {
+                                    "Archive this session now"
+                                }
+                                .to_string(),
+                            ),
                             actions: vec![Box::new(|tx| {
                                 tx.send(AppEvent::ArchiveCurrentThread);
                             })],
@@ -271,27 +310,65 @@ impl ChatWidget {
                 self.request_redraw();
             }
             SlashCommand::Delete => {
+                let chinese = crate::i18n::is_chinese(self.local_settings.tui.language);
                 self.bottom_pane.show_selection_view(SelectionViewParams {
-                    title: Some("Delete this session?".to_string()),
+                    title: Some(
+                        if chinese {
+                            "删除此会话？"
+                        } else {
+                            "Delete this session?"
+                        }
+                        .to_string(),
+                    ),
                     subtitle: Some(
-                        "Cannot be undone. Subagent threads will also be deleted.".to_string(),
+                        if chinese {
+                            "此操作无法撤销，子 Agent 会话也会被删除。"
+                        } else {
+                            "Cannot be undone. Subagent threads will also be deleted."
+                        }
+                        .to_string(),
                     ),
                     footer_hint: Some(standard_popup_hint_line()),
                     items: vec![
                         SelectionItem {
-                            name: "No, keep this session".to_string(),
-                            description: Some("Return to the current session".to_string()),
+                            name: if chinese {
+                                "保留会话"
+                            } else {
+                                "No, keep this session"
+                            }
+                            .to_string(),
+                            description: Some(
+                                if chinese {
+                                    "返回当前会话"
+                                } else {
+                                    "Return to the current session"
+                                }
+                                .to_string(),
+                            ),
                             dismiss_on_select: true,
                             ..Default::default()
                         },
                         SelectionItem {
-                            name: if self.remote_connection.is_some() {
+                            name: if chinese {
+                                if self.remote_connection.is_some() {
+                                    "删除并返回命令中心"
+                                } else {
+                                    "删除并退出"
+                                }
+                            } else if self.remote_connection.is_some() {
                                 "Yes, delete and return to command center"
                             } else {
                                 "Yes, delete and exit"
                             }
                             .to_string(),
-                            description: Some("Permanently delete this session now".to_string()),
+                            description: Some(
+                                if chinese {
+                                    "立即永久删除此会话"
+                                } else {
+                                    "Permanently delete this session now"
+                                }
+                                .to_string(),
+                            ),
                             actions: vec![Box::new(|tx| {
                                 tx.send(AppEvent::DeleteCurrentThread);
                             })],
@@ -561,7 +638,11 @@ impl ChatWidget {
             }
             SlashCommand::Pwd => {
                 self.add_info_message(
-                    format!("Current working directory: {}", self.config.cwd.display()),
+                    if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                        format!("当前工作目录：{}", self.config.cwd.display())
+                    } else {
+                        format!("Current working directory: {}", self.config.cwd.display())
+                    },
                     /*hint*/ None,
                 );
             }
@@ -587,6 +668,12 @@ impl ChatWidget {
             }
             SlashCommand::Theme => {
                 self.open_theme_picker();
+            }
+            SlashCommand::Language => {
+                self.open_language_picker();
+            }
+            SlashCommand::Provider => {
+                self.open_provider_menu();
             }
             SlashCommand::Pets => {
                 self.open_pets_picker();
@@ -903,6 +990,14 @@ impl ChatWidget {
                 }
                 _ => self.add_error_message("Usage: /keymap [debug]".to_string()),
             },
+            SlashCommand::Language => {
+                self.handle_language_command_args(trimmed);
+                self.app_event_tx.send(AppEvent::SettingsSelectionClosed);
+            }
+            SlashCommand::Provider => {
+                self.handle_provider_command_args(trimmed);
+                self.app_event_tx.send(AppEvent::SettingsSelectionClosed);
+            }
             SlashCommand::Raw => match trimmed.to_ascii_lowercase().as_str() {
                 "on" => {
                     self.set_raw_output_mode_and_notify(/*enabled*/ true);
@@ -1262,6 +1357,7 @@ impl ChatWidget {
         let allow_elevate_sandbox = false;
 
         BuiltinCommandFlags {
+            language: self.local_settings.tui.language,
             collaboration_modes_enabled: self.collaboration_modes_enabled(),
             connectors_enabled: self.connectors_enabled(),
             plugins_command_enabled: self.config.features.enabled(Feature::Plugins),
@@ -1361,6 +1457,8 @@ impl ChatWidget {
             | SlashCommand::Statusline
             | SlashCommand::Config
             | SlashCommand::Theme
+            | SlashCommand::Language
+            | SlashCommand::Provider
             | SlashCommand::Tui
             | SlashCommand::Pets => QueueDrain::Stop,
         }

@@ -334,6 +334,7 @@ impl ChatWidget {
         widget
             .bottom_pane
             .set_token_activity_command_enabled(widget.has_codex_backend_auth);
+        widget.set_tui_language(widget.local_settings.tui.language);
         widget.refresh_status_surfaces();
 
         widget

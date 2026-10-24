@@ -856,6 +856,13 @@ pub struct Tui {
     #[serde(default, flatten)]
     pub notification_settings: TuiNotificationSettings,
 
+    /// Interface language for the TUI.
+    ///
+    /// Defaults to Simplified Chinese. `auto` follows the system locale; `zh-CN` and `en`
+    /// select an explicit language.
+    #[serde(default = "default_tui_language")]
+    pub language: TuiLanguage,
+
     /// Enable animations (welcome screen, shimmer effects, spinners).
     /// Defaults to `true`.
     #[serde(default = "default_true")]
@@ -1019,6 +1026,35 @@ pub struct Tui {
     #[serde(default)]
     #[schemars(range(min = 0))]
     pub terminal_resize_reflow_max_rows: Option<usize>,
+}
+
+/// Interface language for the terminal user interface.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, JsonSchema)]
+pub enum TuiLanguage {
+    /// Follow the system locale, falling back to English.
+    #[default]
+    #[serde(rename = "auto")]
+    Auto,
+    /// English.
+    #[serde(rename = "en")]
+    English,
+    /// Simplified Chinese.
+    #[serde(rename = "zh-CN")]
+    Chinese,
+}
+
+const fn default_tui_language() -> TuiLanguage {
+    TuiLanguage::Chinese
+}
+
+impl std::fmt::Display for TuiLanguage {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Auto => "auto",
+            Self::English => "en",
+            Self::Chinese => "zh-CN",
+        })
+    }
 }
 
 const fn default_true() -> bool {

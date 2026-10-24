@@ -7,6 +7,7 @@ use codex_config::types::McpServerConfig;
 use codex_config::types::ResumeCwdMode;
 use codex_config::types::SessionPickerViewMode;
 use codex_config::types::ToolSuggestDisabledTool;
+use codex_config::types::TuiLanguage;
 use codex_features::FEATURES;
 use codex_protocol::config_types::ServiceTier;
 use codex_protocol::config_types::TrustLevel;
@@ -87,6 +88,14 @@ pub fn syntax_theme_edit(name: &str) -> ConfigEdit {
     ConfigEdit::SetPath {
         segments: vec!["tui".to_string(), "theme".to_string()],
         value: value(name.to_string()),
+    }
+}
+
+/// Produces a config edit that sets `[tui].language`.
+pub fn tui_language_edit(language: TuiLanguage) -> ConfigEdit {
+    ConfigEdit::SetPath {
+        segments: vec!["tui".to_string(), "language".to_string()],
+        value: value(language.to_string()),
     }
 }
 

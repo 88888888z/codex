@@ -5195,6 +5195,15 @@
           },
           "description": "Keybinding overrides for the TUI.\n\nThis supports rebinding selected actions globally and by context. Context bindings take precedence over `global` bindings."
         },
+        "language": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/TuiLanguage"
+            }
+          ],
+          "default": "zh-CN",
+          "description": "Interface language for the TUI.\n\nDefaults to Simplified Chinese. `auto` follows the system locale; `zh-CN` and `en` select an explicit language."
+        },
         "model_availability_nux": {
           "allOf": [
             {
@@ -5365,6 +5374,32 @@
         }
       },
       "type": "object"
+    },
+    "TuiLanguage": {
+      "description": "Interface language for the terminal user interface.",
+      "oneOf": [
+        {
+          "description": "Follow the system locale, falling back to English.",
+          "enum": [
+            "auto"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "English.",
+          "enum": [
+            "en"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Simplified Chinese.",
+          "enum": [
+            "zh-CN"
+          ],
+          "type": "string"
+        }
+      ]
     },
     "TuiAgentsKeymap": {
       "additionalProperties": false,
@@ -7189,6 +7224,13 @@
           "description": "The Responses API exposed by OpenAI at `/v1/responses`.",
           "enum": [
             "responses"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "The broadly supported Chat Completions API at `/v1/chat/completions`.",
+          "enum": [
+            "chat"
           ],
           "type": "string"
         }

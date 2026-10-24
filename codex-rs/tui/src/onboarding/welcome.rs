@@ -15,6 +15,8 @@ use ratatui::widgets::Wrap;
 use std::cell::Cell;
 use std::cell::RefCell;
 
+use codex_config::types::TuiLanguage;
+
 use crate::empty_state_animation::EmptyStateAnimation;
 use crate::empty_state_animation::Presentation;
 use crate::key_hint::KeyBindingListExt;
@@ -38,6 +40,7 @@ pub(crate) struct WelcomeWidget {
     presentation: Cell<Presentation>,
     focused: Cell<bool>,
     layout_area: Cell<Option<Rect>>,
+    language: TuiLanguage,
 }
 
 impl KeyboardHandler for WelcomeWidget {
@@ -61,6 +64,7 @@ impl WelcomeWidget {
         is_logged_in: bool,
         request_frame: FrameRequester,
         animations_enabled: bool,
+        language: TuiLanguage,
     ) -> Self {
         let mut animation = EmptyStateAnimation::default();
         animation.start_fresh();
@@ -72,6 +76,7 @@ impl WelcomeWidget {
             presentation: Cell::new(Presentation::Animated),
             focused: Cell::new(/*value*/ true),
             layout_area: Cell::new(None),
+            language,
         }
     }
 
@@ -123,12 +128,21 @@ impl WidgetRef for &WelcomeWidget {
             0
         };
         let mut lines: Vec<Line> = vec![Line::default(); usize::from(logo_rows)];
-        lines.push(Line::from(vec![
-            "  ".into(),
-            "Welcome to ".into(),
-            "Codex".bold(),
-            ", OpenAI's command-line coding agent".into(),
-        ]));
+        lines.push(if crate::i18n::is_chinese(self.language) {
+            Line::from(vec![
+                "  ".into(),
+                "欢迎使用 ".into(),
+                "Codex".bold(),
+                "，OpenAI 的命令行编程 Agent".into(),
+            ])
+        } else {
+            Line::from(vec![
+                "  ".into(),
+                "Welcome to ".into(),
+                "Codex".bold(),
+                ", OpenAI's command-line coding agent".into(),
+            ])
+        });
 
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
@@ -168,6 +182,7 @@ mod tests {
             /*is_logged_in*/ false,
             FrameRequester::test_dummy(),
             /*animations_enabled*/ true,
+            TuiLanguage::English,
         );
         let area = Rect::new(0, 0, MIN_ANIMATION_WIDTH, MIN_ANIMATION_HEIGHT);
         let mut buf = Buffer::empty(area);
@@ -186,6 +201,7 @@ mod tests {
             /*is_logged_in*/ false,
             FrameRequester::test_dummy(),
             /*animations_enabled*/ true,
+            TuiLanguage::English,
         );
         let area = Rect::new(0, 0, MIN_ANIMATION_WIDTH, MIN_ANIMATION_HEIGHT - 1);
         let mut buf = Buffer::empty(area);
@@ -202,6 +218,7 @@ mod tests {
             /*is_logged_in*/ false,
             FrameRequester::test_dummy(),
             /*animations_enabled*/ true,
+            TuiLanguage::English,
         );
         // The first focused draw shows the intact logo at exactly zero elapsed time.
         let area = Rect::new(/*x*/ 0, /*y*/ 0, width, height);

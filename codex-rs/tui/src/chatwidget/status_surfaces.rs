@@ -1011,25 +1011,32 @@ impl ChatWidget {
     /// Startup takes precedence over normal task states, and idle state renders
     /// as `Ready` regardless of the last active status bucket.
     pub(super) fn run_state_status_text(&self) -> String {
+        let english = !crate::i18n::is_chinese(self.local_settings.tui.language);
         if self.mcp_startup_status.is_some() {
-            return "Starting".to_string();
+            return if english { "Starting" } else { "正在启动" }.to_string();
         }
 
         match self.status_state.terminal_title_status_kind {
             TerminalTitleStatusKind::Working if !self.bottom_pane.is_task_running() => {
-                "Ready".to_string()
+                if english { "Ready" } else { "就绪" }.to_string()
             }
             TerminalTitleStatusKind::WaitingForBackgroundTerminal
                 if !self.bottom_pane.is_task_running() =>
             {
-                "Ready".to_string()
+                if english { "Ready" } else { "就绪" }.to_string()
             }
             TerminalTitleStatusKind::Thinking if !self.bottom_pane.is_task_running() => {
-                "Ready".to_string()
+                if english { "Ready" } else { "就绪" }.to_string()
             }
-            TerminalTitleStatusKind::Working => "Working".to_string(),
-            TerminalTitleStatusKind::WaitingForBackgroundTerminal => "Waiting".to_string(),
-            TerminalTitleStatusKind::Thinking => "Thinking".to_string(),
+            TerminalTitleStatusKind::Working => {
+                if english { "Working" } else { "正在处理" }.to_string()
+            }
+            TerminalTitleStatusKind::WaitingForBackgroundTerminal => {
+                if english { "Waiting" } else { "等待中" }.to_string()
+            }
+            TerminalTitleStatusKind::Thinking => {
+                if english { "Thinking" } else { "思考中" }.to_string()
+            }
         }
     }
 

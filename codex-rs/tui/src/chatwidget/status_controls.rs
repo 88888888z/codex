@@ -47,8 +47,14 @@ impl ChatWidget {
             details: details.clone(),
             details_max_lines,
         });
+        let display_header =
+            if crate::i18n::is_chinese(self.local_settings.tui.language) && header == "Working" {
+                "正在处理".to_string()
+            } else {
+                header
+            };
         let status_indicator_updated = self.bottom_pane.update_status(
-            header,
+            display_header,
             details,
             StatusDetailsCapitalization::Preserve,
             details_max_lines,

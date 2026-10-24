@@ -3,6 +3,7 @@
 use super::*;
 use crate::app_event::AppEvent;
 use crate::chatwidget::rate_limits::RATE_LIMIT_SWITCH_PROMPT_VIEW_ID;
+use codex_config::types::TuiLanguage;
 
 impl ChatWidget {
     pub(crate) fn set_daybreak_enabled(&mut self, enabled: bool) {
@@ -293,6 +294,22 @@ impl ChatWidget {
     pub(crate) fn set_tui_theme(&mut self, theme: Option<String>) {
         self.config_panel_tui.theme.clone_from(&theme);
         self.local_settings.tui.theme = theme;
+    }
+
+    pub(crate) fn set_tui_language(&mut self, language: TuiLanguage) {
+        self.config_panel_tui.language = language;
+        self.local_settings.tui.language = language;
+        self.normal_placeholder_text = crate::i18n::placeholder(language).to_string();
+        self.side_placeholder_text = crate::i18n::side_placeholder(language).to_string();
+        let placeholder = if self.active_side_conversation {
+            self.side_placeholder_text.clone()
+        } else {
+            self.normal_placeholder_text.clone()
+        };
+        self.bottom_pane.set_language(language);
+        self.bottom_pane.set_placeholder_text(placeholder);
+        self.refresh_status_surfaces();
+        self.request_redraw();
     }
 
     /// Set the model in the widget's config copy and stored collaboration mode.

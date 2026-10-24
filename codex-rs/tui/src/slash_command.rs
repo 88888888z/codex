@@ -1,8 +1,11 @@
+use codex_config::types::TuiLanguage;
 use strum::IntoEnumIterator;
 use strum_macros::AsRefStr;
 use strum_macros::EnumIter;
 use strum_macros::EnumString;
 use strum_macros::IntoStaticStr;
+
+use crate::i18n;
 
 /// Commands that can be invoked by starting a message with a leading slash.
 #[derive(
@@ -64,6 +67,8 @@ pub enum SlashCommand {
     Title,
     Statusline,
     Theme,
+    Language,
+    Provider,
     #[strum(to_string = "pets", serialize = "pet")]
     Pets,
     Mcp,
@@ -91,6 +96,79 @@ pub enum SlashCommand {
 impl SlashCommand {
     /// User-visible description shown in the popup.
     pub fn description(self) -> &'static str {
+        self.description_for(TuiLanguage::English)
+    }
+
+    /// User-visible description shown in the popup for an interface language.
+    pub fn description_for(self, language: TuiLanguage) -> &'static str {
+        if i18n::is_chinese(language) {
+            return match self {
+                SlashCommand::Config => "配置 Codex 偏好",
+                SlashCommand::Feedback => "向维护者发送日志",
+                SlashCommand::New => "在当前对话中开始新对话",
+                SlashCommand::Init => "创建包含 Codex 指令的 AGENTS.md",
+                SlashCommand::Compact => "压缩对话，避免超出上下文限制",
+                SlashCommand::Recap => "立即总结当前对话",
+                SlashCommand::Review => "检查当前改动并找出问题",
+                SlashCommand::Rename => "重命名当前对话",
+                SlashCommand::Resume => "继续已保存的对话",
+                SlashCommand::Archive => "归档当前会话",
+                SlashCommand::Delete => "永久删除当前会话",
+                SlashCommand::Clear => "清空终端并开始新对话",
+                SlashCommand::Fork => "复制当前对话",
+                SlashCommand::Worktree => "在新的 worktree 中开始或继续对话",
+                SlashCommand::App => "在桌面应用中继续当前会话",
+                SlashCommand::Quit | SlashCommand::Exit => "退出 Codex",
+                SlashCommand::Copy => "复制上一条回复或其部分内容",
+                SlashCommand::Export => "将对话导出为 Markdown",
+                SlashCommand::Raw => "切换原始回滚模式，便于复制终端文本",
+                SlashCommand::Tui => "选择下次启动时的 TUI 模式",
+                SlashCommand::Diff => "显示 Git 差异（包括未跟踪文件）",
+                SlashCommand::Mention => "提及文件",
+                SlashCommand::Skills => "使用 Skills 改善 Codex 的特定任务表现",
+                SlashCommand::Import => "从 Claude Code 导入设置、项目和最近对话",
+                SlashCommand::Hooks => "查看和管理生命周期钩子",
+                SlashCommand::Daemon => "管理本地后台服务",
+                SlashCommand::Warnings => "查看保留的警告和诊断详情",
+                SlashCommand::Status => "显示当前会话配置和 token 用量",
+                SlashCommand::Cd => "切换当前工作目录",
+                SlashCommand::Pwd => "显示当前工作目录",
+                SlashCommand::Usage => "查看账户用量或重置用量限制",
+                SlashCommand::DebugConfig => "显示配置层和配置来源，用于调试",
+                SlashCommand::Title => "配置终端标题显示的内容",
+                SlashCommand::Statusline => "配置状态栏显示的内容",
+                SlashCommand::Theme => "选择语法高亮主题",
+                SlashCommand::Language => "选择界面语言",
+                SlashCommand::Provider => "管理第三方模型服务配置",
+                SlashCommand::Pets => "选择或隐藏终端宠物",
+                SlashCommand::Ps => "列出后台终端",
+                SlashCommand::Stop => "停止所有后台终端",
+                SlashCommand::MemoryDrop | SlashCommand::MemoryUpdate => "请勿使用",
+                SlashCommand::Model => "选择模型和推理强度",
+                SlashCommand::Presets => "运行或保存可复用的提示词和斜杠命令",
+                SlashCommand::Daybreak => "开启或关闭 Daybreak",
+                SlashCommand::Ide => "引入 IDE 中的选区、打开文件和其他上下文",
+                SlashCommand::Plan => "切换到计划模式",
+                SlashCommand::Voice => "开始或停止语音；使用 /voice settings 选择声音",
+                SlashCommand::Goal => "设置或查看长任务的 Goal",
+                SlashCommand::Agents => "打开 Agent 命令中心",
+                SlashCommand::MultiAgents => "在当前会话的子 Agent 之间切换",
+                SlashCommand::Side | SlashCommand::Btw => "在临时分支中开始旁支对话",
+                SlashCommand::Permissions => "选择 Codex 可以执行的操作",
+                SlashCommand::Keymap => "重新映射 TUI 快捷键",
+                SlashCommand::Vim => "切换输入区的 Vim 模式",
+                SlashCommand::ElevateSandbox => "设置提权后的 Agent 沙箱",
+                SlashCommand::Experimental => "切换实验功能",
+                SlashCommand::AutoReview => "批准最近一次自动审查拒绝的重试",
+                SlashCommand::Memories => "配置记忆的使用和生成",
+                SlashCommand::Mcp => "列出 MCP 工具；使用 /mcp verbose 或 /mcp login <name>",
+                SlashCommand::Apps => "管理应用",
+                SlashCommand::Plugins => "浏览插件",
+                SlashCommand::Logout => "退出 Codex 账号",
+                SlashCommand::Rollout => "打印 rollout 文件路径",
+                SlashCommand::TestApproval => "测试审批请求",
+            };
+        }
         match self {
             SlashCommand::Config => "configure Codex preferences",
             SlashCommand::Feedback => "send logs to maintainers",
@@ -127,6 +205,8 @@ impl SlashCommand {
             SlashCommand::Title => "configure which items appear in the terminal title",
             SlashCommand::Statusline => "configure which items appear in the status line",
             SlashCommand::Theme => "choose a syntax highlighting theme",
+            SlashCommand::Language => "choose the interface language",
+            SlashCommand::Provider => "manage third-party model provider profiles",
             SlashCommand::Pets => "choose or hide the terminal pet",
             SlashCommand::Ps => "list background terminals",
             SlashCommand::Stop => "stop all background terminals",
@@ -193,6 +273,8 @@ impl SlashCommand {
                 | SlashCommand::Pwd
                 | SlashCommand::Usage
                 | SlashCommand::Pets
+                | SlashCommand::Language
+                | SlashCommand::Provider
                 | SlashCommand::Side
                 | SlashCommand::Btw
                 | SlashCommand::Resume
@@ -215,6 +297,8 @@ impl SlashCommand {
                 | SlashCommand::Pwd
                 | SlashCommand::Usage
                 | SlashCommand::Ide
+                | SlashCommand::Language
+                | SlashCommand::Provider
         )
     }
 
@@ -242,6 +326,8 @@ impl SlashCommand {
                 | SlashCommand::Rollout
                 | SlashCommand::Copy
                 | SlashCommand::Raw
+                | SlashCommand::Language
+                | SlashCommand::Provider
         )
     }
 
@@ -302,6 +388,8 @@ impl SlashCommand {
             | SlashCommand::AutoReview
             | SlashCommand::Feedback
             | SlashCommand::Ide
+            | SlashCommand::Language
+            | SlashCommand::Provider
             | SlashCommand::Quit
             | SlashCommand::Exit
             | SlashCommand::Side

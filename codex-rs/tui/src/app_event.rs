@@ -1679,6 +1679,28 @@ pub(crate) enum AppEvent {
         name: String,
     },
 
+    /// Apply and persist an interface language selection.
+    LanguageSelected {
+        language: codex_config::types::TuiLanguage,
+    },
+
+    /// Open the focused setup form for a third-party provider preset.
+    OpenProviderSetup {
+        preset: crate::provider_profiles::ProviderPreset,
+    },
+
+    /// Open the provider preset list.
+    OpenProviderPresetPicker,
+
+    /// Persist a provider profile and start a new session with it.
+    SaveProviderProfile(crate::provider_profiles::ProviderProfile),
+
+    /// Select a saved provider profile and start a new session with it.
+    ActivateProviderProfile(crate::provider_profiles::ProfileSummary),
+
+    /// Remove a saved provider profile and its encrypted credential.
+    DeleteProviderProfile(crate::provider_profiles::ProfileSummary),
+
     /// Runtime syntax theme preview changed; refresh theme-derived UI colors.
     SyntaxThemePreviewed,
 

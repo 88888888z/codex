@@ -1,4 +1,5 @@
 use std::fmt;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -47,6 +48,94 @@ impl fmt::Display for SecretName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
+}
+
+/// Stable encrypted-secret name used by model-provider profiles.
+pub fn provider_secret_name(profile: &str) -> anyhow::Result<SecretName> {
+    let normalized = profile
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    SecretName::new(&format!("PROVIDER_{normalized}_API_KEY"))
+}
+
+/// Persist a provider credential, falling back to a mode-0600 private file
+/// when the OS keyring is unavailable (common on headless Linux).
+pub fn store_provider_secret(codex_home: &Path, profile: &str, secret: &str) -> Result<()> {
+    let name = provider_secret_name(profile)?;
+    let manager = SecretsManager::new(codex_home.to_path_buf(), SecretsBackendKind::Local);
+    match manager.set(&SecretScope::Global, &name, secret) {
+        Ok(()) => {
+            let fallback = provider_fallback_secret_path(codex_home, profile)?;
+            if fallback.exists() {
+                std::fs::remove_file(fallback)?;
+            }
+            Ok(())
+        }
+        Err(_) => write_private_secret(codex_home, profile, secret),
+    }
+}
+
+pub fn load_provider_secret(codex_home: &Path, profile: &str) -> Result<Option<String>> {
+    let name = provider_secret_name(profile)?;
+    let manager = SecretsManager::new(codex_home.to_path_buf(), SecretsBackendKind::Local);
+    if let Ok(Some(secret)) = manager.get(&SecretScope::Global, &name) {
+        return Ok(Some(secret));
+    }
+    let path = provider_fallback_secret_path(codex_home, profile)?;
+    match std::fs::read_to_string(path) {
+        Ok(secret) => Ok(Some(secret)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+pub fn delete_provider_secret(codex_home: &Path, profile: &str) -> Result<()> {
+    let name = provider_secret_name(profile)?;
+    let manager = SecretsManager::new(codex_home.to_path_buf(), SecretsBackendKind::Local);
+    let _ = manager.delete(&SecretScope::Global, &name);
+    let path = provider_fallback_secret_path(codex_home, profile)?;
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn provider_fallback_secret_path(codex_home: &Path, profile: &str) -> Result<PathBuf> {
+    let name = provider_secret_name(profile)?;
+    Ok(codex_home
+        .join("secrets")
+        .join(format!("{}.key", name.as_str().to_ascii_lowercase())))
+}
+
+fn write_private_secret(codex_home: &Path, profile: &str, secret: &str) -> Result<()> {
+    let path = provider_fallback_secret_path(codex_home, profile)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let temporary = path.with_extension("tmp");
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&temporary)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o600))?;
+    }
+    file.write_all(secret.as_bytes())?;
+    file.sync_all()?;
+    drop(file);
+    std::fs::rename(temporary, path)?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

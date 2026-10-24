@@ -164,6 +164,10 @@ enum Subcommand {
     /// Manage login.
     Login(LoginCommand),
 
+    /// Manage third-party model provider profiles.
+    #[clap(hide = true)]
+    Provider(ProviderCommand),
+
     /// Remove stored authentication credentials.
     Logout(LogoutCommand),
 
@@ -565,6 +569,25 @@ struct LoginCommand {
 enum LoginSubcommand {
     /// Show login status.
     Status,
+}
+
+#[derive(Debug, Parser)]
+struct ProviderCommand {
+    #[command(subcommand)]
+    action: ProviderSubcommand,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum ProviderSubcommand {
+    /// Internal: print a stored provider credential from stdin-compatible storage.
+    #[clap(hide = true)]
+    Token(ProviderTokenCommand),
+}
+
+#[derive(Debug, Parser)]
+struct ProviderTokenCommand {
+    #[arg(long)]
+    profile: String,
 }
 
 #[derive(Debug, Parser)]
@@ -1704,6 +1727,11 @@ async fn cli_main(
                 }
             }
         }
+        Some(Subcommand::Provider(command)) => match command.action {
+            ProviderSubcommand::Token(command) => {
+                run_provider_token(command)?;
+            }
+        },
         Some(Subcommand::Logout(mut logout_cli)) => {
             reject_remote_mode_for_subcommand(
                 root_remote.as_deref(),
@@ -2042,6 +2070,14 @@ fn loader_overrides_for_profile(
     }
 }
 
+fn run_provider_token(command: ProviderTokenCommand) -> anyhow::Result<()> {
+    let codex_home = find_codex_home()?;
+    let token = codex_secrets::load_provider_secret(&codex_home, &command.profile)?
+        .ok_or_else(|| anyhow::anyhow!("provider credential is not configured"))?;
+    println!("{token}");
+    Ok(())
+}
+
 fn loader_overrides_for_profile_at_codex_home(
     profile_v2: Option<&ProfileV2Name>,
     codex_home: &std::path::Path,
@@ -2376,6 +2412,7 @@ fn unsupported_subcommand_name_for_strict_config(
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         Some(Subcommand::App(_)) => Some("app"),
         Some(Subcommand::Login(_)) => Some("login"),
+        Some(Subcommand::Provider(_)) => Some("provider"),
         Some(Subcommand::Logout(_)) => Some("logout"),
         Some(Subcommand::Completion(_)) => Some("completion"),
         Some(Subcommand::Update) => Some("update"),

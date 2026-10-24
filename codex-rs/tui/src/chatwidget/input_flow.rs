@@ -34,7 +34,9 @@ impl ChatWidget {
                 | SlashCommand::Config
                 | SlashCommand::Title
                 | SlashCommand::Statusline
-                | SlashCommand::Theme,
+                | SlashCommand::Theme
+                | SlashCommand::Language
+                | SlashCommand::Provider,
             ) => false,
             InputResult::Command(_)
             | InputResult::ServiceTierCommand(_)

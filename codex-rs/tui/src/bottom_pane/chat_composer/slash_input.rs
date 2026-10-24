@@ -182,6 +182,7 @@ impl<'a> SlashInput<'a> {
                 worktrees_enabled: self.command_flags.worktrees_enabled,
                 windows_degraded_sandbox_active: self.command_flags.allow_elevate_sandbox,
                 side_conversation_active: self.command_flags.side_conversation_active,
+                language: self.command_flags.language,
             },
             self.service_tier_commands.to_vec(),
         );
@@ -208,8 +209,13 @@ pub(super) fn queued_input_action(
 }
 
 impl ChatComposer {
+    pub(crate) fn set_language(&mut self, language: codex_config::types::TuiLanguage) {
+        self.update_slash_command_catalog(|composer| composer.language = language);
+    }
+
     pub(super) fn builtin_command_flags(&self) -> BuiltinCommandFlags {
         BuiltinCommandFlags {
+            language: self.language,
             collaboration_modes_enabled: self.collaboration_modes_enabled,
             connectors_enabled: self.connectors_enabled,
             plugins_command_enabled: self.plugins_command_enabled,

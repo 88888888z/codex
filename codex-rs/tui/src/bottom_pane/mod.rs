@@ -160,6 +160,7 @@ mod mentions_v2;
 mod picker_presets;
 mod picker_rows;
 mod picker_style;
+pub(crate) mod provider_setup;
 mod shortcut_hud;
 mod shortcut_overlay;
 pub(crate) use picker_style::active_tab_style;
@@ -450,6 +451,11 @@ impl BottomPane {
         if let Some(status) = self.status.as_mut() {
             status.set_motion_preferences(tui);
         }
+        self.request_redraw();
+    }
+
+    pub(crate) fn set_language(&mut self, language: codex_config::types::TuiLanguage) {
+        self.composer.set_language(language);
         self.request_redraw();
     }
 

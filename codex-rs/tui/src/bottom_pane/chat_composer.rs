@@ -435,6 +435,7 @@ use crate::ui_consts::LIVE_PREFIX_COLS;
 #[cfg(test)]
 use codex_app_server_protocol::SkillInterface;
 use codex_app_server_protocol::SkillMetadata;
+use codex_config::types::TuiLanguage;
 use codex_connectors::AppInfo;
 use codex_file_search::FileMatch;
 #[cfg(test)]
@@ -545,6 +546,8 @@ fn parent_owned_command_is_allowed(command: SlashCommand, args: &str) -> bool {
                 | SlashCommand::Apps
                 | SlashCommand::Plugins
                 | SlashCommand::Rollout
+                | SlashCommand::Language
+                | SlashCommand::Provider
         )
 }
 
@@ -645,6 +648,7 @@ pub(crate) struct ChatComposer {
     collaboration_modes_enabled: bool,
     config: ChatComposerConfig,
     connectors_enabled: bool,
+    language: TuiLanguage,
     plugins_command_enabled: bool,
     token_activity_command_enabled: bool,
     service_tier_commands_enabled: bool,
@@ -819,6 +823,7 @@ impl ChatComposer {
             collaboration_modes_enabled: false,
             config,
             connectors_enabled: false,
+            language: TuiLanguage::English,
             plugins_command_enabled: false,
             token_activity_command_enabled: false,
             service_tier_commands_enabled: false,

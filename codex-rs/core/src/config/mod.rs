@@ -55,6 +55,7 @@ use codex_config::types::ToolSuggestConfig;
 use codex_config::types::ToolSuggestDisabledTool;
 use codex_config::types::ToolSuggestDiscoverable;
 use codex_config::types::TuiKeymap;
+use codex_config::types::TuiLanguage;
 use codex_config::types::TuiNotificationSettings;
 use codex_config::types::TuiPetAnchor;
 use codex_config::types::UriBasedFileOpener;
@@ -269,7 +270,7 @@ pub(crate) const DEFAULT_AGENT_MAX_DEPTH: i32 = 1;
 const LOCAL_DEV_BUILD_VERSION: &str = "0.0.0";
 
 pub const CONFIG_TOML_FILE: &str = "config.toml";
-const CONFIG_PROFILE_V2_SUFFIX: &str = ".config.toml";
+pub const CONFIG_PROFILE_V2_SUFFIX: &str = ".config.toml";
 
 fn resolve_sqlite_home_env(resolved_cwd: &Path) -> Option<AbsolutePathBuf> {
     let raw = std::env::var(codex_state::SQLITE_HOME_ENV).ok()?;
@@ -869,6 +870,9 @@ pub struct Config {
 
     /// Syntax highlighting theme override (kebab-case name).
     pub tui_theme: Option<String>,
+
+    /// Interface language for the terminal UI.
+    pub tui_language: TuiLanguage,
 
     /// Pet id preselected by the terminal pet picker.
     pub tui_pet: Option<String>,
@@ -4764,6 +4768,11 @@ impl Config {
                 .unwrap_or(true),
             tui_terminal_title: cfg.tui.as_ref().and_then(|t| t.terminal_title.clone()),
             tui_theme: cfg.tui.as_ref().and_then(|t| t.theme.clone()),
+            tui_language: cfg
+                .tui
+                .as_ref()
+                .map(|t| t.language)
+                .unwrap_or(TuiLanguage::Chinese),
             tui_pet: cfg.tui.as_ref().and_then(|t| t.pet.clone()),
             tui_pet_anchor: cfg
                 .tui

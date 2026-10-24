@@ -61,6 +61,12 @@ impl App {
                     | AppEvent::TerminalTitleSetupCancelled
                     | AppEvent::OpenConfigEditor(_)
                     | AppEvent::SyntaxThemeSelected { .. }
+                    | AppEvent::LanguageSelected { .. }
+                    | AppEvent::OpenProviderSetup { .. }
+                    | AppEvent::OpenProviderPresetPicker
+                    | AppEvent::SaveProviderProfile(_)
+                    | AppEvent::ActivateProviderProfile(_)
+                    | AppEvent::DeleteProviderProfile(_)
                     | AppEvent::SyntaxThemePreviewed
                     | AppEvent::OpenKeymapActionMenu { .. }
                     | AppEvent::OpenKeymapReplaceBindingMenu { .. }
@@ -3495,6 +3501,124 @@ impl App {
                         let message = format!("Failed to save theme: {err}");
                         self.chat_widget.report_config_save_error(message);
                     }
+                }
+            }
+            AppEvent::LanguageSelected { language } => {
+                let edit = crate::legacy_core::config::edit::tui_language_edit(language);
+                let apply_result = ConfigEditsBuilder::for_config_path(
+                    self.local_settings.user_config_path.as_path(),
+                )
+                .with_edits([edit])
+                .apply()
+                .await;
+                match apply_result {
+                    Ok(()) => {
+                        self.local_settings.tui.language = language;
+                        self.chat_widget.set_tui_language(language);
+                        self.chat_widget.refresh_config_panel(/*notice*/ None);
+                        tui.frame_requester().schedule_frame();
+                    }
+                    Err(err) => {
+                        tracing::error!(error = %err, "failed to persist language selection");
+                        self.app_event_tx.send(AppEvent::FollowTranscript);
+                        let message = format!("Failed to save language: {err}");
+                        self.chat_widget.report_config_save_error(message);
+                    }
+                }
+            }
+            AppEvent::OpenProviderSetup { preset } => {
+                self.chat_widget.open_provider_setup(preset);
+            }
+            AppEvent::OpenProviderPresetPicker => {
+                self.chat_widget.open_provider_preset_picker();
+            }
+            AppEvent::SaveProviderProfile(profile) => {
+                let codex_home = self.local_settings.codex_home.to_path_buf();
+                let base_config_path = codex_home.join(codex_config::CONFIG_TOML_FILE);
+                let save_result = match std::env::current_exe() {
+                    Ok(executable) => {
+                        crate::provider_profiles::save_profile(
+                            &codex_home,
+                            &profile,
+                            &executable,
+                            &base_config_path,
+                        )
+                        .await
+                        .map(|_| ())
+                    }
+                    Err(error) => Err(anyhow::Error::from(error)),
+                };
+                match save_result {
+                    Ok(()) => {
+                        self.loader_overrides.user_config_path = None;
+                        self.loader_overrides.user_config_profile = None;
+                        self.chat_widget.add_info_message(
+                            format!("已保存并切换到模型配置 `{}`。", profile.id),
+                            Some("当前会话将使用新配置重新开始。".to_string()),
+                        );
+                        self.start_fresh_session(
+                            tui,
+                            app_server,
+                            Some(ThreadStartSource::Clear),
+                            /*initial_user_message*/ None,
+                            /*new_thread_name*/ None,
+                        )
+                        .await;
+                    }
+                    Err(error) => {
+                        self.chat_widget
+                            .add_error_message(format!("保存模型配置失败：{error:#}"));
+                    }
+                }
+            }
+            AppEvent::ActivateProviderProfile(profile) => {
+                let codex_home = self.local_settings.codex_home.to_path_buf();
+                let base_config_path = codex_home.join(codex_config::CONFIG_TOML_FILE);
+                let activate_result = match std::env::current_exe() {
+                    Ok(executable) => crate::provider_profiles::activate_profile(
+                        &profile,
+                        &executable,
+                        &codex_home,
+                        &base_config_path,
+                    )
+                    .await,
+                    Err(error) => Err(anyhow::Error::from(error)),
+                };
+                match activate_result {
+                    Ok(()) => {
+                        self.loader_overrides.user_config_path = None;
+                        self.loader_overrides.user_config_profile = None;
+                        self.chat_widget.add_info_message(
+                            format!("已切换到模型配置 `{}`。", profile.id),
+                            Some("当前会话将使用新配置重新开始。".to_string()),
+                        );
+                        self.start_fresh_session(
+                            tui,
+                            app_server,
+                            Some(ThreadStartSource::Clear),
+                            /*initial_user_message*/ None,
+                            /*new_thread_name*/ None,
+                        )
+                        .await;
+                    }
+                    Err(error) => {
+                        self.chat_widget
+                            .add_error_message(format!("切换模型配置失败：{error:#}"));
+                    }
+                }
+            }
+            AppEvent::DeleteProviderProfile(profile) => {
+                match crate::provider_profiles::delete_profile(
+                    self.local_settings.codex_home.as_path(),
+                    &profile,
+                ) {
+                    Ok(()) => self.chat_widget.add_info_message(
+                        format!("已删除模型配置 `{}`。", profile.id),
+                        /*hint*/ None,
+                    ),
+                    Err(error) => self
+                        .chat_widget
+                        .add_error_message(format!("删除模型配置失败：{error:#}")),
                 }
             }
             AppEvent::SyntaxThemePreviewed => {

@@ -4,8 +4,101 @@
 //! orchestration module without changing their event wiring.
 
 use super::*;
+use codex_config::types::TuiLanguage;
 
 impl ChatWidget {
+    pub(super) fn open_language_picker(&mut self) {
+        let current = self.local_settings.tui.language;
+        let effective = crate::i18n::effective_language(current);
+        let title = crate::i18n::text(effective, "Select Interface Language", "选择界面语言");
+        let subtitle = crate::i18n::text(
+            effective,
+            "Changes apply immediately and are saved for future sessions.",
+            "切换后立即生效，并保存到后续会话。",
+        );
+        let auto_description =
+            crate::i18n::text(effective, "Follow the system locale", "跟随系统语言环境");
+        let chinese_description =
+            crate::i18n::text(effective, "Use Simplified Chinese", "使用简体中文");
+        let english_description = crate::i18n::text(effective, "Use English", "使用英文");
+        let items = vec![
+            SelectionItem {
+                name: crate::i18n::text(effective, "Auto", "自动").to_string(),
+                description: Some(auto_description.to_string()),
+                is_current: current == TuiLanguage::Auto,
+                dismiss_on_select: true,
+                actions: vec![Box::new(|tx| {
+                    tx.send(AppEvent::LanguageSelected {
+                        language: TuiLanguage::Auto,
+                    });
+                })],
+                ..Default::default()
+            },
+            SelectionItem {
+                name: "简体中文".to_string(),
+                description: Some(chinese_description.to_string()),
+                is_current: current == TuiLanguage::Chinese,
+                dismiss_on_select: true,
+                actions: vec![Box::new(|tx| {
+                    tx.send(AppEvent::LanguageSelected {
+                        language: TuiLanguage::Chinese,
+                    });
+                })],
+                ..Default::default()
+            },
+            SelectionItem {
+                name: "English".to_string(),
+                description: Some(english_description.to_string()),
+                is_current: current == TuiLanguage::English,
+                dismiss_on_select: true,
+                actions: vec![Box::new(|tx| {
+                    tx.send(AppEvent::LanguageSelected {
+                        language: TuiLanguage::English,
+                    });
+                })],
+                ..Default::default()
+            },
+        ];
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            title: Some(title.to_string()),
+            subtitle: Some(subtitle.to_string()),
+            items,
+            initial_selected_idx: Some(match current {
+                TuiLanguage::Auto => 0,
+                TuiLanguage::Chinese => 1,
+                TuiLanguage::English => 2,
+            }),
+            footer_hint: Some(Line::from(crate::i18n::text(
+                effective,
+                "↑/↓ select · Enter confirm · Esc cancel",
+                "↑/↓ 选择 · Enter 确认 · Esc 取消",
+            ))),
+            ..SelectionViewParams::picker()
+        });
+    }
+
+    pub(super) fn handle_language_command_args(&mut self, args: &str) {
+        let language = match args.trim().to_ascii_lowercase().as_str() {
+            "auto" => Some(TuiLanguage::Auto),
+            "zh" | "zh-cn" | "zh_cn" | "chinese" | "中文" => Some(TuiLanguage::Chinese),
+            "en" | "english" => Some(TuiLanguage::English),
+            _ => None,
+        };
+        if let Some(language) = language {
+            self.app_event_tx
+                .send(AppEvent::LanguageSelected { language });
+        } else {
+            self.add_error_message(
+                crate::i18n::text(
+                    self.local_settings.tui.language,
+                    "Usage: /language [auto|zh-CN|en]",
+                    "用法：/language [auto|zh-CN|en]",
+                )
+                .to_string(),
+            );
+        }
+    }
+
     pub(super) fn open_theme_picker(&mut self) {
         let codex_home = codex_utils_home_dir::find_codex_home().ok();
         let params = crate::theme_picker::build_theme_picker_params(

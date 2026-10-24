@@ -2,6 +2,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::WidgetRef;
 
+use codex_config::types::TuiLanguage;
+
 use super::picker_style::selection_style;
 use super::popup_consts::MAX_POPUP_ROWS;
 use super::scroll_state::ScrollState;
@@ -38,10 +40,12 @@ pub(crate) struct CommandPopup {
     side_conversation_active: bool,
     state: ScrollState,
     daybreak_command_description: Option<&'static str>,
+    language: TuiLanguage,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct CommandPopupFlags {
+    pub(crate) language: TuiLanguage,
     pub(crate) collaboration_modes_enabled: bool,
     pub(crate) connectors_enabled: bool,
     pub(crate) plugins_command_enabled: bool,
@@ -55,9 +59,29 @@ pub(crate) struct CommandPopupFlags {
     pub(crate) side_conversation_active: bool,
 }
 
+impl Default for CommandPopupFlags {
+    fn default() -> Self {
+        Self {
+            language: TuiLanguage::English,
+            collaboration_modes_enabled: false,
+            connectors_enabled: false,
+            plugins_command_enabled: false,
+            token_activity_command_enabled: false,
+            service_tier_commands_enabled: false,
+            daybreak_command_description: None,
+            goal_command_enabled: false,
+            voice_command_enabled: false,
+            worktrees_enabled: false,
+            windows_degraded_sandbox_active: false,
+            side_conversation_active: false,
+        }
+    }
+}
+
 impl From<CommandPopupFlags> for BuiltinCommandFlags {
     fn from(value: CommandPopupFlags) -> Self {
         Self {
+            language: value.language,
             collaboration_modes_enabled: value.collaboration_modes_enabled,
             connectors_enabled: value.connectors_enabled,
             plugins_command_enabled: value.plugins_command_enabled,
@@ -100,6 +124,7 @@ impl CommandPopup {
             side_conversation_active: flags.side_conversation_active,
             state: ScrollState::new(),
             daybreak_command_description: flags.daybreak_command_description,
+            language: flags.language,
         }
     }
 
@@ -227,9 +252,9 @@ impl CommandPopup {
                 let name = format!("/{}", item.command());
                 let description = if matches!(item, CommandItem::Builtin(SlashCommand::Daybreak)) {
                     self.daybreak_command_description
-                        .unwrap_or(item.description())
+                        .unwrap_or(item.description(self.language))
                 } else {
-                    item.description()
+                    item.description(self.language)
                 }
                 .to_string();
                 let unavailable = self.is_unavailable(&item);
@@ -307,9 +332,9 @@ impl CommandItem {
         }
     }
 
-    fn description(&self) -> &str {
+    fn description(&self, language: TuiLanguage) -> &str {
         match self {
-            Self::Builtin(cmd) => cmd.description(),
+            Self::Builtin(cmd) => cmd.description_for(language),
             Self::ServiceTier(command) => &command.description,
         }
     }
@@ -324,7 +349,7 @@ impl WidgetRef for CommandPopup {
             &rows,
             &self.state,
             MAX_POPUP_ROWS,
-            "no matches",
+            crate::i18n::text(self.language, "no matches", "没有匹配项"),
             COMMAND_COLUMN_WIDTH,
         );
     }
@@ -679,6 +704,7 @@ mod tests {
                 worktrees_enabled: true,
                 windows_degraded_sandbox_active: false,
                 side_conversation_active: false,
+                language: TuiLanguage::English,
             },
             Vec::new(),
         );

@@ -46,6 +46,8 @@ use std::sync::RwLock;
 use uuid::Uuid;
 
 use crate::LoginStatus;
+use crate::bottom_pane::provider_setup::ProviderSetupAction;
+use crate::bottom_pane::provider_setup::ProviderSetupForm;
 use crate::key_hint::KeyBinding;
 use crate::key_hint::KeyBindingListExt;
 use crate::motion::MotionMode;
@@ -54,6 +56,7 @@ use crate::onboarding::bedrock::BedrockState;
 use crate::onboarding::keys;
 use crate::onboarding::onboarding_screen::KeyboardHandler;
 use crate::onboarding::onboarding_screen::StepStateProvider;
+use crate::provider_profiles::ProviderPreset;
 use crate::terminal_hyperlinks::HyperlinkLine;
 use crate::terminal_hyperlinks::mark_buffer_hyperlinks;
 use crate::terminal_hyperlinks::visible_lines;
@@ -91,6 +94,11 @@ pub(crate) enum SignInState {
     ApiKeyConfigured,
     Bedrock(BedrockState),
     BedrockConfigured,
+    ProviderPresetPick {
+        selected: usize,
+    },
+    ProviderSetup(ProviderSetupForm),
+    ProviderConfigured,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -99,6 +107,7 @@ pub(crate) enum SignInOption {
     DeviceCode,
     ApiKey,
     Bedrock,
+    Provider,
 }
 
 const API_KEY_DISABLED_MESSAGE: &str = "API key login is disabled.";
@@ -182,6 +191,9 @@ impl ContinueWithDeviceCodeState {
 
 impl KeyboardHandler for AuthModeWidget {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        if self.handle_provider_key_event(&key_event) {
+            return;
+        }
         if self.handle_bedrock_key_event(&key_event) {
             return;
         }
@@ -243,6 +255,13 @@ impl KeyboardHandler for AuthModeWidget {
                 drop(sign_in_state);
                 let _ = self.handle_api_key_entry_paste(pasted);
             }
+            SignInState::ProviderSetup(_) => {
+                drop(sign_in_state);
+                let mut state = self.sign_in_state.write().unwrap();
+                if let SignInState::ProviderSetup(form) = &mut *state {
+                    form.handle_paste(pasted);
+                }
+            }
             _ => {}
         }
     }
@@ -265,6 +284,73 @@ pub(crate) struct AuthModeWidget {
 }
 
 impl AuthModeWidget {
+    fn handle_provider_key_event(&mut self, key_event: &KeyEvent) -> bool {
+        let action = {
+            let mut state = self.sign_in_state.write().unwrap();
+            match &mut *state {
+                SignInState::ProviderPresetPick { selected } => {
+                    if keys::CANCEL.is_pressed(*key_event) || key_event.code == KeyCode::Esc {
+                        *state = SignInState::PickMode;
+                    } else if keys::MOVE_UP.is_pressed(*key_event) {
+                        *selected = selected.saturating_sub(1);
+                    } else if keys::MOVE_DOWN.is_pressed(*key_event) {
+                        *selected = (*selected + 1).min(ProviderPreset::ALL.len() - 1);
+                    } else if keys::CONFIRM.is_pressed(*key_event) {
+                        let preset = ProviderPreset::ALL[*selected];
+                        *state = SignInState::ProviderSetup(ProviderSetupForm::new(preset));
+                    }
+                    ProviderSetupAction::None
+                }
+                SignInState::ProviderSetup(form) => form.handle_key_event(*key_event),
+                _ => return false,
+            }
+        };
+        match action {
+            ProviderSetupAction::None => {}
+            ProviderSetupAction::Cancelled => {
+                *self.sign_in_state.write().unwrap() =
+                    SignInState::ProviderPresetPick { selected: 0 };
+                self.set_error(/*message*/ None);
+            }
+            ProviderSetupAction::Save(profile) => self.save_provider_profile(profile),
+        }
+        self.request_frame.schedule_frame();
+        true
+    }
+
+    fn save_provider_profile(&self, profile: crate::provider_profiles::ProviderProfile) {
+        let sign_in_state = self.sign_in_state.clone();
+        let error = self.error.clone();
+        let request_frame = self.request_frame.clone();
+        tokio::spawn(async move {
+            let result = async {
+                let codex_home = codex_utils_home_dir::find_codex_home()?;
+                let base_config_path = codex_home.join(codex_config::CONFIG_TOML_FILE);
+                let executable = std::env::current_exe()?;
+                crate::provider_profiles::save_profile(
+                    &codex_home,
+                    &profile,
+                    &executable,
+                    &base_config_path,
+                )
+                .await
+            }
+            .await;
+            match result {
+                Ok(_) => {
+                    *error.write().unwrap() = None;
+                    *sign_in_state.write().unwrap() = SignInState::ProviderConfigured;
+                }
+                Err(err) => {
+                    *error.write().unwrap() = Some(format!("保存模型配置失败：{err:#}"));
+                    *sign_in_state.write().unwrap() =
+                        SignInState::ProviderPresetPick { selected: 0 };
+                }
+            }
+            request_frame.schedule_frame();
+        });
+    }
+
     pub(crate) fn set_animations_suppressed(&self, suppressed: bool) {
         self.animations_suppressed.set(suppressed);
     }
@@ -315,6 +401,7 @@ impl AuthModeWidget {
         self.sign_in_state.read().is_ok_and(|guard| match &*guard {
             SignInState::ApiKeyEntry(_) => true,
             SignInState::Bedrock(state) => state.is_text_entry_active(),
+            SignInState::ProviderSetup(_) => true,
             _ => false,
         })
     }
@@ -327,6 +414,7 @@ impl AuthModeWidget {
         self.sign_in_state.read().is_ok_and(|guard| match &*guard {
             SignInState::ApiKeyEntry(state) => !state.value.is_empty(),
             SignInState::Bedrock(state) => state.is_text_entry_active(),
+            SignInState::ProviderSetup(_) => true,
             _ => false,
         })
     }
@@ -350,7 +438,7 @@ impl AuthModeWidget {
     }
 
     fn displayed_sign_in_options(&self) -> Vec<SignInOption> {
-        let mut options = vec![SignInOption::ChatGpt];
+        let mut options = vec![SignInOption::Provider, SignInOption::ChatGpt];
         if self.is_chatgpt_login_allowed() {
             options.push(SignInOption::DeviceCode);
         }
@@ -364,7 +452,7 @@ impl AuthModeWidget {
     }
 
     fn selectable_sign_in_options(&self) -> Vec<SignInOption> {
-        let mut options = Vec::new();
+        let mut options = vec![SignInOption::Provider];
         if self.is_chatgpt_login_allowed() {
             options.push(SignInOption::ChatGpt);
             options.push(SignInOption::DeviceCode);
@@ -426,6 +514,12 @@ impl AuthModeWidget {
                     self.disallow_api_login();
                 }
             }
+            SignInOption::Provider => {
+                *self.sign_in_state.write().unwrap() =
+                    SignInState::ProviderPresetPick { selected: 0 };
+                self.set_error(/*message*/ None);
+                self.request_frame.schedule_frame();
+            }
         }
     }
 
@@ -436,19 +530,33 @@ impl AuthModeWidget {
         self.request_frame.schedule_frame();
     }
 
+    fn render_provider_presets(&self, area: Rect, buf: &mut Buffer, selected: usize) {
+        let mut lines = vec![Line::from("  选择模型服务".bold()), Line::from("")];
+        for (index, preset) in ProviderPreset::ALL.into_iter().enumerate() {
+            let current = index == selected;
+            lines.push(if current {
+                Line::from(format!("> {}  {}", preset.name(), preset.description())).cyan()
+            } else {
+                Line::from(format!("  {}  {}", preset.name(), preset.description()))
+            });
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from("  ↑/↓ 选择   Enter 下一步   Esc 返回").dim());
+        if let Some(error) = self.error_message() {
+            lines.push(Line::from(error).red());
+        }
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .render(area, buf);
+    }
+
     fn render_pick_mode(&self, area: Rect, buf: &mut Buffer) {
         let mut lines: Vec<Line> = if self.bedrock_setup_enabled {
-            vec!["  Choose how you want to use Codex.".into(), "".into()]
+            vec!["  选择 Codex 的使用方式。".into(), "".into()]
         } else {
             vec![
-                Line::from(vec![
-                    "  ".into(),
-                    "Sign in with ChatGPT to use Codex as part of your paid plan".into(),
-                ]),
-                Line::from(vec![
-                    "  ".into(),
-                    "or connect an API key for usage-based billing".into(),
-                ]),
+                Line::from(vec!["  ".into(), "登录 ChatGPT 使用订阅额度".into()]),
+                Line::from(vec!["  ".into(), "或配置第三方模型 API 与自有密钥".into()]),
                 "".into(),
             ]
         };
@@ -525,6 +633,14 @@ impl AuthModeWidget {
                         option,
                         "Use Amazon Bedrock",
                         "Connect using your AWS credentials",
+                    ));
+                }
+                SignInOption::Provider => {
+                    lines.extend(create_mode_item(
+                        idx,
+                        option,
+                        "配置第三方模型 API",
+                        "OpenAI 兼容、DeepSeek、OpenRouter、Ollama 等",
                     ));
                 }
             }
@@ -1050,10 +1166,13 @@ impl StepStateProvider for AuthModeWidget {
             | SignInState::ChatGptContinueInBrowser(_)
             | SignInState::ChatGptDeviceCode(_)
             | SignInState::ChatGptSuccessMessage
-            | SignInState::Bedrock(_) => StepState::InProgress,
+            | SignInState::Bedrock(_)
+            | SignInState::ProviderPresetPick { .. }
+            | SignInState::ProviderSetup(_) => StepState::InProgress,
             SignInState::ChatGptSuccess
             | SignInState::ApiKeyConfigured
-            | SignInState::BedrockConfigured => StepState::Complete,
+            | SignInState::BedrockConfigured
+            | SignInState::ProviderConfigured => StepState::Complete,
         }
     }
 }
@@ -1088,6 +1207,15 @@ impl WidgetRef for AuthModeWidget {
             }
             SignInState::BedrockConfigured => {
                 Paragraph::new("✓ Amazon Bedrock configured".green())
+                    .wrap(Wrap { trim: false })
+                    .render(area, buf);
+            }
+            SignInState::ProviderPresetPick { selected } => {
+                self.render_provider_presets(area, buf, *selected);
+            }
+            SignInState::ProviderSetup(form) => form.render(area, buf),
+            SignInState::ProviderConfigured => {
+                Paragraph::new("✓ 第三方模型服务已配置".green())
                     .wrap(Wrap { trim: false })
                     .render(area, buf);
             }

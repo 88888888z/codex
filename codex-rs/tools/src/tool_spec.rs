@@ -92,6 +92,37 @@ pub fn create_tools_json_for_responses_api(
     Ok(tools_json)
 }
 
+/// Returns function tools in the Chat Completions tool schema.
+///
+/// Responses-only tools such as web search and tool search are omitted because
+/// third-party Chat Completions providers do not expose an equivalent contract.
+pub fn create_tools_json_for_chat_completions_api(
+    tools: &[ToolSpec],
+) -> Result<Vec<Value>, serde_json::Error> {
+    Ok(create_tools_json_for_responses_api(tools)?
+        .into_iter()
+        .filter_map(|mut tool| {
+            if tool.get("type").and_then(Value::as_str) != Some("function") {
+                return None;
+            }
+            let object = tool.as_object_mut()?;
+            let name = object.remove("name")?.as_str()?.to_string();
+            object.remove("type");
+            if object.get("strict").and_then(Value::as_bool) == Some(false) {
+                object.remove("strict");
+            }
+            if name.is_empty() {
+                return None;
+            }
+            object.insert("name".to_string(), Value::String(name));
+            Some(serde_json::json!({
+                "type": "function",
+                "function": object,
+            }))
+        })
+        .collect())
+}
+
 pub fn create_tools_json_for_responses_lite(
     tools: &[ToolSpec],
 ) -> Result<Vec<Value>, serde_json::Error> {

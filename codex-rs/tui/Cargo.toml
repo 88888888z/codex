@@ -60,6 +60,7 @@ codex-realtime-webrtc = { workspace = true }
 futures = { workspace = true }
 codex-rollout = { workspace = true }
 codex-sandboxing = { workspace = true }
+codex-secrets = { workspace = true }
 codex-shell-command = { workspace = true }
 codex-state = { workspace = true }
 codex-terminal-detection = { workspace = true }

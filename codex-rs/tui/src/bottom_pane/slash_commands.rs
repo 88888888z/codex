@@ -5,6 +5,7 @@
 //! and ensures they stay in sync.
 use std::str::FromStr;
 
+use codex_config::types::TuiLanguage;
 use codex_utils_fuzzy_match::fuzzy_match;
 
 use crate::slash_command::SlashCommand;
@@ -53,8 +54,9 @@ impl SlashCommandItem {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct BuiltinCommandFlags {
+    pub(crate) language: TuiLanguage,
     pub(crate) collaboration_modes_enabled: bool,
     pub(crate) connectors_enabled: bool,
     pub(crate) plugins_command_enabled: bool,
@@ -66,6 +68,25 @@ pub(crate) struct BuiltinCommandFlags {
     pub(crate) worktrees_enabled: bool,
     pub(crate) allow_elevate_sandbox: bool,
     pub(crate) side_conversation_active: bool,
+}
+
+impl Default for BuiltinCommandFlags {
+    fn default() -> Self {
+        Self {
+            language: TuiLanguage::English,
+            collaboration_modes_enabled: false,
+            connectors_enabled: false,
+            plugins_command_enabled: false,
+            token_activity_command_enabled: false,
+            service_tier_commands_enabled: false,
+            daybreak_command_description: None,
+            goal_command_enabled: false,
+            voice_command_enabled: false,
+            worktrees_enabled: false,
+            allow_elevate_sandbox: false,
+            side_conversation_active: false,
+        }
+    }
 }
 
 /// Return the built-ins that should be visible/usable for the current input.
@@ -179,6 +200,7 @@ mod tests {
 
     fn all_enabled_flags() -> BuiltinCommandFlags {
         BuiltinCommandFlags {
+            language: TuiLanguage::English,
             collaboration_modes_enabled: true,
             connectors_enabled: true,
             plugins_command_enabled: true,
