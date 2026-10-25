@@ -293,10 +293,18 @@ impl ChatWidget {
         }
 
         if !RealtimeWebrtcSession::is_supported() {
-            self.add_error_message(
+            let supported_platform = cfg!(any(
+                target_os = "macos",
+                target_os = "linux",
+                all(windows, target_env = "msvc")
+            ));
+            self.add_error_message(if supported_platform {
+                "Voice runtime package is unavailable. Run an installed Codex package that contains codex-resources/voice."
+                    .to_string()
+            } else {
                 "Voice requires macOS, an MSVC-based Windows build, or a glibc-based Linux build."
-                    .to_string(),
-            );
+                    .to_string()
+            });
             return;
         }
 

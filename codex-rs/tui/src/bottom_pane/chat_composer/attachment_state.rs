@@ -14,6 +14,7 @@ use ratatui::text::Line;
 use super::InputResult;
 use crate::bottom_pane::LocalImageAttachment;
 use crate::bottom_pane::textarea::TextArea;
+use crate::clipboard_paste::normalize_pasted_path;
 use codex_protocol::models::local_image_label_text;
 use codex_protocol::user_input::TextElement;
 
@@ -84,9 +85,15 @@ impl AttachmentState {
             local_image_paths
                 .into_iter()
                 .enumerate()
-                .map(|(index, path)| AttachedImage {
-                    placeholder: local_image_label_text(self.remote_image_urls.len() + index + 1),
-                    path,
+                .map(|(index, path)| {
+                    let normalized = normalize_pasted_path(&path.to_string_lossy())
+                        .unwrap_or(path);
+                    AttachedImage {
+                        placeholder: local_image_label_text(
+                            self.remote_image_urls.len() + index + 1,
+                        ),
+                        path: normalized,
+                    }
                 }),
         );
         self.selected_remote_image_index = None;

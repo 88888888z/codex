@@ -163,8 +163,7 @@ impl App {
             KeyCode::Char('2') => WorkbenchView::Diff,
             KeyCode::Char('3') => WorkbenchView::Files,
             KeyCode::Char('4') => WorkbenchView::Sessions,
-            KeyCode::Char('5') => WorkbenchView::Agents,
-            KeyCode::Char('6') => WorkbenchView::Verify,
+            KeyCode::Char('5') => WorkbenchView::Verify,
             _ => return false,
         };
         self.activate_workbench_view(view);
@@ -415,17 +414,15 @@ enum WorkbenchView {
     Diff,
     Files,
     Sessions,
-    Agents,
     Verify,
 }
 
 impl WorkbenchView {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 5] = [
         Self::Chat,
         Self::Diff,
         Self::Files,
         Self::Sessions,
-        Self::Agents,
         Self::Verify,
     ];
 
@@ -436,7 +433,6 @@ impl WorkbenchView {
                 Self::Diff => "差异",
                 Self::Files => "文件",
                 Self::Sessions => "会话",
-                Self::Agents => "Agent",
                 Self::Verify => "验证",
             }
         } else {
@@ -445,7 +441,6 @@ impl WorkbenchView {
                 Self::Diff => "Diff",
                 Self::Files => "Files",
                 Self::Sessions => "Sessions",
-                Self::Agents => "Agents",
                 Self::Verify => "Verify",
             }
         }
@@ -457,8 +452,7 @@ impl WorkbenchView {
             Self::Diff => "Alt+2",
             Self::Files => "Alt+3",
             Self::Sessions => "Alt+4",
-            Self::Agents => "Alt+5",
-            Self::Verify => "Alt+6",
+            Self::Verify => "Alt+5",
         }
     }
 
@@ -468,7 +462,6 @@ impl WorkbenchView {
             Self::Diff => Some(SlashCommand::Diff),
             Self::Files => Some(SlashCommand::Files),
             Self::Sessions => Some(SlashCommand::Resume),
-            Self::Agents => Some(SlashCommand::Agents),
             Self::Verify => Some(SlashCommand::Verify),
         }
     }
