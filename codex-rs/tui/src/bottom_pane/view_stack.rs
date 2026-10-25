@@ -74,6 +74,7 @@ pub(crate) struct CenteredView<'a>(pub(crate) &'a dyn BottomPaneView);
 
 impl Renderable for CenteredView<'_> {
     fn render(&self, area: Rect, buf: &mut Buffer) {
+        crate::style::dim_backdrop(area, buf);
         let dialog = dialog_area(self.0, area);
         Clear.render(dialog, buf);
         // A dialog can cover cached blank cells whose color the terminal did not retain.

@@ -176,7 +176,9 @@ impl ChatWidget {
         self.bottom_pane.show_selection_view(SelectionViewParams {
             footer_note,
             items,
-            title: Some("Update Model Permissions".into()),
+            title: Some(
+                crate::i18n::ui_text("Update Model Permissions", "更新模型权限").into(),
+            ),
             ..SelectionViewParams::picker()
         });
     }
@@ -190,7 +192,10 @@ impl ChatWidget {
             return;
         }
         let Some(thread_id) = self.thread_id() else {
-            self.add_error_message("That thread is no longer available.".to_string());
+            self.add_error_message(
+                crate::i18n::ui_text("That thread is no longer available.", "该会话已不可用。")
+                    .to_string(),
+            );
             return;
         };
 
@@ -232,8 +237,16 @@ impl ChatWidget {
         self.bottom_pane.show_selection_view(SelectionViewParams {
             header: Box::new(
                 Paragraph::new(vec![
-                    Line::from("Auto-review Denials".bold()),
-                    Line::from("Select a denied action to approve.".dim()),
+                    Line::from(
+                        crate::i18n::ui_text("Auto-review Denials", "自动审查拒绝项").bold(),
+                    ),
+                    Line::from(
+                        crate::i18n::ui_text(
+                            "Select a denied action to approve.",
+                            "选择要批准的被拒操作。",
+                        )
+                        .dim(),
+                    ),
                 ])
                 .wrap(Wrap { trim: false }),
             ),
@@ -248,7 +261,13 @@ impl ChatWidget {
 
     pub(crate) fn approve_recent_auto_review_denial(&mut self, thread_id: ThreadId, id: String) {
         let Some(event) = self.review.recent_auto_review_denials.take(&id) else {
-            self.add_error_message("That auto-review denial is no longer available.".to_string());
+            self.add_error_message(
+                crate::i18n::ui_text(
+                    "That auto-review denial is no longer available.",
+                    "该自动审查拒绝项已不可用。",
+                )
+                .to_string(),
+            );
             return;
         };
 
@@ -436,7 +455,9 @@ impl ChatWidget {
                     && model.model_specialty.as_deref() == Some(MODEL_SPECIALTY_CYBER)
             })
         });
-        let title_line = Line::from("Enable full access?").bold();
+        let title_line = Line::from(
+            crate::i18n::ui_text("Enable full access?", "启用完全访问？").bold(),
+        );
         let info_lines = if is_cyber_model {
             let recommendation = if auto_review_available(&self.config) {
                 "We strongly recommend selecting \"Approve for me\" instead, and customizing the reviewer policy for your use case."

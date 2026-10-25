@@ -307,6 +307,9 @@ impl HistoryCell for ExecCell {
 
 impl ExecCell {
     fn output_ellipsis_text(omitted: usize) -> String {
+        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+            return format!("… +{omitted} 行（{}）", transcript_hint());
+        }
         let noun = if omitted == 1 { "line" } else { "lines" };
         format!("… +{omitted} {noun} ({})", transcript_hint())
     }
@@ -326,9 +329,9 @@ impl ExecCell {
                 },
                 " ".into(),
                 if self.is_active() {
-                    "Exploring".bold()
+                    crate::i18n::ui_text("Exploring", "正在探索").bold()
                 } else {
-                    "Explored".bold()
+                    crate::i18n::ui_text("Explored", "已探索").bold()
                 },
             ])
             .into(),
@@ -375,7 +378,7 @@ impl ExecCell {
                     })
                     .unique();
                 vec![(
-                    "Read",
+                    crate::i18n::ui_text("Read", "读取"),
                     Itertools::intersperse(names.into_iter().map(Into::into), ", ".dim()).collect(),
                 )]
             } else {
@@ -383,23 +386,36 @@ impl ExecCell {
                 for parsed in &call.parsed {
                     match parsed {
                         ParsedCommand::Read { name, .. } => {
-                            lines.push(("Read", vec![name.clone().into()]));
+                            lines.push((
+                                crate::i18n::ui_text("Read", "读取"),
+                                vec![name.clone().into()],
+                            ));
                         }
                         ParsedCommand::ListFiles { cmd, path } => {
-                            lines.push(("List", vec![path.clone().unwrap_or(cmd.clone()).into()]));
+                            lines.push((
+                                crate::i18n::ui_text("List", "列出"),
+                                vec![path.clone().unwrap_or(cmd.clone()).into()],
+                            ));
                         }
                         ParsedCommand::Search { cmd, query, path } => {
                             let spans = match (query, path) {
                                 (Some(q), Some(p)) => {
-                                    vec![q.clone().into(), " in ".dim(), p.clone().into()]
+                                    vec![
+                                        q.clone().into(),
+                                        crate::i18n::ui_text(" in ", " 在 ").dim(),
+                                        p.clone().into(),
+                                    ]
                                 }
                                 (Some(q), None) => vec![q.clone().into()],
                                 _ => vec![cmd.clone().into()],
                             };
-                            lines.push(("Search", spans));
+                            lines.push((crate::i18n::ui_text("Search", "搜索"), spans));
                         }
                         ParsedCommand::Unknown { cmd } => {
-                            lines.push(("Run", vec![cmd.clone().into()]));
+                            lines.push((
+                                crate::i18n::ui_text("Run", "运行"),
+                                vec![cmd.clone().into()],
+                            ));
                         }
                     }
                 }
@@ -412,7 +428,13 @@ impl ExecCell {
                     && index + 1 == line_count
                 {
                     // A compound command has one exit code, not an outcome for each parsed action.
-                    let status = if call.parsed.len() > 1 {
+                    let status = if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        if call.parsed.len() > 1 {
+                            format!("（命令退出码 {code}）")
+                        } else {
+                            format!("（退出码 {code}）")
+                        }
+                    } else if call.parsed.len() > 1 {
                         format!(" (command exit {code})")
                     } else {
                         format!(" (exit {code})")
@@ -473,11 +495,11 @@ impl ExecCell {
         let title = if is_interaction {
             ""
         } else if self.is_active() {
-            "Running"
+            crate::i18n::ui_text("Running", "运行中")
         } else if call.is_user_shell_command() {
-            "You ran"
+            crate::i18n::ui_text("You ran", "你运行了")
         } else {
-            "Ran"
+            crate::i18n::ui_text("Ran", "已运行")
         };
 
         let header_line = if is_interaction {
@@ -561,7 +583,10 @@ impl ExecCell {
             if !call.is_user_shell_command() {
                 let preview = output_preview_lines(output, layout.output_block.wrap_width(width));
                 let preview = if preview.is_empty() && !call.is_unified_exec_interaction() {
-                    vec![Line::from("(no output)".dim()).into()]
+                    vec![Line::from(
+                        crate::i18n::ui_text("(no output)", "（无输出）").dim(),
+                    )
+                    .into()]
                 } else {
                     preview
                 };
@@ -591,7 +616,10 @@ impl ExecCell {
             if raw_output.lines.is_empty() {
                 if !call.is_unified_exec_interaction() {
                     lines.extend(prefix_hyperlink_lines(
-                        vec![Line::from("(no output)".dim()).into()],
+                        vec![Line::from(
+                            crate::i18n::ui_text("(no output)", "（无输出）").dim(),
+                        )
+                        .into()],
                         Span::from(layout.output_block.initial_prefix).dim(),
                         Span::from(layout.output_block.subsequent_prefix),
                     ));

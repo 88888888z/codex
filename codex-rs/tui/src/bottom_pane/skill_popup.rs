@@ -166,6 +166,7 @@ impl SkillPopup {
                 GenericDisplayRow {
                     category_tag: mention.category_tag.clone(),
                     selection_style: Some(super::picker_style::selection_style()),
+                    selection_border: true,
                     name,
                     name_prefix_spans: vec![
                         if self.state.selected_idx == Some(visible_idx) {

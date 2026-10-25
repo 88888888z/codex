@@ -210,13 +210,19 @@ impl WidgetRef for &OssSelectionWidget<'_> {
         column.push(/*flex*/ 1, RenderableItem::Borrowed(&""));
         column.push(
             /*flex*/ 0,
-            Paragraph::new("Select an open-source provider".bold())
+            Paragraph::new(crate::i18n::ui_text("Select an open-source provider", "选择开源模型服务").bold())
                 .wrap(Wrap { trim: false })
                 .inset(Insets::vh(/*v*/ 0, /*h*/ 2)),
         );
         column.push(
             /*flex*/ 1,
-            Paragraph::new("Choose a local AI server for this session.".dim())
+            Paragraph::new(
+                crate::i18n::ui_text(
+                    "Choose a local AI server for this session.",
+                    "为当前会话选择本地 AI 服务。",
+                )
+                .dim(),
+            )
                 .wrap(Wrap { trim: false })
                 .inset(Insets::vh(/*v*/ 0, /*h*/ 2)),
         );
@@ -226,7 +232,10 @@ impl WidgetRef for &OssSelectionWidget<'_> {
             .zip(&self.provider_statuses)
             .map(|(option, status)| {
                 let (label, color) = match status {
-                    ProviderStatus::Running => ("● Running", Color::Green),
+                    ProviderStatus::Running => (
+                        crate::i18n::ui_text("● Running", "● 运行中"),
+                        Color::Green,
+                    ),
                     ProviderStatus::NotRunning => ("○ Not running", Color::Red),
                     ProviderStatus::Unknown => ("? Unknown", Color::Yellow),
                 };

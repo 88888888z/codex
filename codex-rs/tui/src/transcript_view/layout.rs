@@ -86,6 +86,16 @@ fn cell_content_layout(
             width,
         )
     };
+    if mode == HistoryRenderMode::Rich
+        && cell
+            .as_any()
+            .is::<crate::history_cell::UserHistoryCell>()
+    {
+        layout = layout.with_rounded_prompt_frame(
+            crate::style::history_prompt_style(),
+            crate::style::history_prompt_border_style(),
+        );
+    }
     if let Some(protocol) = presentation.image_protocol
         && let Some(path) = cell.image_path()
     {
@@ -94,10 +104,6 @@ fn cell_content_layout(
                 .map(Arc::new);
     }
     layout
-}
-
-fn is_rich_user_prompt(cell: &dyn HistoryCell, mode: HistoryRenderMode) -> bool {
-    mode == HistoryRenderMode::Rich && cell.as_any().is::<crate::history_cell::UserHistoryCell>()
 }
 
 #[derive(Default)]
@@ -128,7 +134,6 @@ struct CachedLayout {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct CellPresentation {
     separated: bool,
-    shares_prompt_background: bool,
     turn_tip_space: bool,
     expanded: bool,
     disclosure: bool,
@@ -152,7 +157,6 @@ impl TranscriptView {
         }
         CellPresentation {
             separated: false,
-            shares_prompt_background: false,
             turn_tip_space: false,
             expanded: disclosure && (full_content || manually_expanded),
             disclosure,
@@ -242,44 +246,10 @@ impl TranscriptView {
             .disclosure
             .keymap
             .primary_hint(KeymapContext::Global, "open_transcript");
-        let shares_prompt_background = is_rich_user_prompt(cell.as_ref(), mode)
-            && (0..index)
-                .rev()
-                .find(|&previous| {
-                    let previous = &cells[previous];
-                    let key = EntryKey::cell(previous);
-                    if let Some(layout) = self.search.match_layout(key).or_else(|| {
-                        self.snapshot()
-                            .and_then(|snapshot| snapshot.pinned.get(&key))
-                            .cloned()
-                    }) {
-                        return layout.row_count() > 0;
-                    }
-                    let previous_presentation =
-                        self.content_presentation(previous.as_ref(), self.detailed, mode);
-                    self.cache
-                        .has_visible_content(previous, width, previous_presentation, || {
-                            cell_content_layout(
-                                previous.as_ref(),
-                                width,
-                                mode,
-                                previous_presentation,
-                                shortcut,
-                            )
-                        })
-                })
-                .is_some_and(|previous| is_rich_user_prompt(cells[previous].as_ref(), mode));
-        presentation.separated =
-            index > 0 && !cell.is_stream_continuation() && !shares_prompt_background;
-        presentation.shares_prompt_background = shares_prompt_background;
+        presentation.separated = index > 0 && !cell.is_stream_continuation();
         presentation.turn_tip_space = self.turn_tip_key == Some(EntryKey::cell(cell));
         Some(self.cache.get(cell, width, presentation, || {
-            let mut layout =
-                cell_content_layout(cell.as_ref(), width, mode, presentation, shortcut);
-            if shares_prompt_background {
-                layout = layout.without_leading_blank_row();
-            }
-            layout
+            cell_content_layout(cell.as_ref(), width, mode, presentation, shortcut)
         }))
     }
 }

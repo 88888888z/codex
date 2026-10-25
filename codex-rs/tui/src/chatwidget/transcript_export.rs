@@ -9,8 +9,14 @@ impl ChatWidget {
         self.show_selection_view(SelectionViewParams {
             header: Box::new(
                 Paragraph::new(vec![
-                    Line::from("Export conversation".bold()),
-                    Line::from("Save the complete conversation as Markdown".dim()),
+                    Line::from(crate::i18n::ui_text("Export conversation", "导出对话").bold()),
+                    Line::from(
+                        crate::i18n::ui_text(
+                            "Save the complete conversation as Markdown",
+                            "将完整对话保存为 Markdown",
+                        )
+                        .dim(),
+                    ),
                 ])
                 .wrap(Wrap { trim: false }),
             ),

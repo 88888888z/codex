@@ -40,9 +40,25 @@ impl HistoryCell for UnifiedExecInteractionCell {
         let waited_only = self.stdin.is_empty();
 
         let mut header_spans = if waited_only {
-            vec!["• Waited for background terminal".bold()]
+            vec![
+                format!(
+                    "• {}",
+                    crate::i18n::ui_text(
+                        "Waited for background terminal",
+                        "等待后台终端"
+                    )
+                )
+                .bold(),
+            ]
         } else {
-            vec!["↳ ".dim(), "Interacted with background terminal".bold()]
+            vec![
+                "↳ ".dim(),
+                crate::i18n::ui_text(
+                    "Interacted with background terminal",
+                    "已与后台终端交互",
+                )
+                .bold(),
+            ]
         };
         if let Some(command) = &self.command_display
             && !command.is_empty()
@@ -83,10 +99,17 @@ impl HistoryCell for UnifiedExecInteractionCell {
                 .filter(|command| !command.is_empty())
             {
                 out.push(Line::from(format!(
-                    "Waited for background terminal: {command}"
+                    "{}: {command}",
+                    crate::i18n::ui_text(
+                        "Waited for background terminal",
+                        "等待后台终端"
+                    )
                 )));
             } else {
-                out.push(Line::from("Waited for background terminal"));
+                out.push(Line::from(crate::i18n::ui_text(
+                    "Waited for background terminal",
+                    "等待后台终端",
+                )));
             }
             return out;
         }
@@ -97,10 +120,17 @@ impl HistoryCell for UnifiedExecInteractionCell {
             .filter(|command| !command.is_empty())
         {
             out.push(Line::from(format!(
-                "Interacted with background terminal: {command}"
+                "{}: {command}",
+                crate::i18n::ui_text(
+                    "Interacted with background terminal",
+                    "已与后台终端交互"
+                )
             )));
         } else {
-            out.push(Line::from("Interacted with background terminal"));
+            out.push(Line::from(crate::i18n::ui_text(
+                "Interacted with background terminal",
+                "已与后台终端交互",
+            )));
         }
         out.extend(raw_lines_from_source(&self.stdin));
         out
@@ -140,11 +170,23 @@ impl HistoryCell for UnifiedExecProcessesCell {
         let wrap_width = width as usize;
         let max_processes = 16usize;
         let mut out: Vec<Line<'static>> = Vec::new();
-        out.push(vec!["Background terminals".bold()].into());
+        out.push(
+            vec![crate::i18n::ui_text("Background terminals", "后台终端").bold()].into(),
+        );
         out.push("".into());
 
         if self.processes.is_empty() {
-            out.push("  • No background terminals running.".italic().into());
+            out.push(
+                format!(
+                    "  • {}",
+                    crate::i18n::ui_text(
+                        "No background terminals running.",
+                        "没有正在运行的后台终端。"
+                    )
+                )
+                .italic()
+                .into(),
+            );
             return out;
         }
 

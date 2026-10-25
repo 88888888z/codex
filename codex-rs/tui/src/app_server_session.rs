@@ -2045,6 +2045,12 @@ fn config_request_overrides_from_config(
             overrides.insert(key.to_string(), serde_json::json!(effective[key]));
         }
     }
+    if matches!(thread_params_mode, ThreadParamsMode::Embedded)
+        && let Some(model_providers) = effective.get("model_providers")
+        && let Ok(model_providers) = serde_json::to_value(model_providers)
+    {
+        overrides.insert("model_providers".to_string(), model_providers);
+    }
     if is_launch("features.concurrent_reasoning_summaries") {
         overrides
             .entry("features".to_string())

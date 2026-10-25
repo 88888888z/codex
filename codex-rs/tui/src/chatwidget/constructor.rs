@@ -299,6 +299,13 @@ impl ChatWidget {
             test_codex_home: None,
         };
 
+        if let Some(context_window) = widget.config.model_context_window {
+            widget.bottom_pane.set_context_window(
+                Some(/*percent*/ 100),
+                Some(/*used*/ 0),
+                Some(context_window),
+            );
+        }
         widget.bottom_pane.set_mention_usage_home(
             widget.local_settings.codex_home.as_path(),
             widget.local_settings.history.persistence,

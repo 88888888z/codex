@@ -82,7 +82,13 @@ impl DynamicToolCallCell {
         data.interrupted = true;
         data.output
             .get_or_insert_with(Vec::new)
-            .push("Interrupted before this tool returned a result.".to_owned());
+            .push(
+                crate::i18n::ui_text(
+                    "Interrupted before this tool returned a result.",
+                    "工具尚未返回结果就被中断。",
+                )
+                .to_owned(),
+            );
     }
 }
 
@@ -138,12 +144,22 @@ impl DynamicToolCallData {
 
     fn header(&self) -> Line<'static> {
         let (marker, verb) = if self.interrupted {
-            ("•".red().bold(), "Interrupted")
+            (
+                "•".red().bold(),
+                crate::i18n::ui_text("Interrupted", "已中断"),
+            )
         } else {
             match self.status {
-                DynamicToolCallStatus::InProgress => ("•".dim(), "Calling"),
-                DynamicToolCallStatus::Completed => ("•".green(), "Called"),
-                DynamicToolCallStatus::Failed => ("•".red().bold(), "Failed"),
+                DynamicToolCallStatus::InProgress => {
+                    ("•".dim(), crate::i18n::ui_text("Calling", "调用中"))
+                }
+                DynamicToolCallStatus::Completed => {
+                    ("•".green(), crate::i18n::ui_text("Called", "已调用"))
+                }
+                DynamicToolCallStatus::Failed => (
+                    "•".red().bold(),
+                    crate::i18n::ui_text("Failed", "失败"),
+                ),
             }
         };
         let mut line = Line::from(vec![
@@ -161,13 +177,17 @@ impl DynamicToolCallData {
 
     fn output_lines(&self) -> Vec<Line<'static>> {
         match &self.output {
-            Some(output) if output.is_empty() => vec![Line::from("(no output)".dim())],
+            Some(output) if output.is_empty() => vec![Line::from(
+                crate::i18n::ui_text("(no output)", "（无输出）").dim(),
+            )],
             Some(output) => output
                 .iter()
                 .flat_map(|text| raw_lines_from_source(text))
                 .collect(),
             None if self.is_active() => Vec::new(),
-            None => vec![Line::from("(output unavailable)".dim())],
+            None => vec![Line::from(
+                crate::i18n::ui_text("(output unavailable)", "（输出不可用）").dim(),
+            )],
         }
     }
 }

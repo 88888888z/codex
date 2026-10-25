@@ -42,8 +42,10 @@ impl ChatWidget {
 
         SelectionViewParams {
             view_id: Some(USAGE_MENU_VIEW_ID),
-            title: Some("Usage".to_string()),
-            subtitle: Some("Account usage and resets.".to_string()),
+            title: Some(crate::i18n::ui_text("Usage", "用量").to_string()),
+            subtitle: Some(
+                crate::i18n::ui_text("Account usage and resets.", "账户用量与重置。").to_string(),
+            ),
             footer_hint: Some(usage_hint_line(&self.bottom_pane.list_keymap(), "open")),
             items: vec![
                 SelectionItem {
@@ -103,8 +105,16 @@ impl ChatWidget {
         self.pending_rate_limit_reset_request_id = Some(request_id);
         self.bottom_pane.show_selection_view(SelectionViewParams {
             view_id: Some(RATE_LIMIT_RESET_VIEW_ID),
-            title: Some("Usage limit resets".to_string()),
-            subtitle: Some("Checking your available resets...".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Usage limit resets", "用量限制重置").to_string(),
+            ),
+            subtitle: Some(
+                crate::i18n::ui_text(
+                    "Checking your available resets...",
+                    "正在检查可用重置次数…",
+                )
+                .to_string(),
+            ),
             items: vec![SelectionItem {
                 name: "Loading...".to_string(),
                 is_disabled: true,
@@ -202,7 +212,9 @@ impl ChatWidget {
         });
         SelectionViewParams {
             view_id: Some(RATE_LIMIT_RESET_VIEW_ID),
-            title: Some("Usage limit resets".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Usage limit resets", "用量限制重置").to_string(),
+            ),
             subtitle: Some(format!(
                 "{} {} available.",
                 reset_credits.available_count,
@@ -242,7 +254,7 @@ impl ChatWidget {
         );
         self.bottom_pane.show_selection_view(SelectionViewParams {
             view_id: Some(RATE_LIMIT_RESET_CONFIRMATION_VIEW_ID),
-            title: Some("Use this reset?".to_string()),
+            title: Some(crate::i18n::ui_text("Use this reset?", "使用这次重置？").to_string()),
             subtitle: Some(subtitle),
             footer_hint: Some(usage_hint_line(&self.bottom_pane.list_keymap(), "confirm")),
             items: vec![
@@ -290,7 +302,9 @@ impl ChatWidget {
     fn rate_limit_reset_message_params(message: &str) -> SelectionViewParams {
         SelectionViewParams {
             view_id: Some(RATE_LIMIT_RESET_VIEW_ID),
-            title: Some("Usage limit resets".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Usage limit resets", "用量限制重置").to_string(),
+            ),
             subtitle: Some(message.to_string()),
             items: vec![SelectionItem {
                 name: "Close".to_string(),
@@ -304,7 +318,9 @@ impl ChatWidget {
     fn reset_refresh_params(message: &str) -> SelectionViewParams {
         SelectionViewParams {
             view_id: Some(RATE_LIMIT_RESET_VIEW_ID),
-            title: Some("Usage limit resets".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Usage limit resets", "用量限制重置").to_string(),
+            ),
             subtitle: Some(message.to_string()),
             items: vec![
                 SelectionItem {
@@ -337,8 +353,12 @@ impl ChatWidget {
             .dismiss_view_by_id(RATE_LIMIT_RESET_VIEW_ID);
         self.bottom_pane.show_selection_view(SelectionViewParams {
             view_id: Some(RATE_LIMIT_RESET_VIEW_ID),
-            title: Some("Usage limit resets".to_string()),
-            subtitle: Some("Resetting your usage...".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Usage limit resets", "用量限制重置").to_string(),
+            ),
+            subtitle: Some(
+                crate::i18n::ui_text("Resetting your usage...", "正在重置用量…").to_string(),
+            ),
             items: vec![SelectionItem {
                 name: "Using a reset...".to_string(),
                 is_disabled: true,
@@ -402,8 +422,16 @@ impl ChatWidget {
                 self.pending_rate_limit_reset_idempotency_key = Some(idempotency_key.clone());
                 self.replace_rate_limit_reset_popup(SelectionViewParams {
                     view_id: Some(RATE_LIMIT_RESET_VIEW_ID),
-                    title: Some("Usage limit resets".to_string()),
-                    subtitle: Some("Couldn't reset usage. Please try again.".to_string()),
+                    title: Some(
+                        crate::i18n::ui_text("Usage limit resets", "用量限制重置").to_string(),
+                    ),
+                    subtitle: Some(
+                        crate::i18n::ui_text(
+                            "Couldn't reset usage. Please try again.",
+                            "无法重置用量，请重试。",
+                        )
+                        .to_string(),
+                    ),
                     items: vec![
                         SelectionItem {
                             name: "Try again".to_string(),
@@ -461,8 +489,16 @@ impl ChatWidget {
     fn rate_limit_reset_success_loading_params() -> SelectionViewParams {
         SelectionViewParams {
             view_id: Some(RATE_LIMIT_RESET_VIEW_ID),
-            title: Some("Usage limit resets".to_string()),
-            subtitle: Some("Usage reset. Checking your remaining resets...".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Usage limit resets", "用量限制重置").to_string(),
+            ),
+            subtitle: Some(
+                crate::i18n::ui_text(
+                    "Usage reset. Checking your remaining resets...",
+                    "用量已重置，正在检查剩余重置次数…",
+                )
+                .to_string(),
+            ),
             items: vec![SelectionItem {
                 name: "Refreshing...".to_string(),
                 is_disabled: true,

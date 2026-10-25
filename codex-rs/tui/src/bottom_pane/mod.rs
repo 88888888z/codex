@@ -195,8 +195,6 @@ mod feedback_view;
 mod hooks_browser_view;
 pub(crate) use feedback_view::FeedbackAudience;
 pub(crate) use feedback_view::feedback_classification;
-pub(crate) use feedback_view::feedback_disabled_params;
-pub(crate) use feedback_view::feedback_selection_params;
 pub(crate) use feedback_view::feedback_success_cell;
 pub(crate) use feedback_view::feedback_upload_consent_params;
 pub(crate) use skills_toggle_view::SkillsToggleItem;
@@ -339,6 +337,7 @@ pub(crate) struct BottomPane {
     pending_thread_approvals: PendingThreadApprovals,
     context_window_percent: Option<i64>,
     context_window_used_tokens: Option<i64>,
+    context_window_tokens: Option<i64>,
     keymap: RuntimeKeymap,
 }
 
@@ -428,6 +427,7 @@ impl BottomPane {
             effects,
             context_window_percent: None,
             context_window_used_tokens: None,
+            context_window_tokens: None,
             keymap,
         }
     }
@@ -1467,16 +1467,27 @@ impl BottomPane {
         }
     }
 
-    pub(crate) fn set_context_window(&mut self, percent: Option<i64>, used_tokens: Option<i64>) {
-        if self.context_window_percent == percent && self.context_window_used_tokens == used_tokens
+    pub(crate) fn set_context_window(
+        &mut self,
+        percent: Option<i64>,
+        used_tokens: Option<i64>,
+        context_window: Option<i64>,
+    ) {
+        if self.context_window_percent == percent
+            && self.context_window_used_tokens == used_tokens
+            && self.context_window_tokens == context_window
         {
             return;
         }
 
         self.context_window_percent = percent;
         self.context_window_used_tokens = used_tokens;
-        self.composer
-            .set_context_window(percent, self.context_window_used_tokens);
+        self.context_window_tokens = context_window;
+        self.composer.set_context_window(
+            percent,
+            self.context_window_used_tokens,
+            self.context_window_tokens,
+        );
         self.request_redraw();
     }
 

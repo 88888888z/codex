@@ -134,7 +134,11 @@ pub(super) async fn run_main_inner(
     }
 
     let mut launch_loader_overrides = loader_overrides.clone();
-    if let Some(profile_v2) = cli.config_profile_v2.as_ref() {
+    let active_profile = cli
+        .config_profile_v2
+        .clone()
+        .or_else(|| crate::provider_profiles::active_profile(codex_home.as_path()));
+    if let Some(profile_v2) = active_profile.as_ref() {
         let user_config_path = resolve_profile_v2_config_path(&codex_home, profile_v2);
         launch_loader_overrides.user_config_path = Some(user_config_path);
         launch_loader_overrides.user_config_profile = Some(profile_v2.clone());

@@ -81,20 +81,29 @@ impl MemoriesSettingsView {
             items: vec![
                 MemoriesMenuItem::Setting {
                     setting: MemoriesSetting::Use,
-                    name: "Use memories",
-                    description: "Use memories starting with the next thread",
+                    name: crate::i18n::ui_text("Use memories", "使用记忆"),
+                    description: crate::i18n::ui_text(
+                        "Use memories starting with the next thread",
+                        "从下一个会话开始使用记忆",
+                    ),
                     enabled: use_memories,
                 },
                 MemoriesMenuItem::Setting {
                     setting: MemoriesSetting::Generate,
-                    name: "Generate memories",
-                    description: "Generate memories from this thread and future threads",
+                    name: crate::i18n::ui_text("Generate memories", "生成记忆"),
+                    description: crate::i18n::ui_text(
+                        "Generate memories from this thread and future threads",
+                        "从当前及后续会话生成记忆",
+                    ),
                     enabled: generate_memories,
                 },
                 MemoriesMenuItem::Action {
                     action: MemoriesAction::Reset,
-                    name: "Reset all memories",
-                    description: "Clear local memory files and summaries without changing existing threads",
+                    name: crate::i18n::ui_text("Reset all memories", "重置全部记忆"),
+                    description: crate::i18n::ui_text(
+                        "Clear local memory files and summaries without changing existing threads",
+                        "清除本地记忆文件和摘要，不修改现有会话",
+                    ),
                 },
             ],
             state: ScrollState::new(),
@@ -102,7 +111,7 @@ impl MemoriesSettingsView {
             complete: false,
             app_event_tx,
             docs_link: Line::from(vec![
-                "Learn more: ".dim(),
+                crate::i18n::ui_text("Learn more: ", "了解更多：").dim(),
                 MEMORIES_DOC_URL
                     .fg(crate::style::accent_color())
                     .underlined(),
@@ -119,11 +128,17 @@ impl MemoriesSettingsView {
 
     fn settings_header(&self) -> ColumnRenderable<'_> {
         let mut header = ColumnRenderable::new();
-        header.push(Paragraph::new(Line::from("Memories".bold())).wrap(Wrap { trim: false }));
+        header.push(
+            Paragraph::new(Line::from(crate::i18n::ui_text("Memories", "记忆").bold()))
+                .wrap(Wrap { trim: false }),
+        );
         header.push(
             Paragraph::new(Line::from(
-                "Choose how Codex uses and creates memories. Changes are saved to config.toml"
-                    .dim(),
+                crate::i18n::ui_text(
+                    "Choose how Codex uses and creates memories. Changes are saved to config.toml",
+                    "选择 Codex 如何使用和生成记忆。更改会保存到 config.toml",
+                )
+                .dim(),
             ))
             .wrap(Wrap { trim: false }),
         );
@@ -133,12 +148,18 @@ impl MemoriesSettingsView {
     fn reset_confirmation_header(&self) -> ColumnRenderable<'_> {
         let mut header = ColumnRenderable::new();
         header.push(
-            Paragraph::new(Line::from("Reset all memories?".bold())).wrap(Wrap { trim: false }),
+            Paragraph::new(Line::from(
+                crate::i18n::ui_text("Reset all memories?", "重置全部记忆？").bold(),
+            ))
+            .wrap(Wrap { trim: false }),
         );
         header.push(
             Paragraph::new(Line::from(
-                "This clears local memory files and rollout summaries for the current Codex home."
-                    .dim(),
+                crate::i18n::ui_text(
+                    "This clears local memory files and rollout summaries for the current Codex home.",
+                    "这会清除当前 Codex 主目录中的本地记忆文件和会话摘要。",
+                )
+                .dim(),
             ))
             .wrap(Wrap { trim: false }),
         );
@@ -163,11 +184,15 @@ impl MemoriesSettingsView {
 
     fn build_rows(&self) -> Vec<GenericDisplayRow> {
         if let Some(state) = self.reset_confirmation.as_ref() {
-            return ["Reset all memories", "Go back"]
+            return [
+                crate::i18n::ui_text("Reset all memories", "重置全部记忆"),
+                crate::i18n::ui_text("Go back", "返回"),
+            ]
                 .into_iter()
                 .enumerate()
                 .map(|(idx, name)| GenericDisplayRow {
-                    selection_style: Some(super::picker_style::selection_style()),
+                    selection_style: None,
+                    selection_border: true,
                     wrap_indent: Some(2),
                     name: if state.selected_idx == Some(idx) {
                         format!("› {name}")
@@ -175,8 +200,16 @@ impl MemoriesSettingsView {
                         format!("  {name}")
                     },
                     description: Some(match idx {
-                        0 => "Delete local memory files and rollout summaries".to_string(),
-                        1 => "Return to memory settings".to_string(),
+                        0 => crate::i18n::ui_text(
+                            "Delete local memory files and rollout summaries",
+                            "删除本地记忆文件和会话摘要",
+                        )
+                        .to_string(),
+                        1 => crate::i18n::ui_text(
+                            "Return to memory settings",
+                            "返回记忆设置",
+                        )
+                        .to_string(),
                         _ => unreachable!("reset confirmation only renders two rows"),
                     }),
                     ..Default::default()
@@ -209,7 +242,8 @@ impl MemoriesSettingsView {
                     } => (format!("{prefix} {name}"), description),
                 };
                 GenericDisplayRow {
-                    selection_style: Some(super::picker_style::selection_style()),
+                    selection_style: None,
+                    selection_border: true,
                     wrap_indent: Some(if matches!(item, MemoriesMenuItem::Setting { .. }) {
                         6
                     } else {
@@ -406,7 +440,10 @@ impl Renderable for MemoriesSettingsView {
                 &rows,
                 self.active_state(),
                 MAX_POPUP_ROWS,
-                "  No memory settings available",
+                crate::i18n::ui_text(
+                    "  No memory settings available",
+                    "  没有可用的记忆设置",
+                ),
             );
         }
         if self.reset_confirmation.is_none() {
@@ -453,16 +490,19 @@ impl Renderable for MemoriesSettingsView {
 }
 
 fn memories_settings_hint_line(keymap: &ListKeymap) -> Line<'static> {
-    let mut spans = vec![key_hint::plain(KeyCode::Char(' ')).into(), " toggle".into()];
+    let mut spans = vec![
+        key_hint::plain(KeyCode::Char(' ')).into(),
+        crate::i18n::ui_text(" toggle", " 切换").into(),
+    ];
     if let Some(accept) = keymap.primary_hint(ListAction::Accept) {
         spans.push(" · ".into());
         spans.extend(accept.spans());
-        spans.push(" save/select".into());
+        spans.push(crate::i18n::ui_text(" save/select", " 保存/选择").into());
     }
     if let Some(cancel) = keymap.primary_hint(ListAction::Cancel) {
         spans.push(" · ".into());
         spans.extend(cancel.spans());
-        spans.push(" cancel".into());
+        spans.push(crate::i18n::ui_text(" cancel", " 取消").into());
     }
     Line::from(spans)
 }

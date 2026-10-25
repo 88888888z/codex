@@ -152,9 +152,9 @@ impl HookCell {
             {
                 message.to_string()
             } else if multiple {
-                "Running hooks".to_string()
+                crate::i18n::ui_text("Running hooks", "正在运行 Hooks").to_string()
             } else {
-                "Running hook".to_string()
+                crate::i18n::ui_text("Running hook", "正在运行 Hook").to_string()
             },
         )
     }

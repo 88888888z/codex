@@ -788,7 +788,16 @@ impl MultiSelectPickerBuilder {
                 )));
                 spans.push(" reorder".dim());
             }
-            for (action, label) in [(ListAction::Accept, "save"), (ListAction::Cancel, "cancel")] {
+            for (action, label) in [
+                (
+                    ListAction::Accept,
+                    crate::i18n::ui_text("save", "保存"),
+                ),
+                (
+                    ListAction::Cancel,
+                    crate::i18n::ui_text("cancel", "取消"),
+                ),
+            ] {
                 if let Some(hint) = self.keymap.primary_hint(action) {
                     spans.push(" · ".dim());
                     spans.extend(hint.spans());

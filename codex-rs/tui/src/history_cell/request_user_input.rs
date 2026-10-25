@@ -33,7 +33,13 @@ impl HistoryCell for RequestUserInputResultCell {
         let mut header = vec!["•".dim(), " ".into(), "Questions".bold()];
         header.push(format!(" {answered}/{total} answered").dim());
         if self.interrupted {
-            header.push(" (interrupted)".fg(accent_color()));
+            header.push(
+                format!(
+                    " {}",
+                    crate::i18n::ui_text("(interrupted)", "（已中断）")
+                )
+                .fg(accent_color()),
+            );
         }
 
         let mut lines = vec![HyperlinkLine::new(header.into())];
@@ -117,7 +123,11 @@ impl HistoryCell for RequestUserInputResultCell {
         }
 
         if self.interrupted && unanswered > 0 {
-            let summary = format!("interrupted with {unanswered} unanswered");
+            let summary = if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("已中断，{unanswered} 个问题未回答")
+            } else {
+                format!("interrupted with {unanswered} unanswered")
+            };
             lines.extend(wrap_with_prefix(
                 &summary,
                 width,
@@ -147,7 +157,10 @@ impl HistoryCell for RequestUserInputResultCell {
             .count();
         let mut lines = vec![Line::from(format!("Questions {answered}/{total} answered"))];
         if self.interrupted {
-            lines.push(Line::from("(interrupted)"));
+            lines.push(Line::from(crate::i18n::ui_text(
+                "(interrupted)",
+                "（已中断）",
+            )));
         }
         for question in &self.questions {
             lines.push(Line::from(question.question.clone()));
@@ -157,7 +170,10 @@ impl HistoryCell for RequestUserInputResultCell {
                 .filter(|answer| !answer.answers.is_empty())
             {
                 if question.is_secret {
-                    lines.push(Line::from("answer: ******"));
+                    lines.push(Line::from(format!(
+                        "{}: ******",
+                        crate::i18n::ui_text("answer", "回答")
+                    )));
                 } else {
                     let (options, note) = split_request_user_input_answer(answer);
                     lines.extend(
@@ -170,7 +186,10 @@ impl HistoryCell for RequestUserInputResultCell {
                     }
                 }
             } else {
-                lines.push(Line::from("(unanswered)"));
+                lines.push(Line::from(crate::i18n::ui_text(
+                    "(unanswered)",
+                    "（未回答）",
+                )));
             }
         }
         lines

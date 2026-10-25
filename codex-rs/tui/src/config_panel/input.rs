@@ -28,11 +28,11 @@ impl ConfigPanel {
         let tab = self
             .picker
             .active_tab_id()
-            .unwrap_or(ConfigSection::Appearance.title());
+            .unwrap_or_else(|| ConfigSection::Appearance.title_for(self.language));
         self.settings
             .iter()
             .enumerate()
-            .filter(|(_, setting)| setting.section.title() == tab)
+            .filter(|(_, setting)| setting.section.title_for(self.language) == tab)
             .nth(selected)
             .map(|(index, _)| index)
     }
@@ -97,12 +97,14 @@ impl BottomPaneView for ConfigPanel {
             notice: update.notice.clone(),
         };
         self.settings = settings(&update.tui, update.status);
+        self.language = update.tui.language;
         self.saving = false;
         self.picker = super::render::picker(
             &self.settings,
             self.app_event_tx.clone(),
             update.keymap.clone(),
             state,
+            self.language,
         );
         true
     }

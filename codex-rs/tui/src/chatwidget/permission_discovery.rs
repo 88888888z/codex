@@ -149,9 +149,15 @@ impl ChatWidget {
         }
         self.bottom_pane.show_selection_view(SelectionViewParams {
             view_id: Some(VIEW_ID),
-            title: Some("Update Model Permissions".into()),
+            title: Some(
+                crate::i18n::ui_text("Update Model Permissions", "更新模型权限").into(),
+            ),
             items: vec![SelectionItem {
-                name: "Loading permission profiles…".to_string(),
+                name: crate::i18n::ui_text(
+                    "Loading permission profiles…",
+                    "正在加载权限配置…",
+                )
+                .to_string(),
                 is_disabled: true,
                 ..Default::default()
             }],
@@ -218,7 +224,10 @@ impl ChatWidget {
                 let retry_args = self.pending_permission_profile_args().map(str::to_owned);
                 self.bottom_pane.show_selection_view(SelectionViewParams {
                     view_id: Some(VIEW_ID),
-                    title: Some("Update Model Permissions".to_string()),
+                    title: Some(
+                        crate::i18n::ui_text("Update Model Permissions", "更新模型权限")
+                            .to_string(),
+                    ),
                     subtitle: Some(message),
                     items: vec![SelectionItem {
                         name: "Retry".to_string(),

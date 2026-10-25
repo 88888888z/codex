@@ -874,6 +874,9 @@ pub struct Config {
     /// Interface language for the terminal UI.
     pub tui_language: TuiLanguage,
 
+    /// Last selected third-party model provider profile.
+    pub tui_provider_profile: Option<String>,
+
     /// Pet id preselected by the terminal pet picker.
     pub tui_pet: Option<String>,
 
@@ -4773,6 +4776,10 @@ impl Config {
                 .as_ref()
                 .map(|t| t.language)
                 .unwrap_or(TuiLanguage::Chinese),
+            tui_provider_profile: cfg
+                .tui
+                .as_ref()
+                .and_then(|tui| tui.provider_profile.clone()),
             tui_pet: cfg.tui.as_ref().and_then(|t| t.pet.clone()),
             tui_pet_anchor: cfg
                 .tui

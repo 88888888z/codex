@@ -409,13 +409,24 @@ impl StatusHistoryCell {
 
         vec![
             Span::from(total_fmt),
-            Span::from(" total "),
+            Span::from(format!(
+                " {} ",
+                crate::i18n::ui_text("total", "总计")
+            )),
             Span::from(" (").dim(),
             Span::from(input_fmt).dim(),
-            Span::from(" input").dim(),
+            Span::from(format!(
+                " {}",
+                crate::i18n::ui_text("input", "输入")
+            ))
+            .dim(),
             Span::from(" + ").dim(),
             Span::from(output_fmt).dim(),
-            Span::from(" output").dim(),
+            Span::from(format!(
+                " {}",
+                crate::i18n::ui_text("output", "输出")
+            ))
+            .dim(),
             Span::from(")").dim(),
         ]
     }
@@ -427,10 +438,14 @@ impl StatusHistoryCell {
         let window_fmt = format_tokens_compact(context.window);
 
         Some(vec![
-            Span::from(format!("{percent}% left")),
+            Span::from(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("剩余 {percent}%")
+            } else {
+                format!("{percent}% left")
+            }),
             Span::from(" (").dim(),
             Span::from(used_fmt).dim(),
-            Span::from(" used / ").dim(),
+            Span::from(crate::i18n::ui_text(" used / ", " 已用 / ")).dim(),
             Span::from(window_fmt).dim(),
             Span::from(")").dim(),
         ])
@@ -584,7 +599,11 @@ impl StatusHistoryCell {
         match &state.rate_limits {
             StatusRateLimitData::Available(rows) => {
                 if rows.is_empty() {
-                    push_label(labels, seen, "Limits");
+                    push_label(
+                        labels,
+                        seen,
+                        crate::i18n::ui_text("Limits", "额度"),
+                    );
                 } else {
                     for row in rows {
                         push_label(labels, seen, row.label.as_str());
@@ -595,10 +614,18 @@ impl StatusHistoryCell {
                 for row in rows {
                     push_label(labels, seen, row.label.as_str());
                 }
-                push_label(labels, seen, "Warning");
+                push_label(
+                    labels,
+                    seen,
+                    crate::i18n::ui_text("Warning", "警告"),
+                );
             }
-            StatusRateLimitData::Unavailable => push_label(labels, seen, "Limits"),
-            StatusRateLimitData::Missing => push_label(labels, seen, "Limits"),
+            StatusRateLimitData::Unavailable => {
+                push_label(labels, seen, crate::i18n::ui_text("Limits", "额度"))
+            }
+            StatusRateLimitData::Missing => {
+                push_label(labels, seen, crate::i18n::ui_text("Limits", "额度"))
+            }
         }
     }
 }
@@ -797,7 +824,10 @@ impl StatusHistoryCell {
 
         if let Some(remote_connection) = self.remote_connection.as_ref() {
             let value = if remote_connection.is_local_daemon {
-                Line::from("Local background server")
+                Line::from(crate::i18n::ui_text(
+                    "Local background server",
+                    "本地后台服务",
+                ))
             } else {
                 Line::from(vec![
                     Span::from(remote_connection.address.clone()),
@@ -809,7 +839,10 @@ impl StatusHistoryCell {
             let wrapped_remote = word_wrap_lines([value], RtOptions::new(value_width.max(1)));
             let mut wrapped_remote = wrapped_remote.into_iter();
             if let Some(first) = wrapped_remote.next() {
-                lines.push(formatter.line("Server", first.spans));
+                lines.push(formatter.line(
+                    crate::i18n::ui_text("Server", "服务器"),
+                    first.spans,
+                ));
                 lines.extend(wrapped_remote.map(|line| formatter.continuation(line.spans)));
             }
             lines.push(Line::from(Vec::<Span<'static>>::new()));
@@ -824,41 +857,74 @@ impl StatusHistoryCell {
 
         let directory_value = format_directory_display(&self.directory, /*max_width*/ None);
 
-        lines.push(formatter.line("Model", model_spans));
+        lines.push(formatter.line(crate::i18n::ui_text("Model", "模型"), model_spans));
         if let Some(model_provider) = self.model_provider.as_ref() {
-            lines.push(formatter.line("Model provider", vec![Span::from(model_provider.clone())]));
+            lines.push(formatter.line(
+                crate::i18n::ui_text("Model provider", "模型服务商"),
+                vec![Span::from(model_provider.clone())],
+            ));
         }
-        lines.push(formatter.line("Directory", vec![Span::from(directory_value)]));
-        lines.push(formatter.line("Permissions", vec![Span::from(self.permissions.clone())]));
-        lines.push(formatter.line("Agents.md", vec![Span::from(agents_summary)]));
+        lines.push(formatter.line(
+            crate::i18n::ui_text("Directory", "目录"),
+            vec![Span::from(directory_value)],
+        ));
+        lines.push(formatter.line(
+            crate::i18n::ui_text("Permissions", "权限"),
+            vec![Span::from(self.permissions.clone())],
+        ));
+        lines.push(formatter.line(
+            crate::i18n::ui_text("Agents.md", "Agents.md"),
+            vec![Span::from(agents_summary)],
+        ));
 
         if let Some(account_value) = account_value {
-            lines.push(formatter.line("Account", vec![Span::from(account_value)]));
+            lines.push(formatter.line(
+                crate::i18n::ui_text("Account", "账户"),
+                vec![Span::from(account_value)],
+            ));
         }
 
         if let Some(thread_name) = thread_name {
-            lines.push(formatter.line("Thread name", vec![Span::from(thread_name.to_string())]));
+            lines.push(formatter.line(
+                crate::i18n::ui_text("Thread name", "会话名称"),
+                vec![Span::from(thread_name.to_string())],
+            ));
         }
         if let Some(collab_mode) = self.collaboration_mode.as_ref() {
-            lines.push(formatter.line("Collaboration mode", vec![Span::from(collab_mode.clone())]));
+            lines.push(formatter.line(
+                crate::i18n::ui_text("Collaboration mode", "协作模式"),
+                vec![Span::from(collab_mode.clone())],
+            ));
         }
         if let Some(session) = self.session_id.as_ref() {
-            lines.push(formatter.line("Session", vec![Span::from(session.clone())]));
+            lines.push(formatter.line(
+                crate::i18n::ui_text("Session", "会话"),
+                vec![Span::from(session.clone())],
+            ));
         }
         if self.session_id.is_some()
             && let Some(forked_from) = self.forked_from.as_ref()
         {
-            lines.push(formatter.line("Forked from", vec![Span::from(forked_from.clone())]));
+            lines.push(formatter.line(
+                crate::i18n::ui_text("Forked from", "分叉自"),
+                vec![Span::from(forked_from.clone())],
+            ));
         }
 
         lines.push(Line::from(Vec::<Span<'static>>::new()));
         // Hide token usage only for ChatGPT subscribers
         if !matches!(self.account, Some(StatusAccountDisplay::ChatGpt { .. })) {
-            lines.push(formatter.line("Token usage", self.token_usage_spans()));
+            lines.push(formatter.line(
+                crate::i18n::ui_text("Token usage", "Token 用量"),
+                self.token_usage_spans(),
+            ));
         }
 
         if let Some(spans) = self.context_window_spans() {
-            lines.push(formatter.line("Context window", spans));
+            lines.push(formatter.line(
+                crate::i18n::ui_text("Context window", "上下文窗口"),
+                spans,
+            ));
         }
 
         lines.extend(self.rate_limit_lines(&rate_limit_state, available_width, &formatter));

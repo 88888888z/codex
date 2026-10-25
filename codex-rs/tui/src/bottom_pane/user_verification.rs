@@ -258,7 +258,7 @@ fn user_verification_options(keymap: &ApprovalKeymap) -> Vec<UserVerificationOpt
             shortcuts: keymap.approve.clone(),
         },
         UserVerificationOption {
-            label: "Cancel this request".to_string(),
+            label: crate::i18n::ui_text("Cancel this request", "取消此请求").to_string(),
             decision: UserVerificationDecision::Cancel,
             shortcuts: keymap.cancel.clone(),
         },
@@ -294,7 +294,12 @@ fn request_details(request: &UserVerificationRequest) -> Box<dyn Renderable> {
 
 fn waiting_view(request: &UserVerificationRequest, keymap: &ListKeymap) -> Box<dyn Renderable> {
     let mut view = ColumnRenderable::new();
-    view.push(Paragraph::new("Waiting for verification…".bold()).wrap(Wrap { trim: false }));
+    view.push(
+        Paragraph::new(
+            crate::i18n::ui_text("Waiting for verification…", "正在等待验证…").bold(),
+        )
+        .wrap(Wrap { trim: false }),
+    );
     view.push(Line::from(""));
     view.push(request_details(request));
     view.push(Line::from(""));

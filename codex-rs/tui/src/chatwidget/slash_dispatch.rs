@@ -225,19 +225,6 @@ impl ChatWidget {
                     enabled: !self.daybreak_enabled,
                 });
             }
-            SlashCommand::Feedback => {
-                if !self.config.feedback_enabled {
-                    let params = crate::bottom_pane::feedback_disabled_params();
-                    self.bottom_pane.show_selection_view(params);
-                    self.request_redraw();
-                    return;
-                }
-                // Step 1: pick a category (UI built in feedback_view)
-                let params =
-                    crate::bottom_pane::feedback_selection_params(self.app_event_tx.clone());
-                self.bottom_pane.show_selection_view(params);
-                self.request_redraw();
-            }
             SlashCommand::New => {
                 self.show_session_checkout_picker(ManagedWorktreeMode::New, /*name*/ None);
             }
@@ -925,7 +912,9 @@ impl ChatWidget {
             }
             SlashCommand::Cd => self.request_working_directory_change(trimmed),
             SlashCommand::Pwd => {
-                self.add_error_message("Usage: /pwd".to_string());
+                self.add_error_message(
+                    crate::i18n::ui_text("Usage: /pwd", "用法：/pwd").to_string(),
+                );
             }
             SlashCommand::Usage => {
                 if self.ensure_usage_command_available() {
@@ -949,7 +938,13 @@ impl ChatWidget {
                     thread_id: self.thread_id(),
                     control: crate::app_event::VoiceControl::Stop,
                 }),
-                _ => self.add_error_message("Usage: /voice [settings|mute|stop]".to_string()),
+                _ => self.add_error_message(
+                    crate::i18n::ui_text(
+                        "Usage: /voice [settings|mute|stop]",
+                        "用法：/voice [settings|mute|stop]",
+                    )
+                    .to_string(),
+                ),
             },
             SlashCommand::Ide => {
                 self.handle_ide_command_args(trimmed);
@@ -972,7 +967,13 @@ impl ChatWidget {
                         );
                     }
                 } else {
-                    self.add_error_message("Usage: /mcp [verbose | login <name>]".to_string());
+                    self.add_error_message(
+                        crate::i18n::ui_text(
+                            "Usage: /mcp [verbose | login <name>]",
+                            "用法：/mcp [verbose | login <name>]",
+                        )
+                        .to_string(),
+                    );
                 }
             }
             SlashCommand::Keymap => match trimmed.to_ascii_lowercase().as_str() {
@@ -988,7 +989,10 @@ impl ChatWidget {
                         }
                     }
                 }
-                _ => self.add_error_message("Usage: /keymap [debug]".to_string()),
+                _ => self.add_error_message(
+                    crate::i18n::ui_text("Usage: /keymap [debug]", "用法：/keymap [debug]")
+                        .to_string(),
+                ),
             },
             SlashCommand::Language => {
                 self.handle_language_command_args(trimmed);
@@ -1016,7 +1020,13 @@ impl ChatWidget {
                 self.session_telemetry
                     .counter("codex.thread.rename", /*inc*/ 1, &[]);
                 let Some(name) = normalize_thread_name(&args) else {
-                    self.add_error_message("Thread name cannot be empty.".to_string());
+                    self.add_error_message(
+                        crate::i18n::ui_text(
+                            "Thread name cannot be empty.",
+                            "会话名称不能为空。",
+                        )
+                        .to_string(),
+                    );
                     return;
                 };
                 self.app_event_tx.set_thread_name(name);
@@ -1420,8 +1430,7 @@ impl ChatWidget {
                     QueueDrain::Continue
                 }
             }
-            SlashCommand::Feedback
-            | SlashCommand::Warnings
+            SlashCommand::Warnings
             | SlashCommand::Export
             | SlashCommand::New
             | SlashCommand::Archive

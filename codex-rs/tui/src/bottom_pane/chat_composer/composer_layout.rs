@@ -106,7 +106,7 @@ impl ChatComposer {
         let voice_rows = voice_rows * u16::from(composer_rect.height >= voice_rows + 3);
         let mut textarea_rect = composer_rect.inset(Insets::tlbr(
             /*top*/ 1 + voice_rows,
-            LIVE_PREFIX_COLS,
+            LIVE_PREFIX_COLS + 1,
             /*bottom*/ 1,
             /*right*/ 1u16.saturating_add(options.textarea_right_reserve),
         ));
@@ -173,7 +173,7 @@ impl ChatComposer {
         options: ComposerRenderOptions<'_>,
     ) -> u16 {
         let footer_hint_height = self.footer_hint_height(width, options);
-        const COLS_WITH_MARGIN: u16 = LIVE_PREFIX_COLS + 1;
+        const COLS_WITH_MARGIN: u16 = LIVE_PREFIX_COLS + 2;
         let inner_width =
             width.saturating_sub(COLS_WITH_MARGIN.saturating_add(options.textarea_right_reserve));
         let remote_images_height: u16 = self

@@ -104,7 +104,17 @@ impl HistoryCell for PatchFailureCell {
     }
 
     fn transcript_hyperlink_lines(&self, width: u16) -> Vec<HyperlinkLine> {
-        let mut lines = vec![Line::from("✘ Failed to apply patch".magenta().bold()).into()];
+        let mut lines = vec![
+            Line::from(
+                format!(
+                    "✘ {}",
+                    crate::i18n::ui_text("Failed to apply patch", "应用补丁失败")
+                )
+                .magenta()
+                .bold(),
+            )
+            .into(),
+        ];
         let error = if self.stderr.trim().is_empty() {
             "(error details unavailable)"
         } else {
@@ -126,7 +136,10 @@ impl HistoryCell for PatchFailureCell {
     }
 
     fn raw_lines(&self) -> Vec<Line<'static>> {
-        let mut lines = vec![Line::from("Failed to apply patch")];
+        let mut lines = vec![Line::from(crate::i18n::ui_text(
+            "Failed to apply patch",
+            "应用补丁失败",
+        ))];
         lines.extend(plain_lines(ansi_escape(&self.stderr).lines));
         lines
     }
@@ -135,7 +148,16 @@ impl HistoryCell for PatchFailureCell {
         let mut lines: Vec<Line<'static>> = Vec::new();
 
         // Failure title
-        lines.push(Line::from("✘ Failed to apply patch".magenta().bold()));
+        lines.push(
+            Line::from(
+                format!(
+                    "✘ {}",
+                    crate::i18n::ui_text("Failed to apply patch", "应用补丁失败")
+                )
+                .magenta()
+                .bold(),
+            ),
+        );
 
         if !self.stderr.trim().is_empty() {
             let output = output_lines(

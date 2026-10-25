@@ -25,6 +25,7 @@ fn experimental_features_keep_following_choice_at_wrap_boundary() {
         /*catalog_rx*/ None,
         AppEventSender::new(app_tx),
         crate::keymap::RuntimeKeymap::defaults().list,
+        codex_config::types::TuiLanguage::English,
     );
 
     let mut snapshots = Vec::new();
@@ -68,6 +69,7 @@ fn experimental_features_display_metadata() {
             /*catalog_rx*/ None,
             AppEventSender::new(app_tx),
             crate::keymap::RuntimeKeymap::defaults().list,
+            codex_config::types::TuiLanguage::English,
         );
         snapshot_view(&format!("experimental_features_{}", feature.key()), &view);
     }
@@ -95,6 +97,7 @@ fn experimental_features_discovery_preserves_server_order_and_accepts_new_keys()
         Some(catalog_rx),
         AppEventSender::new(app_tx),
         crate::keymap::RuntimeKeymap::defaults().list,
+        codex_config::types::TuiLanguage::English,
     );
     view.toggle_selected();
     let mut stable = server_feature("stable_feature");
@@ -224,6 +227,7 @@ fn experimental_features_empty_error_and_cancel_remain_usable() {
             Some(catalog_rx),
             AppEventSender::new(app_tx),
             crate::keymap::RuntimeKeymap::defaults().list,
+            codex_config::types::TuiLanguage::English,
         );
         assert!(view.next_frame_delay().is_some());
         catalog_tx.send(result).unwrap();
@@ -250,6 +254,7 @@ fn experimental_features_empty_error_and_cancel_remain_usable() {
         Some(catalog_rx),
         AppEventSender::new(app_tx),
         crate::keymap::RuntimeKeymap::defaults().list,
+        codex_config::types::TuiLanguage::English,
     );
     drop(view);
     assert!(catalog_tx.send(Ok(Vec::new())).is_err());

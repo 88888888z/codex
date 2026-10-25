@@ -43,13 +43,22 @@ pub(crate) fn historical_tool_fallback(item: &ThreadItem) -> Option<PlainHistory
             || replay_command_args(command).is_none() =>
         {
             let status_label = match status {
-                CommandExecutionStatus::InProgress => "In progress at last update",
-                CommandExecutionStatus::Completed => "Completed",
-                CommandExecutionStatus::Failed => "Failed",
-                CommandExecutionStatus::Declined => "Declined",
+                CommandExecutionStatus::InProgress => {
+                    crate::i18n::ui_text("In progress at last update", "上次更新时仍在运行")
+                }
+                CommandExecutionStatus::Completed => {
+                    crate::i18n::ui_text("Completed", "已完成")
+                }
+                CommandExecutionStatus::Failed => crate::i18n::ui_text("Failed", "失败"),
+                CommandExecutionStatus::Declined => {
+                    crate::i18n::ui_text("Declined", "已拒绝")
+                }
             };
             let mut status_line = if *source == CommandExecutionSource::UnifiedExecInteraction {
-                format!("Terminal interaction · {status_label}")
+                format!(
+                    "{} · {status_label}",
+                    crate::i18n::ui_text("Terminal interaction", "终端交互")
+                )
             } else {
                 status_label.to_string()
             };
@@ -58,7 +67,10 @@ pub(crate) fn historical_tool_fallback(item: &ThreadItem) -> Option<PlainHistory
                 CommandExecutionStatus::Completed | CommandExecutionStatus::Failed
             ) && let Some(code) = exit_code
             {
-                status_line.push_str(&format!(" · exit {code}"));
+                status_line.push_str(&format!(
+                    " · {}{code}",
+                    crate::i18n::ui_text("exit ", "退出码 ")
+                ));
             }
             let mut lines: Vec<Line<'static>> = vec![
                 vec!["$ ".dim(), command.clone().into()].into(),
@@ -82,9 +94,15 @@ pub(crate) fn historical_tool_fallback(item: &ThreadItem) -> Option<PlainHistory
             ..
         } if *status == McpToolCallStatus::InProgress || (result.is_none() && error.is_none()) => {
             let status = match status {
-                McpToolCallStatus::InProgress => "In progress at last update",
-                McpToolCallStatus::Completed => "Completed · result unavailable",
-                McpToolCallStatus::Failed => "Failed · result unavailable",
+                McpToolCallStatus::InProgress => {
+                    crate::i18n::ui_text("In progress at last update", "上次更新时仍在运行")
+                }
+                McpToolCallStatus::Completed => {
+                    crate::i18n::ui_text("Completed · result unavailable", "已完成 · 结果不可用")
+                }
+                McpToolCallStatus::Failed => {
+                    crate::i18n::ui_text("Failed · result unavailable", "失败 · 结果不可用")
+                }
             };
             vec![format!("mcp tool: {server}/{tool} · {status}").dim().into()]
         }
@@ -99,10 +117,16 @@ pub(crate) fn historical_tool_fallback(item: &ThreadItem) -> Option<PlainHistory
             ..
         } if *status != CollabAgentToolCallStatus::Completed => {
             let status = match status {
-                CollabAgentToolCallStatus::InProgress => "In progress at last update",
-                CollabAgentToolCallStatus::Failed => "Failed",
-                CollabAgentToolCallStatus::Interrupted => "Interrupted",
-                CollabAgentToolCallStatus::Completed => "Completed",
+                CollabAgentToolCallStatus::InProgress => {
+                    crate::i18n::ui_text("In progress at last update", "上次更新时仍在运行")
+                }
+                CollabAgentToolCallStatus::Failed => crate::i18n::ui_text("Failed", "失败"),
+                CollabAgentToolCallStatus::Interrupted => {
+                    crate::i18n::ui_text("Interrupted", "已中断")
+                }
+                CollabAgentToolCallStatus::Completed => {
+                    crate::i18n::ui_text("Completed", "已完成")
+                }
             };
             vec![format!("agent tool: {tool:?} · {status}").dim().into()]
         }

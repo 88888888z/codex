@@ -56,6 +56,7 @@ pub(super) async fn load(
         AbsolutePathBuf::from_absolute_path(codex_home)?,
     )
     .map_err(io::Error::other)?;
+    crate::i18n::set_current_language(local_settings.tui.language);
     let settings = &local_settings.tui;
     // Terminal probing happens after configuration loads; startup finalizes this before painting.
     let use_alt_screen = crate::determine_alt_screen_mode(

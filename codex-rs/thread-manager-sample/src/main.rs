@@ -305,6 +305,7 @@ async fn new_config(
         tui_terminal_title: None,
         tui_theme: None,
         tui_language: codex_config::types::TuiLanguage::Chinese,
+        tui_provider_profile: None,
         tui_raw_output_mode: false,
         tui_pet: None,
         tui_pet_anchor: TuiPetAnchor::Composer,

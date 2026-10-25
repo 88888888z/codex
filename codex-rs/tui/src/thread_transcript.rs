@@ -115,7 +115,13 @@ pub(crate) fn thread_to_transcript_cells(
         .collect::<TranscriptCells>();
     if cells.is_empty() {
         cells.push(Arc::new(PlainHistoryCell::new(vec![
-            "No transcript content available".italic().dim().into(),
+            crate::i18n::ui_text(
+                "No transcript content available",
+                "没有可显示的对话内容",
+            )
+            .italic()
+            .dim()
+            .into(),
         ])));
     }
     cells

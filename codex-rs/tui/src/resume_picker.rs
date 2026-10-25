@@ -161,8 +161,12 @@ pub enum SessionPickerLaunchContext {
 impl SessionPickerAction {
     fn title(self) -> &'static str {
         match self {
-            SessionPickerAction::Resume => "Resume a previous session",
-            SessionPickerAction::Fork => "Fork a previous session",
+            SessionPickerAction::Resume => {
+                crate::i18n::ui_text("Resume a previous session", "恢复以前的会话")
+            }
+            SessionPickerAction::Fork => {
+                crate::i18n::ui_text("Fork a previous session", "分叉以前的会话")
+            }
         }
     }
 
@@ -1258,7 +1262,13 @@ impl PickerState {
             return;
         };
         let Some(thread_id) = row.thread_id else {
-            self.inline_error = Some("No transcript available for this session".to_string());
+            self.inline_error = Some(
+                crate::i18n::ui_text(
+                    "No transcript available for this session",
+                    "此会话没有可用的对话记录",
+                )
+                .to_string(),
+            );
             self.request_frame();
             return;
         };
@@ -1612,7 +1622,13 @@ impl PickerState {
                         self.pending_page_down_target = None;
                         self.frozen_footer_percent = None;
                         self.search_state = SearchState::Idle;
-                        self.inline_error = Some("Could not load more sessions".to_string());
+                        self.inline_error = Some(
+                            crate::i18n::ui_text(
+                                "Could not load more sessions",
+                                "无法加载更多会话",
+                            )
+                            .to_string(),
+                        );
                         self.request_frame();
                         return Ok(None);
                     }
@@ -1655,7 +1671,13 @@ impl PickerState {
                         self.pending_transcript_cancellation = None;
                         self.pending_transcript_open = None;
                         self.transcript_loading_frame_shown = false;
-                        self.inline_error = Some("Could not load transcript preview".to_string());
+                        self.inline_error = Some(
+                            crate::i18n::ui_text(
+                                "Could not load transcript preview",
+                                "无法加载对话预览",
+                            )
+                            .to_string(),
+                        );
                     }
                     self.request_frame();
                 }
@@ -3696,7 +3718,12 @@ fn render_empty_state_line(state: &PickerState) -> Line<'static> {
         .into();
     }
 
-    vec!["No sessions yet".set_style(secondary_text_style()).italic()].into()
+    vec![
+        crate::i18n::ui_text("No sessions yet", "还没有会话")
+            .set_style(secondary_text_style())
+            .italic(),
+    ]
+    .into()
 }
 
 #[cfg(test)]

@@ -77,7 +77,6 @@ pub enum SlashCommand {
     Logout,
     Quit,
     Exit,
-    Feedback,
     Rollout,
     Ps,
     #[strum(to_string = "stop", serialize = "clean")]
@@ -104,7 +103,6 @@ impl SlashCommand {
         if i18n::is_chinese(language) {
             return match self {
                 SlashCommand::Config => "配置 Codex 偏好",
-                SlashCommand::Feedback => "向维护者发送日志",
                 SlashCommand::New => "在当前对话中开始新对话",
                 SlashCommand::Init => "创建包含 Codex 指令的 AGENTS.md",
                 SlashCommand::Compact => "压缩对话，避免超出上下文限制",
@@ -144,7 +142,7 @@ impl SlashCommand {
                 SlashCommand::Ps => "列出后台终端",
                 SlashCommand::Stop => "停止所有后台终端",
                 SlashCommand::MemoryDrop | SlashCommand::MemoryUpdate => "请勿使用",
-                SlashCommand::Model => "选择模型和推理强度",
+                SlashCommand::Model => "选择模型和思考强度",
                 SlashCommand::Presets => "运行或保存可复用的提示词和斜杠命令",
                 SlashCommand::Daybreak => "开启或关闭 Daybreak",
                 SlashCommand::Ide => "引入 IDE 中的选区、打开文件和其他上下文",
@@ -171,7 +169,6 @@ impl SlashCommand {
         }
         match self {
             SlashCommand::Config => "configure Codex preferences",
-            SlashCommand::Feedback => "send logs to maintainers",
             SlashCommand::New => "start a new chat during a conversation",
             SlashCommand::Init => "create an AGENTS.md file with instructions for Codex",
             SlashCommand::Compact => "summarize conversation to prevent hitting the context limit",
@@ -386,7 +383,6 @@ impl SlashCommand {
             | SlashCommand::Title
             | SlashCommand::Statusline
             | SlashCommand::AutoReview
-            | SlashCommand::Feedback
             | SlashCommand::Ide
             | SlashCommand::Language
             | SlashCommand::Provider

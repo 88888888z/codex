@@ -380,7 +380,7 @@ impl ChatWidget {
                     ),
                     TurnAbortReason::Interrupted => PlainHistoryCell::new(vec![
                         Line::from(
-                            "■ Conversation interrupted - use /feedback if something went wrong",
+                            "■ Conversation interrupted",
                         )
                         .style(crate::style::secondary_text_style()),
                     ]),

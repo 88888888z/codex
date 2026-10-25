@@ -10,14 +10,43 @@ impl ChatWidget {
     pub(crate) fn open_provider_menu(&mut self) {
         let profiles = list_profiles(self.local_settings.codex_home.as_path());
         let profile_count = profiles.len();
+        let selected_profile_id = self.local_settings.tui.provider_profile.as_deref();
+        let matched_profile = selected_profile_id
+            .and_then(|id| {
+                profiles.iter().find(|profile| {
+                    profile.id == id
+                        && profile.provider == self.config.model_provider_id
+                        && profile.model == self.current_model()
+                })
+            })
+            .or_else(|| {
+                profiles.iter().find(|profile| {
+                    profile.provider == self.config.model_provider_id
+                        && profile.model == self.current_model()
+                })
+            });
+        let current_label = matched_profile
+            .map(|profile| format!("{} · {}", profile.display_name, profile.model))
+            .unwrap_or_else(|| {
+                format!(
+                    "{} · {}",
+                    self.config.model_provider.name,
+                    self.current_model()
+                )
+            });
+        let current_profile_id = matched_profile.map(|profile| profile.id.clone());
         let mut items = profiles
             .into_iter()
             .map(|profile| {
                 let id = profile.id.clone();
-                let is_current = profile.provider == self.config.model_provider_id
-                    && profile.model == self.current_model();
+                let is_current = current_profile_id.as_deref() == Some(profile.id.as_str());
                 SelectionItem {
-                    name: format!("{}  ·  {}", profile.display_name, profile.model),
+                    name: format!(
+                        "{}{}  ·  {}",
+                        if is_current { "✓ " } else { "  " },
+                        profile.display_name,
+                        profile.model
+                    ),
                     description: Some(format!("配置：{id}")),
                     is_current,
                     actions: vec![Box::new(move |tx| {
@@ -40,9 +69,10 @@ impl ChatWidget {
         self.bottom_pane.show_selection_view(SelectionViewParams {
             title: Some("模型服务配置".to_string()),
             subtitle: Some(format!(
-                "{} · {} 个已保存配置 · 选择配置会用新服务开始会话。",
-                self.local_settings.codex_home.display(),
-                profile_count
+                "当前：{} · {} 个已保存配置 · {}",
+                current_label,
+                profile_count,
+                self.local_settings.codex_home.display()
             )),
             items,
             footer_hint: Some(Line::from("↑/↓ 选择 · Enter 确认 · Esc 取消")),

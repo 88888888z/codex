@@ -726,7 +726,7 @@ pub(crate) struct ChatWidget {
     // Runtime metrics accumulated across delta snapshots for the active turn.
     turn_runtime_metrics: RuntimeMetricsSummary,
     last_rendered_width: std::cell::Cell<Option<u16>>,
-    // Feedback sink for /feedback
+    // Diagnostics sink for feedback uploads.
     feedback: codex_feedback::CodexFeedback,
     // Current session rollout path (if known)
     current_rollout_path: Option<PathBuf>,
@@ -1071,28 +1071,39 @@ impl ChatWidget {
     }
 
     pub(crate) fn open_feature_enable_prompt(&mut self, feature: Feature) {
-        let (label, name) = match feature {
-            Feature::Collab => ("Subagents", "subagents"),
-            Feature::MemoryTool => ("Memories", "memories"),
+        let (label, name, chinese_label, chinese_name) = match feature {
+            Feature::Collab => ("Subagents", "subagents", "子 Agent", "子 Agent"),
+            Feature::MemoryTool => ("Memories", "memories", "记忆", "记忆"),
             _ => return,
         };
+        let chinese = crate::i18n::is_chinese(crate::i18n::current_language());
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            title: Some(format!("Enable {name}?")),
-            subtitle: Some(format!("{label} are disabled in this TUI session.")),
+            title: Some(if chinese {
+                format!("启用{chinese_label}？")
+            } else {
+                format!("Enable {name}?")
+            }),
+            subtitle: Some(if chinese {
+                format!("此 TUI 会话尚未启用{chinese_name}。")
+            } else {
+                format!("{label} are disabled in this TUI session.")
+            }),
             footer_note: (feature == Feature::MemoryTool).then(|| {
                 Line::from(vec![
-                    "Learn more: ".dim(),
+                    crate::i18n::ui_text("Learn more: ", "了解更多：").dim(),
                     MEMORIES_DOC_URL.cyan().underlined(),
                 ])
             }),
             footer_hint: Some(standard_popup_hint_line()),
             items: vec![
                 SelectionItem {
-                    name: "Yes, enable".to_string(),
-                    description: Some(
+                    name: crate::i18n::ui_text("Yes, enable", "是，启用").to_string(),
+                    description: Some(if chinese {
+                        "在服务端为新会话启用，不改变当前会话".to_string()
+                    } else {
                         "Save on the server for new threads without changing this thread"
-                            .to_string(),
-                    ),
+                            .to_string()
+                    }),
                     actions: vec![Box::new(move |tx| {
                         tx.send(AppEvent::EnableFeatureForNewThreads(feature));
                     })],
@@ -1100,8 +1111,12 @@ impl ChatWidget {
                     ..Default::default()
                 },
                 SelectionItem {
-                    name: "Not now".to_string(),
-                    description: Some(format!("Keep {name} disabled")),
+                    name: crate::i18n::ui_text("Not now", "暂不启用").to_string(),
+                    description: Some(if chinese {
+                        format!("保持{chinese_name}关闭")
+                    } else {
+                        format!("Keep {name} disabled")
+                    }),
                     dismiss_on_select: true,
                     ..Default::default()
                 },
@@ -1138,7 +1153,11 @@ impl ChatWidget {
                 self.bottom_pane
                     .set_context_window_pending(/*pending*/ true);
                 self.bottom_pane
-                    .set_context_window(/*percent*/ None, /*used_tokens*/ None);
+                    .set_context_window(
+                        /*percent*/ None,
+                        /*used_tokens*/ None,
+                        /*context_window*/ None,
+                    );
                 self.token_info = None;
             }
         }
@@ -1148,25 +1167,27 @@ impl ChatWidget {
         self.token_usage_pending = false;
         self.bottom_pane
             .set_context_window_pending(/*pending*/ false);
+        let context_window = self.context_window_size(&info);
         let percent = self.context_remaining_percent(&info);
-        let used_tokens = self.context_used_tokens(&info, percent.is_some());
-        self.bottom_pane.set_context_window(percent, used_tokens);
+        let used_tokens = self.context_used_tokens(&info);
+        self.bottom_pane
+            .set_context_window(percent, Some(used_tokens), context_window);
         self.token_info = Some(info);
     }
 
+    fn context_window_size(&self, info: &TokenUsageInfo) -> Option<i64> {
+        info.model_context_window.or(self.config.model_context_window)
+    }
+
     fn context_remaining_percent(&self, info: &TokenUsageInfo) -> Option<i64> {
-        info.model_context_window.map(|window| {
+        self.context_window_size(info).map(|window| {
             info.last_token_usage
                 .percent_of_context_window_remaining(window)
         })
     }
 
-    fn context_used_tokens(&self, info: &TokenUsageInfo, percent_known: bool) -> Option<i64> {
-        if percent_known {
-            return None;
-        }
-
-        Some(info.total_token_usage.tokens_in_context_window())
+    fn context_used_tokens(&self, info: &TokenUsageInfo) -> i64 {
+        info.last_token_usage.tokens_in_context_window()
     }
 
     fn restore_pre_review_token_info(&mut self) {
@@ -1175,7 +1196,11 @@ impl ChatWidget {
                 Some(info) => self.apply_token_info(info),
                 None => {
                     self.bottom_pane
-                        .set_context_window(/*percent*/ None, /*used_tokens*/ None);
+                        .set_context_window(
+                            /*percent*/ None,
+                            /*used_tokens*/ None,
+                            /*context_window*/ None,
+                        );
                     self.token_info = None;
                 }
             }

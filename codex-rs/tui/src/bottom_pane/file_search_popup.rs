@@ -157,6 +157,7 @@ impl WidgetRef for &FileSearchPopup {
                     GenericDisplayRow {
                         category_tag: None,
                         selection_style: Some(super::picker_style::selection_style()),
+                        selection_border: true,
                         name,
                         name_prefix_spans: vec![
                             if self.state.selected_idx == Some(idx) {

@@ -863,6 +863,10 @@ pub struct Tui {
     #[serde(default = "default_tui_language")]
     pub language: TuiLanguage,
 
+    /// Last selected third-party model provider profile.
+    #[serde(default)]
+    pub provider_profile: Option<String>,
+
     /// Enable animations (welcome screen, shimmer effects, spinners).
     /// Defaults to `true`.
     #[serde(default = "default_true")]

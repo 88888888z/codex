@@ -90,6 +90,10 @@ impl ChatWidget {
             .collect();
 
         let current_model = self.current_model();
+        let current_preset = presets
+            .iter()
+            .find(|preset| preset.model == current_model)
+            .cloned();
         let current_label = presets
             .iter()
             .find(|preset| preset.model.as_str() == current_model)
@@ -116,13 +120,10 @@ impl ChatWidget {
                 let description =
                     (!preset.description.is_empty()).then_some(preset.description.clone());
                 let model = preset.model.clone();
-                let requires_advanced_selection =
-                    Self::is_advanced_reasoning_effort(&preset.default_reasoning_effort)
-                        || preset
-                            .supported_reasoning_efforts
-                            .iter()
-                            .any(|option| Self::is_advanced_reasoning_effort(&option.effort));
-                let actions: Vec<SelectionAction> = if requires_advanced_selection {
+                let requires_reasoning_selection =
+                    preset.supported_reasoning_efforts.len() > 1
+                        || Self::is_advanced_reasoning_effort(&preset.default_reasoning_effort);
+                let actions: Vec<SelectionAction> = if requires_reasoning_selection {
                     let preset_for_action = preset.clone();
                     vec![Box::new(move |tx| {
                         tx.send(AppEvent::OpenReasoningPopup {
@@ -145,7 +146,7 @@ impl ChatWidget {
                     name: preset.display_name.clone(),
                     description,
                     is_current: model.as_str() == current_model,
-                    secondary_action: if requires_advanced_selection {
+                    secondary_action: if requires_reasoning_selection {
                         None
                     } else {
                         self.session_model_selection_action(
@@ -154,12 +155,45 @@ impl ChatWidget {
                         )
                     },
                     actions,
-                    dismiss_on_select: !requires_advanced_selection,
-                    dismiss_parent_on_child_accept: requires_advanced_selection,
+                    dismiss_on_select: !requires_reasoning_selection,
+                    dismiss_parent_on_child_accept: requires_reasoning_selection,
                     ..Default::default()
                 }
             })
             .collect();
+
+        if let Some(preset) = current_preset.clone()
+            && (preset.supported_reasoning_efforts.len() > 1
+                || Self::is_advanced_reasoning_effort(&preset.default_reasoning_effort))
+        {
+            let effort = self
+                .effective_reasoning_effort()
+                .unwrap_or_else(|| preset.default_reasoning_effort.clone());
+            let effort_label = self.reasoning_effort_label_for_current_language(&effort);
+            let chinese = crate::i18n::is_chinese(self.local_settings.tui.language);
+            let preset_for_action = preset;
+            model_ids.push("Reasoning effort".to_string());
+            items.push(SelectionItem {
+                name: if chinese {
+                    format!("思考强度：{effort_label}")
+                } else {
+                    format!("Reasoning effort: {effort_label}")
+                },
+                description: Some(if chinese {
+                    "调整当前模型的思考强度，不切换模型".to_string()
+                } else {
+                    "Change the current model's reasoning effort without switching models."
+                        .to_string()
+                }),
+                actions: vec![Box::new(move |tx| {
+                    tx.send(AppEvent::OpenReasoningPopup {
+                        model: preset_for_action.clone(),
+                    });
+                })],
+                dismiss_parent_on_child_accept: true,
+                ..Default::default()
+            });
+        }
 
         if !other_presets.is_empty() {
             model_ids.push("All models".to_string());
@@ -173,8 +207,18 @@ impl ChatWidget {
             ));
 
             items.push(SelectionItem {
-                name: "All models".to_string(),
-                description,
+                name: if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                    "全部模型".to_string()
+                } else {
+                    "All models".to_string()
+                },
+                description: description.map(|description| {
+                    if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                        format!("选择具体模型和思考强度（当前：{current_label}）")
+                    } else {
+                        description
+                    }
+                }),
                 is_current,
                 actions,
                 dismiss_on_select: true,
@@ -182,9 +226,18 @@ impl ChatWidget {
             });
         }
 
+        let chinese = crate::i18n::is_chinese(self.local_settings.tui.language);
         let header = self.model_menu_header(
-            "Select Model",
-            "Pick a quick auto mode or browse all models.",
+            if chinese {
+                "选择模型"
+            } else {
+                "Select Model"
+            },
+            if chinese {
+                "选择快速模式、调整思考强度，或浏览全部模型。"
+            } else {
+                "Pick a quick mode, adjust reasoning effort, or browse all models."
+            },
         );
         self.show_model_selection_view(
             model_ids,
@@ -276,7 +329,14 @@ impl ChatWidget {
             });
         }
 
-        let header = self.model_menu_header("Select Model and Effort", "");
+        let header = self.model_menu_header(
+            if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                "选择模型和思考强度"
+            } else {
+                "Select Model and Effort"
+            },
+            "",
+        );
         self.show_model_selection_view(
             model_ids,
             SelectionViewParams {
@@ -495,8 +555,14 @@ impl ChatWidget {
             None
         };
         let warning_text = warn_effort.as_ref().map(|effort| {
-            let effort_label = Self::reasoning_effort_label(effort);
-            format!("⚠ {effort_label} reasoning effort can quickly consume Plus plan rate limits")
+            let effort_label = self.reasoning_effort_label_for_current_language(effort);
+            if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                format!("⚠ {effort_label}思考强度可能快速消耗 Plus 套餐额度")
+            } else {
+                format!(
+                    "⚠ {effort_label} reasoning effort can quickly consume Plus plan rate limits"
+                )
+            }
         });
         let warn_for_model = preset.model.starts_with("gpt-5.1-codex")
             || preset.model.starts_with("gpt-5.1-codex-max")
@@ -556,9 +622,13 @@ impl ChatWidget {
         let mut items: Vec<SelectionItem> = Vec::new();
         for choice in choices.iter() {
             let effort = choice.clone();
-            let mut effort_label = Self::reasoning_effort_label(&effort);
+            let mut effort_label = self.reasoning_effort_label_for_current_language(&effort);
             if Some(choice) == default_choice.as_ref() {
-                effort_label.push_str(" (default)");
+                effort_label.push_str(if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                    "（默认）"
+                } else {
+                    " (default)"
+                });
             }
 
             let description = supported
@@ -606,9 +676,13 @@ impl ChatWidget {
         if !advanced_choices.is_empty() {
             let advanced_label = advanced_choices
                 .iter()
-                .map(Self::reasoning_effort_label)
+                .map(|effort| self.reasoning_effort_label_for_current_language(effort))
                 .collect::<Vec<_>>()
-                .join(" and ");
+                .join(if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                    "、"
+                } else {
+                    " and "
+                });
             let verb = if advanced_choices.len() == 1 {
                 "consumes"
             } else {
@@ -620,9 +694,18 @@ impl ChatWidget {
                     model: preset_for_action.clone(),
                 });
             })];
+            let chinese = crate::i18n::is_chinese(self.local_settings.tui.language);
             items.push(SelectionItem {
-                name: "More reasoning…".to_string(),
-                description: Some(format!("{advanced_label} {verb} usage limits faster")),
+                name: if chinese {
+                    "更多思考强度…".to_string()
+                } else {
+                    "More reasoning…".to_string()
+                },
+                description: Some(if chinese {
+                    format!("{advanced_label}会更快消耗用量额度")
+                } else {
+                    format!("{advanced_label} {verb} usage limits faster")
+                }),
                 is_current: is_current_model
                     && highlight_choice
                         .as_ref()
@@ -634,7 +717,12 @@ impl ChatWidget {
         }
 
         let header = Paragraph::new(Line::from(
-            format!("Select Reasoning Level for {model_label}").bold(),
+            if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                format!("选择思考强度 · {model_label}")
+            } else {
+                format!("Select Reasoning Level for {model_label}")
+            }
+            .bold(),
         ))
         .wrap(Wrap { trim: false });
 
@@ -669,14 +757,23 @@ impl ChatWidget {
         let highlight_choice = is_current_model
             .then(|| self.effective_reasoning_effort())
             .flatten();
+        let chinese = crate::i18n::is_chinese(self.local_settings.tui.language);
         let mut items = Vec::new();
         for effort in choices {
             let description = match &effort {
                 ReasoningEffortConfig::Max => {
-                    "For difficult problems when quality matters more than speed · higher usage"
+                    if chinese {
+                        "适合质量优先于速度的难题，用量更高"
+                    } else {
+                        "For difficult problems when quality matters more than speed · higher usage"
+                    }
                 }
                 ReasoningEffortConfig::Ultra => {
-                    "For demanding work using multiple agents · highest usage"
+                    if chinese {
+                        "适合使用多个 Agent 的高要求任务，用量最高"
+                    } else {
+                        "For demanding work using multiple agents · highest usage"
+                    }
                 }
                 _ => unreachable!("advanced choices are limited to Max and Ultra"),
             };
@@ -689,7 +786,7 @@ impl ChatWidget {
             );
 
             items.push(SelectionItem {
-                name: Self::reasoning_effort_label(&effort),
+                name: self.reasoning_effort_label_for_current_language(&effort),
                 description: Some(description.to_string()),
                 is_current: is_current_model && Some(&effort) == highlight_choice.as_ref(),
                 secondary_action: self
@@ -701,8 +798,18 @@ impl ChatWidget {
         }
 
         let header = Paragraph::new(vec![
-            Line::from("Advanced Reasoning".bold()),
-            Line::from("⚠ Consumes usage limits faster".cyan()),
+            Line::from(if chinese {
+                "高级思考强度"
+            } else {
+                "Advanced Reasoning"
+            }
+            .bold()),
+            Line::from(if chinese {
+                "⚠ 会更快消耗用量额度"
+            } else {
+                "⚠ Consumes usage limits faster"
+            }
+            .cyan()),
         ])
         .wrap(Wrap { trim: false });
         self.bottom_pane.show_selection_view(SelectionViewParams {
@@ -732,6 +839,32 @@ impl ChatWidget {
             ReasoningEffortConfig::Persistent => "Persistent".to_string(),
             ReasoningEffortConfig::Custom(value) => value.clone(),
         }
+    }
+
+    pub(super) fn reasoning_effort_label_for_current_language(
+        &self,
+        effort: &ReasoningEffortConfig,
+    ) -> String {
+        if !crate::i18n::is_chinese(self.local_settings.tui.language) {
+            return Self::reasoning_effort_label(effort);
+        }
+        Self::reasoning_effort_label_zh(effort)
+    }
+
+    pub(super) fn reasoning_effort_label_zh(effort: &ReasoningEffortConfig) -> String {
+        match effort {
+            ReasoningEffortConfig::None => "无",
+            ReasoningEffortConfig::Minimal => "极低",
+            ReasoningEffortConfig::Low => "低",
+            ReasoningEffortConfig::Medium => "中",
+            ReasoningEffortConfig::High => "高",
+            ReasoningEffortConfig::XHigh => "极高",
+            ReasoningEffortConfig::Max => "最高",
+            ReasoningEffortConfig::Ultra => "极致",
+            ReasoningEffortConfig::Persistent => "持续",
+            ReasoningEffortConfig::Custom(value) => return value.clone(),
+        }
+        .to_string()
     }
 
     pub(super) fn reasoning_effort_sentence_label(effort: &ReasoningEffortConfig) -> String {

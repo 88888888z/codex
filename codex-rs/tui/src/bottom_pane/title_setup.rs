@@ -16,6 +16,8 @@ use strum_macros::Display;
 use strum_macros::EnumIter;
 use strum_macros::EnumString;
 
+use codex_config::types::TuiLanguage;
+
 use crate::app_event::AppEvent;
 use crate::app_event_sender::AppEventSender;
 use crate::bottom_pane::ACTION_REQUIRED_PREVIEW_PREFIX;
@@ -147,6 +149,77 @@ impl TerminalTitleItem {
         }
     }
 
+    fn description_for(self, language: TuiLanguage) -> &'static str {
+        if !crate::i18n::is_chinese(language) {
+            return self.description();
+        }
+        match self {
+            TerminalTitleItem::AppName => "Codex 应用名称",
+            TerminalTitleItem::Project => "项目名称（不可用时使用当前目录名）",
+            TerminalTitleItem::CurrentDir => "当前工作目录",
+            TerminalTitleItem::Spinner => "运行中显示动画，等待操作时显示提示",
+            TerminalTitleItem::Status => "简洁的运行状态（就绪、运行中、思考中）",
+            TerminalTitleItem::ThreadName => "当前会话名称（未命名时省略）",
+            TerminalTitleItem::Thread => "当前会话标题，未命名时显示标识符",
+            TerminalTitleItem::GitBranch => "当前 Git 分支（不可用时省略）",
+            TerminalTitleItem::ContextRemaining => "上下文窗口剩余百分比（未知时省略）",
+            TerminalTitleItem::ContextUsed => "上下文窗口已用百分比（未知时省略）",
+            TerminalTitleItem::FiveHourLimit => "主要用量额度的剩余量（不可用时省略）",
+            TerminalTitleItem::WeeklyLimit => "次要用量额度的剩余量（不可用时省略）",
+            TerminalTitleItem::CodexVersion => "Codex 应用版本",
+            TerminalTitleItem::UsedTokens => "当前会话已用 token 总数（为零时省略）",
+            TerminalTitleItem::TotalInputTokens => "当前会话输入 token 总数",
+            TerminalTitleItem::TotalOutputTokens => "当前会话输出 token 总数",
+            TerminalTitleItem::ThreadCredits => {
+                "当前会话预计额度（仅企业工作区，不可用时省略）"
+            }
+            TerminalTitleItem::EstimatedThreadCost => {
+                "当前会话预计费用（仅企业工作区，不可用时省略）"
+            }
+            TerminalTitleItem::SessionId => "当前会话标识符（会话开始前省略）",
+            TerminalTitleItem::FastMode => "Fast 模式是否已启用",
+            TerminalTitleItem::Daybreak => "当前会话是否启用 Daybreak",
+            TerminalTitleItem::Model => "当前模型名称",
+            TerminalTitleItem::ModelWithReasoning => "当前模型名称和思考强度",
+            TerminalTitleItem::Reasoning => "当前思考强度",
+            TerminalTitleItem::TaskProgress => "update_plan 的最新任务进度（可用后显示）",
+        }
+    }
+
+    fn name_for(self, language: TuiLanguage) -> String {
+        if !crate::i18n::is_chinese(language) {
+            return self.to_string();
+        }
+        match self {
+            TerminalTitleItem::AppName => "应用名称",
+            TerminalTitleItem::Project => "项目名称",
+            TerminalTitleItem::CurrentDir => "当前目录",
+            TerminalTitleItem::Spinner => "运行动画",
+            TerminalTitleItem::Status => "运行状态",
+            TerminalTitleItem::ThreadName => "会话名称",
+            TerminalTitleItem::Thread => "会话标题",
+            TerminalTitleItem::GitBranch => "Git 分支",
+            TerminalTitleItem::ContextRemaining => "上下文剩余",
+            TerminalTitleItem::ContextUsed => "上下文已用",
+            TerminalTitleItem::FiveHourLimit => "5 小时额度",
+            TerminalTitleItem::WeeklyLimit => "每周额度",
+            TerminalTitleItem::CodexVersion => "Codex 版本",
+            TerminalTitleItem::UsedTokens => "已用 Token",
+            TerminalTitleItem::TotalInputTokens => "输入 Token",
+            TerminalTitleItem::TotalOutputTokens => "输出 Token",
+            TerminalTitleItem::ThreadCredits => "会话额度",
+            TerminalTitleItem::EstimatedThreadCost => "会话费用",
+            TerminalTitleItem::SessionId => "会话 ID",
+            TerminalTitleItem::FastMode => "Fast 模式",
+            TerminalTitleItem::Daybreak => "Daybreak",
+            TerminalTitleItem::Model => "模型",
+            TerminalTitleItem::ModelWithReasoning => "模型与思考强度",
+            TerminalTitleItem::Reasoning => "思考强度",
+            TerminalTitleItem::TaskProgress => "任务进度",
+        }
+        .to_string()
+    }
+
     pub(crate) fn preview_item(self) -> Option<StatusSurfacePreviewItem> {
         match self {
             TerminalTitleItem::AppName => Some(StatusSurfacePreviewItem::AppName),
@@ -273,6 +346,22 @@ impl TerminalTitleSetupView {
         app_event_tx: AppEventSender,
         list_keymap: ListKeymap,
     ) -> Self {
+        Self::new_for_language(
+            title_items,
+            preview_data,
+            app_event_tx,
+            list_keymap,
+            TuiLanguage::English,
+        )
+    }
+
+    pub(crate) fn new_for_language(
+        title_items: Option<&[String]>,
+        preview_data: StatusSurfacePreviewData,
+        app_event_tx: AppEventSender,
+        list_keymap: ListKeymap,
+        language: TuiLanguage,
+    ) -> Self {
         let selected_items = title_items
             .into_iter()
             .flatten()
@@ -285,20 +374,35 @@ impl TerminalTitleSetupView {
             .collect::<std::collections::HashSet<_>>();
         let items = selected_items
             .into_iter()
-            .map(|item| Self::title_select_item(item, /*enabled*/ true, &preview_data))
+            .map(|item| {
+                Self::title_select_item(item, /*enabled*/ true, &preview_data, language)
+            })
             .chain(
                 TerminalTitleItem::iter()
                     .filter(|item| !selected_set.contains(item))
                     .map(|item| {
-                        Self::title_select_item(item, /*enabled*/ false, &preview_data)
+                        Self::title_select_item(
+                            item,
+                            /*enabled*/ false,
+                            &preview_data,
+                            language,
+                        )
                     }),
             )
             .collect();
 
         Self {
             picker: MultiSelectPicker::builder(
-                "Configure Terminal Title".to_string(),
-                Some("Select which items to display in the terminal title.".to_string()),
+                crate::i18n::text(language, "Configure Terminal Title", "配置终端标题")
+                    .to_string(),
+                Some(
+                    crate::i18n::text(
+                        language,
+                        "Select which items to display in the terminal title.",
+                        "选择终端标题中显示的内容。",
+                    )
+                    .to_string(),
+                ),
                 app_event_tx,
             )
             .list_keymap(list_keymap)
@@ -341,9 +445,10 @@ impl TerminalTitleSetupView {
         item: TerminalTitleItem,
         enabled: bool,
         preview_data: &StatusSurfacePreviewData,
+        language: TuiLanguage,
     ) -> MultiSelectItem {
-        let default_name = item.to_string();
-        let default_description = item.description();
+        let default_name = item.name_for(language);
+        let default_description = item.description_for(language);
         let (name, description) = match item.preview_item() {
             Some(
                 preview_item @ (StatusSurfacePreviewItem::FiveHourLimit

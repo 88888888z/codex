@@ -181,7 +181,10 @@ impl ChatWidget {
         match connectors_cache {
             ConnectorsCacheState::Ready(snapshot) => {
                 if snapshot.connectors.is_empty() {
-                    self.add_info_message("No apps available.".to_string(), /*hint*/ None);
+                    self.add_info_message(
+                        crate::i18n::ui_text("No apps available.", "没有可用的应用。").to_string(),
+                        /*hint*/ None,
+                    );
                 } else {
                     self.open_connectors_popup(&snapshot.connectors);
                 }
@@ -215,8 +218,14 @@ impl ChatWidget {
     fn connectors_loading_popup_params(&self) -> SelectionViewParams {
         SelectionViewParams {
             view_id: Some(CONNECTORS_SELECTION_VIEW_ID),
-            title: Some("Apps".to_string()),
-            subtitle: Some("Loading installed and available apps...".to_string()),
+            title: Some(crate::i18n::ui_text("Apps", "应用").to_string()),
+            subtitle: Some(
+                crate::i18n::ui_text(
+                    "Loading installed and available apps...",
+                    "正在加载已安装和可用的应用…",
+                )
+                .to_string(),
+            ),
             items: vec![SelectionItem {
                 name: "Loading apps...".to_string(),
                 description: Some("This updates when the full list is ready".to_string()),
@@ -230,8 +239,10 @@ impl ChatWidget {
     fn connectors_error_popup_params(&self) -> SelectionViewParams {
         SelectionViewParams {
             view_id: Some(CONNECTORS_SELECTION_VIEW_ID),
-            title: Some("Apps".to_string()),
-            subtitle: Some("Failed to load apps.".to_string()),
+            title: Some(crate::i18n::ui_text("Apps", "应用").to_string()),
+            subtitle: Some(
+                crate::i18n::ui_text("Failed to load apps.", "加载应用失败。").to_string(),
+            ),
             items: vec![
                 SelectionItem {
                     name: "App directory unavailable".to_string(),
@@ -268,8 +279,14 @@ impl ChatWidget {
             .filter(|connector| connector.is_accessible)
             .count();
         let header = Paragraph::new(vec![
-            Line::from("Apps".bold()),
-            Line::from("Use $ to insert an installed app into your prompt.".dim()),
+            Line::from(crate::i18n::ui_text("Apps", "应用").bold()),
+            Line::from(
+                crate::i18n::ui_text(
+                    "Use $ to insert an installed app into your prompt.",
+                    "输入 $ 可将已安装的应用插入提示词。",
+                )
+                .dim(),
+            ),
             Line::from(format!("Installed {installed} of {total} available apps.").dim()),
         ])
         .wrap(Wrap { trim: false });
@@ -346,7 +363,9 @@ impl ChatWidget {
             header: Box::new(header),
             items,
             is_searchable: true,
-            search_placeholder: Some("Type to search apps".to_string()),
+            search_placeholder: Some(
+                crate::i18n::ui_text("Type to search apps", "输入以搜索应用").to_string(),
+            ),
             col_width_mode: ColumnWidthMode::AutoAllRows,
             initial_selected_idx,
             ..SelectionViewParams::picker()

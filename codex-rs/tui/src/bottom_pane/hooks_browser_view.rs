@@ -459,7 +459,12 @@ impl HooksBrowserView {
     ) -> Vec<crate::terminal_hyperlinks::HyperlinkLine> {
         let Some(hook) = self.selected_hook(event_name) else {
             return crate::terminal_hyperlinks::plain_hyperlink_lines(vec![
-                "No hooks installed for this event.".dim().into(),
+                crate::i18n::ui_text(
+                    "No hooks installed for this event.",
+                    "此事件没有已安装的 Hook。",
+                )
+                .dim()
+                .into(),
             ]);
         };
 
@@ -478,7 +483,7 @@ impl HooksBrowserView {
         match &hook.handler {
             HookHandlerMetadata::Command { command, r#async } => {
                 lines.extend(detail_wrapped_lines(
-                    "Command",
+                    crate::i18n::ui_text("Command", "命令"),
                     command,
                     width,
                     Some(MAX_COMMAND_DETAIL_LINES),
@@ -493,7 +498,7 @@ impl HooksBrowserView {
                     /*max_lines*/ None,
                 ));
                 lines.extend(detail_wrapped_lines(
-                    "MCP Tool", tool, width, /*max_lines*/ None,
+                    crate::i18n::ui_text("MCP Tool", "MCP 工具"), tool, width, /*max_lines*/ None,
                 ));
             }
             HookHandlerMetadata::Prompt {} => {

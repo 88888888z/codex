@@ -108,7 +108,7 @@ impl ChatWidget {
             .collect();
 
         self.show_selection_view(SelectionViewParams {
-            title: Some("Copy to clipboard".into()),
+            title: Some(crate::i18n::ui_text("Copy to clipboard", "复制到剪贴板").into()),
             items,
             ..SelectionViewParams::picker()
         });

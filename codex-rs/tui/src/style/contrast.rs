@@ -42,37 +42,34 @@ pub(super) fn selection_style(background: Option<(u8, u8, u8)>, level: StdoutCol
     let Some(background) = background else {
         return fallback;
     };
-    let (preferred, alternate) = if is_light(background) {
+    let (preferred, _alternate) = if is_light(background) {
         (super::CHATGPT_BLUE_100, super::CHATGPT_BLUE_200)
     } else {
         (super::CHATGPT_BLUE_200, super::CHATGPT_BLUE_100)
     };
-    let mut fill = best_color_for_level(preferred, level);
     let resolve = |color| match color {
         Color::Rgb(r, g, b) => Some((r, g, b)),
         Color::Indexed(index) if index >= 16 => Some(XTERM_COLORS[usize::from(index)]),
         _ => None,
     };
-    let Some(mut fill_rgb) = resolve(fill) else {
+    let Some(accent_rgb) = resolve(best_color_for_level(preferred, level)) else {
         return fallback;
     };
-    // A subtle fill is intentional, but it must not disappear into a similarly blue canvas.
-    if ratio(fill_rgb, background) < 1.25 {
-        let alternate_fill = best_color_for_level(alternate, level);
-        let alternate_rgb = resolve(alternate_fill).unwrap_or(alternate);
-        if ratio(alternate_rgb, background) > ratio(fill_rgb, background) {
-            fill = alternate_fill;
-            fill_rgb = alternate_rgb;
-        }
+    let mut alpha = if is_light(background) { 0.14 } else { 0.22 };
+    let mut fill_rgb = blend(accent_rgb, background, alpha);
+    while ratio(fill_rgb, background) < 1.16 && alpha < 0.36 {
+        alpha += 0.03;
+        fill_rgb = blend(accent_rgb, background, alpha);
     }
+    let preferred_foreground = if is_light(background) {
+        (0, 0, 0)
+    } else {
+        (255, 255, 255)
+    };
     Style::default()
-        .fg(foreground(
-            /*preferred*/ (0, 0, 46),
-            Some(fill_rgb),
-            level,
-        ))
-        .bg(fill)
-        .bold()
+        .fg(foreground(preferred_foreground, Some(fill_rgb), level))
+        .bg(best_color_for_level(fill_rgb, level))
+        .not_bold()
         .not_dim()
         .not_reversed()
 }

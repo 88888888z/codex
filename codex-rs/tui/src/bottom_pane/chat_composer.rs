@@ -309,6 +309,8 @@ use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::widgets::Block;
+use ratatui::widgets::BorderType;
+use ratatui::widgets::Borders;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::StatefulWidgetRef;
 use ratatui::widgets::Widget;
@@ -505,8 +507,7 @@ fn parent_owned_command_is_allowed(command: SlashCommand, args: &str) -> bool {
     args.is_empty()
         && matches!(
             command,
-            SlashCommand::Feedback
-                | SlashCommand::New
+            SlashCommand::New
                 | SlashCommand::Clear
                 | SlashCommand::Resume
                 | SlashCommand::App
@@ -763,6 +764,7 @@ impl ChatComposer {
                 flash: None,
                 context_window_percent: None,
                 context_window_used_tokens: None,
+                context_window_tokens: None,
                 context_window_pending: false,
                 collaboration_mode_indicator: None,
                 goal_status_indicator: None,
@@ -1464,20 +1466,35 @@ impl ChatComposer {
         }
     }
 
-    fn right_footer_line_with_context(&self) -> Line<'static> {
-        let mut line = if self.footer.context_window_pending {
+    fn context_window_footer_line(&self) -> Line<'static> {
+        if self.footer.context_window_pending {
             Line::default()
         } else {
             context_window_line(
-                self.footer.context_window_percent,
                 self.footer.context_window_used_tokens,
+                self.footer.context_window_tokens,
             )
-        };
-        if let Some(vim_mode) = self.vim_mode_indicator_span() {
-            line.spans.push(" | ".dim());
-            line.spans.push(vim_mode);
+        }
+    }
+
+    fn with_context_right(&self, line: Option<Line<'static>>) -> Line<'static> {
+        let mut line = line.unwrap_or_default();
+        let context = self.context_window_footer_line();
+        if context.width() > 0 {
+            if line.width() > 0 {
+                line.push_span(" | ".dim());
+            }
+            line.spans.extend(context.spans);
         }
         line
+    }
+
+    fn right_footer_line_with_context(&self) -> Line<'static> {
+        let mut line = Line::default();
+        if let Some(vim_mode) = self.vim_mode_indicator_span() {
+            line.spans.push(vim_mode);
+        }
+        self.with_context_right((line.width() > 0).then_some(line))
     }
 
     pub(crate) fn current_text_with_pending(&self) -> String {
@@ -4304,14 +4321,21 @@ impl ChatComposer {
         self.queue_submissions = queue_submissions;
     }
 
-    pub(crate) fn set_context_window(&mut self, percent: Option<i64>, used_tokens: Option<i64>) {
+    pub(crate) fn set_context_window(
+        &mut self,
+        percent: Option<i64>,
+        used_tokens: Option<i64>,
+        context_window: Option<i64>,
+    ) {
         if self.footer.context_window_percent == percent
             && self.footer.context_window_used_tokens == used_tokens
+            && self.footer.context_window_tokens == context_window
         {
             return;
         }
         self.footer.context_window_percent = percent;
         self.footer.context_window_used_tokens = used_tokens;
+        self.footer.context_window_tokens = context_window;
     }
 
     pub(crate) fn set_context_window_pending(&mut self, pending: bool) {
@@ -4698,14 +4722,19 @@ impl ChatComposer {
                     };
                     let right_line =
                         if let Some(label) = self.footer.side_conversation_context_label.as_ref() {
-                            Some(side_conversation_context_line(label))
+                            Some(self.with_context_right(Some(
+                                side_conversation_context_line(label),
+                            )))
                         } else if let Some(line) = self.shell_mode_footer_line() {
-                            Some(line)
+                            Some(self.with_context_right(Some(line)))
                         } else if self.status_surface_height(options) > 0 || transition_active {
                             None
                         } else if status_line_active {
-                            let full = self.mode_indicator_line(show_cycle_hint);
-                            let compact = self.mode_indicator_line(/*show_cycle_hint*/ false);
+                            let full = Some(self.with_context_right(
+                                self.mode_indicator_line(show_cycle_hint),
+                            ));
+                            // The ambient token pair has priority over optional mode detail.
+                            let compact = Some(self.context_window_footer_line());
                             let full_width = full.as_ref().map(|l| l.width() as u16).unwrap_or(0);
                             if can_show_left_with_context(hint_rect, left_width, full_width) {
                                 full
@@ -4857,8 +4886,17 @@ impl ChatComposer {
             selection.register(status.intersection(buf.area), changed);
             selection.register(footer_rect.intersection(buf.area), changed);
         }
-        let style = user_message_style();
-        Block::default().style(style).render(composer_rect, buf);
+        let style = crate::style::composer_surface_style();
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(if self.has_focus {
+                crate::style::focused_border_style()
+            } else {
+                crate::style::hairline_style()
+            })
+            .style(style)
+            .render(composer_rect, buf);
         if !remote_images_rect.is_empty() {
             let first = self
                 .attachments
@@ -5724,7 +5762,11 @@ mod tests {
         ) {
             composer.set_collaboration_modes_enabled(/*enabled*/ true);
             composer.set_collaboration_mode_indicator(indicator);
-            composer.set_context_window(Some(context_percent), /*used_tokens*/ None);
+            composer.set_context_window(
+                Some(context_percent),
+                Some(context_percent),
+                Some(/*context_window*/ 100),
+            );
         }
 
         // Empty textarea, agent idle: shortcuts hint can show, and cycle hint is hidden.
@@ -12192,7 +12234,7 @@ mod tests {
             "'/re' should activate slash popup via prefix match"
         );
 
-        // Case 3: fuzzy match "/ac" (subsequence of /compact and /feedback)
+        // Case 3: fuzzy match "/ac" (subsequence of /compact)
         composer.set_text_content("/ac".to_string(), Vec::new(), Vec::new());
         assert!(
             matches!(composer.popups.active, ActivePopup::Command(_)),

@@ -178,7 +178,13 @@ async fn persist_remembered_cwd_selection(
         Ok(()) => None,
         Err(err) => {
             tracing::error!(error = %err, "failed to persist working directory preference");
-            Some(Line::from("Failed to save working directory preference.").red())
+            Some(
+                Line::from(crate::i18n::ui_text(
+                    "Failed to save working directory preference.",
+                    "保存工作目录偏好失败。",
+                ))
+                .red(),
+            )
         }
     }
 }
@@ -291,7 +297,11 @@ impl WidgetRef for &CwdPromptScreen {
         column.push(/*flex*/ 1, RenderableItem::Borrowed(&""));
         column.push(
             /*flex*/ 0,
-            Paragraph::new(format!("Working directory · {action_verb}").bold())
+            Paragraph::new(format!(
+                "{} · {action_verb}",
+                crate::i18n::ui_text("Working directory", "工作目录")
+            ))
+            .bold()
                 .wrap(Wrap { trim: false })
                 .inset(Insets::vh(/*v*/ 0, /*h*/ 2)),
         );

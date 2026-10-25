@@ -92,8 +92,8 @@ impl AgentsOverviewGroup {
     fn label(self) -> &'static str {
         match self {
             Self::NeedsYou => "Needs input",
-            Self::Working => "Working",
-            Self::Ready => "Ready",
+            Self::Working => crate::i18n::ui_text("Working", "运行中"),
+            Self::Ready => crate::i18n::ui_text("Ready", "就绪"),
             Self::Finished => "Inactive",
         }
     }
@@ -431,8 +431,14 @@ impl AgentsOverviewView {
                 ("Error", "!".red())
             }
             AgentsOverviewGroup::NeedsYou => ("Needs input", "●".red()),
-            AgentsOverviewGroup::Working => ("Working", "●".green()),
-            AgentsOverviewGroup::Ready => ("Ready", "○".cyan()),
+            AgentsOverviewGroup::Working => (
+                crate::i18n::ui_text("Working", "运行中"),
+                "●".green(),
+            ),
+            AgentsOverviewGroup::Ready => (
+                crate::i18n::ui_text("Ready", "就绪"),
+                "○".cyan(),
+            ),
             AgentsOverviewGroup::Finished => ("Inactive", "○".dim()),
         }
     }
@@ -506,7 +512,7 @@ impl AgentsOverviewView {
         lines.extend([Line::default(), Line::from("Prompt".dim())]);
         let prompt = crate::markdown_render::render_markdown_lines_with_width_and_cwd(
             match preview.as_str() {
-                "" => "No prompt available.",
+                "" => crate::i18n::ui_text("No prompt available.", "没有可用的提示词。"),
                 preview => preview,
             },
             Some(width),

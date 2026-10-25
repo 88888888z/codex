@@ -76,11 +76,14 @@ impl HistoryCell for UpdateAvailableHistoryCell {
             "See https://github.com/openai/codex for installation options.".to_string()
         };
         vec![
-            Line::from("Update available!"),
+            Line::from(crate::i18n::ui_text("Update available!", "有可用更新！")),
             Line::from(format!("{CODEX_CLI_VERSION} -> {}", self.latest_version)),
             Line::from(update_instruction),
             Line::from(""),
-            Line::from("See full release notes:"),
+            Line::from(crate::i18n::ui_text(
+                "See full release notes:",
+                "查看完整更新日志：",
+            )),
             Line::from("https://github.com/openai/codex/releases/latest"),
         ]
     }
@@ -126,7 +129,11 @@ pub(crate) fn new_server_version_warning(
             "Use /daemon to manage the local background server.".fg(accent_color()),
         ));
         lines.push(Line::from(
-            "Updating may interrupt active or queued work.".set_style(style),
+            crate::i18n::ui_text(
+                "Updating may interrupt active or queued work.",
+                "更新可能会中断正在运行或排队的工作。",
+            )
+            .set_style(style),
         ));
     }
     WarningHistoryCell {
@@ -370,7 +377,10 @@ impl HistoryCell for ThreadRecapLoadingCell {
     }
 
     fn raw_lines(&self) -> Vec<Line<'static>> {
-        vec![Line::from("Generating conversation recap...")]
+        vec![Line::from(crate::i18n::ui_text(
+            "Generating conversation recap...",
+            "正在生成对话回顾…",
+        ))]
     }
 
     fn transcript_animation_tick(&self) -> Option<u64> {

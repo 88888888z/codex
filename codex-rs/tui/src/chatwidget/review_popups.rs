@@ -62,7 +62,7 @@ impl ChatWidget {
         });
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            title: Some("Select a review preset".into()),
+            title: Some(crate::i18n::ui_text("Select a review preset", "选择审查预设").into()),
             items,
             ..SelectionViewParams::picker()
         });
@@ -92,11 +92,15 @@ impl ChatWidget {
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
             picker_surface: PickerSurface::Panel,
-            title: Some("Select a base branch".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Select a base branch", "选择基准分支").to_string(),
+            ),
             subtitle: Some(format!("Current branch: {current_branch}")),
             items,
             is_searchable: true,
-            search_placeholder: Some("Type to search branches".to_string()),
+            search_placeholder: Some(
+                crate::i18n::ui_text("Type to search branches", "输入以搜索分支").to_string(),
+            ),
             ..Default::default()
         });
     }
@@ -129,10 +133,12 @@ impl ChatWidget {
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
             picker_surface: PickerSurface::Panel,
-            title: Some("Select a commit to review".into()),
+            title: Some(crate::i18n::ui_text("Select a commit to review", "选择要审查的提交").into()),
             items,
             is_searchable: true,
-            search_placeholder: Some("Type to search commits".to_string()),
+            search_placeholder: Some(
+                crate::i18n::ui_text("Type to search commits", "输入以搜索提交").to_string(),
+            ),
             ..Default::default()
         });
     }

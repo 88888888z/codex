@@ -39,6 +39,7 @@ use crate::wrapping::word_wrap_line_with_source;
 use logical::LogicalLine;
 use logical::logical_lines;
 use ratatui::text::Line;
+use ratatui::text::Span;
 
 /// One cell's logical text and its width-dependent display rows.
 pub(super) struct TextLayout {
@@ -51,12 +52,18 @@ pub(super) struct TextLayout {
     pub(super) disclosure: bool,
     leading_blank_hidden: bool,
     disclosure_control: Option<DisclosureControl>,
+    prompt_frame: Option<PromptFrame>,
 }
 
 struct DisclosureControl {
     label: String,
     source_offset: usize,
     row: usize,
+}
+
+struct PromptFrame {
+    fill: Style,
+    border: Style,
 }
 
 struct TextRow {
@@ -143,6 +150,9 @@ impl TextLayout {
         if self.leading_blank_hidden {
             layout = layout.without_leading_blank_row();
         }
+        if let Some(frame) = &self.prompt_frame {
+            layout = layout.with_rounded_prompt_frame(frame.fill, frame.border);
+        }
         if self.separated {
             layout.with_leading_separator()
         } else {
@@ -224,6 +234,57 @@ impl TextLayout {
                 control.row = control.row.saturating_sub(/*rhs*/ 1);
             }
         }
+        self
+    }
+
+    /// Add a presentation-only rounded frame to submitted prompts.
+    ///
+    /// The frame occupies the blank padding rows already present around user prompts, so it
+    /// changes neither their copyable source nor their searchable text.
+    pub(super) fn with_rounded_prompt_frame(mut self, fill: Style, border: Style) -> Self {
+        let Some(first) = self
+            .rows
+            .iter()
+            .position(|row| line_width(&row.line.line) == 0)
+        else {
+            return self;
+        };
+        let Some(last) = self
+            .rows
+            .iter()
+            .rposition(|row| line_width(&row.line.line) == 0)
+        else {
+            return self;
+        };
+        if first == last || self.width < 4 {
+            return self;
+        }
+
+        let inner_width = usize::from(self.width - 2);
+        self.rows[first].line = HyperlinkLine::new(
+            Line::from(format!("╭{}╮", "─".repeat(inner_width))).style(border),
+        );
+        self.rows[last].line = HyperlinkLine::new(
+            Line::from(format!("╰{}╯", "─".repeat(inner_width))).style(border),
+        );
+
+        for row in &mut self.rows[first + 1..last] {
+            let content_width = row.line.width();
+            let padding = usize::from(self.width)
+                .saturating_sub(/*left*/ 2 + content_width + /*right*/ 2);
+            let mut spans = Vec::with_capacity(row.line.line.spans.len() + 3);
+            spans.push(Span::styled("│ ", border));
+            spans.extend(std::mem::take(&mut row.line.line.spans));
+            spans.push(Span::styled(" ".repeat(padding), fill));
+            spans.push(Span::styled(" │", border));
+            row.line.line = Line::from(spans).style(fill);
+            row.first_column += 2;
+            row.prefix_columns += 2;
+            for hyperlink in &mut row.line.hyperlinks {
+                hyperlink.columns = hyperlink.columns.start + 2..hyperlink.columns.end + 2;
+            }
+        }
+        self.prompt_frame = Some(PromptFrame { fill, border });
         self
     }
 
@@ -553,6 +614,7 @@ impl TextLayout {
             disclosure: false,
             leading_blank_hidden: false,
             disclosure_control: None,
+            prompt_frame: None,
         }
     }
 }

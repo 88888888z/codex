@@ -2058,16 +2058,11 @@ async fn disable_feature_in_config(feature: &str) -> anyhow::Result<()> {
 fn loader_overrides_for_profile(
     profile_v2: Option<&ProfileV2Name>,
 ) -> anyhow::Result<LoaderOverrides> {
-    match profile_v2 {
-        Some(profile_v2) => {
-            let codex_home = find_codex_home()?;
-            Ok(loader_overrides_for_profile_at_codex_home(
-                Some(profile_v2),
-                &codex_home,
-            ))
-        }
-        None => Ok(LoaderOverrides::default()),
-    }
+    let codex_home = find_codex_home()?;
+    Ok(loader_overrides_for_profile_at_codex_home(
+        profile_v2,
+        &codex_home,
+    ))
 }
 
 fn run_provider_token(command: ProviderTokenCommand) -> anyhow::Result<()> {
@@ -2082,14 +2077,28 @@ fn loader_overrides_for_profile_at_codex_home(
     profile_v2: Option<&ProfileV2Name>,
     codex_home: &std::path::Path,
 ) -> LoaderOverrides {
-    match profile_v2 {
-        Some(profile_v2) => LoaderOverrides {
-            user_config_path: Some(resolve_profile_v2_config_path(codex_home, profile_v2)),
-            user_config_profile: Some(profile_v2.clone()),
-            ..Default::default()
-        },
-        None => LoaderOverrides::default(),
-    }
+    let active_profile = profile_v2
+        .cloned()
+        .or_else(|| configured_active_profile(codex_home));
+    active_profile.map_or_else(LoaderOverrides::default, |profile_v2| LoaderOverrides {
+        user_config_path: Some(resolve_profile_v2_config_path(codex_home, &profile_v2)),
+        user_config_profile: Some(profile_v2),
+        ..Default::default()
+    })
+}
+
+fn configured_active_profile(codex_home: &std::path::Path) -> Option<ProfileV2Name> {
+    let config_path = codex_home.join(codex_config::CONFIG_TOML_FILE);
+    let text = std::fs::read_to_string(config_path).ok()?;
+    let config = toml::from_str::<toml::Value>(&text).ok()?;
+    let profile = config
+        .get("tui")
+        .and_then(|tui| tui.get("provider_profile"))
+        .and_then(toml::Value::as_str)?
+        .parse()
+        .ok()?;
+    let profile_path = resolve_profile_v2_config_path(codex_home, &profile);
+    profile_path.as_path().is_file().then_some(profile)
 }
 
 fn maybe_print_under_development_feature_warning(codex_home: &std::path::Path, feature: &str) {

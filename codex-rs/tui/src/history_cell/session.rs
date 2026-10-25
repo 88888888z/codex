@@ -371,8 +371,10 @@ impl HistoryCell for SessionHeaderHistoryCell {
         ];
         if self.yolo_mode {
             lines.push(Line::from(vec![
-                "  permissions: ".dim(),
-                "YOLO mode".magenta().bold(),
+                crate::i18n::ui_text("  permissions: ", "  权限：").dim(),
+                crate::i18n::ui_text("YOLO mode", "YOLO 模式")
+                    .magenta()
+                    .bold(),
             ]));
         }
         lines
@@ -397,7 +399,11 @@ impl HistoryCell for SessionHeaderHistoryCell {
             )),
         ];
         if self.yolo_mode {
-            lines.push(Line::from("permissions: YOLO mode"));
+            lines.push(Line::from(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                "权限：YOLO 模式"
+            } else {
+                "permissions: YOLO mode"
+            }));
         }
         lines
     }

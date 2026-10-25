@@ -66,12 +66,19 @@ impl ChatComposer {
             .unwrap_or_else(|| "/warnings".into());
         let mut full = Line::from(vec![
             "⚠ ".into(),
-            Span::styled(format!("{count} warning{plural}"), accent),
+            Span::styled(
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("{count} 个警告")
+                } else {
+                    format!("{count} warning{plural}")
+                },
+                accent,
+            ),
             " · ".into(),
         ])
         .style(secondary);
         full.extend(key_hint::key_label_spans(&shortcut));
-        full.push_span(" to view");
+        full.push_span(crate::i18n::ui_text(" to view", " 查看"));
         if full.width() <= usize::from(width) {
             return full;
         }

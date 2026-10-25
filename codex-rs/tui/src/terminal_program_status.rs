@@ -105,8 +105,8 @@ impl ProgramStatus {
     fn iterm_label(self) -> &'static str {
         match self {
             Self::Idle | Self::Done | Self::Error => "Idle",
-            Self::Working => "Working",
-            Self::Blocked(_) => "Waiting",
+            Self::Working => crate::i18n::ui_text("Working", "处理中"),
+            Self::Blocked(_) => crate::i18n::ui_text("Waiting", "等待中"),
         }
     }
 

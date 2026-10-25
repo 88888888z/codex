@@ -71,7 +71,11 @@ impl FinalMessageSeparator {
             } else {
                 format!("{seconds}s")
             };
-            label_parts.push(format!("Worked for {elapsed}"));
+            label_parts.push(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("用时 {elapsed}")
+            } else {
+                format!("Worked for {elapsed}")
+            });
         }
         if let Some(completed_at) = self.completed_at {
             let date_format = if completed_at.date_naive() == today {

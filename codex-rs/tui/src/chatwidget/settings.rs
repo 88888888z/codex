@@ -297,6 +297,7 @@ impl ChatWidget {
     }
 
     pub(crate) fn set_tui_language(&mut self, language: TuiLanguage) {
+        crate::i18n::set_current_language(language);
         self.config_panel_tui.language = language;
         self.local_settings.tui.language = language;
         self.normal_placeholder_text = crate::i18n::placeholder(language).to_string();

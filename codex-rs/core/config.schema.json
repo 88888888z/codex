@@ -5204,6 +5204,14 @@
           "default": "zh-CN",
           "description": "Interface language for the TUI.\n\nDefaults to Simplified Chinese. `auto` follows the system locale; `zh-CN` and `en` select an explicit language."
         },
+        "provider_profile": {
+          "default": null,
+          "description": "Last selected third-party model provider profile.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "model_availability_nux": {
           "allOf": [
             {

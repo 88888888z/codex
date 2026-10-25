@@ -118,8 +118,14 @@ pub(crate) fn build_pet_picker_params(
 
     SelectionViewParams {
         view_id: Some(PET_PICKER_VIEW_ID),
-        title: Some("Select Pet".to_string()),
-        subtitle: Some("Choose a pet to wake in the terminal.".to_string()),
+        title: Some(crate::i18n::ui_text("Select Pet", "选择宠物").to_string()),
+        subtitle: Some(
+            crate::i18n::ui_text(
+                "Choose a pet to wake in the terminal.",
+                "选择要在终端中唤醒的宠物。",
+            )
+            .to_string(),
+        ),
         footer_hint: Some(standard_popup_hint_line()),
         items,
         is_searchable: true,

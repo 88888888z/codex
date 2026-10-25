@@ -245,7 +245,9 @@ impl ChatWidget {
         self.bottom_pane.show_selection_view(SelectionViewParams {
             view_id: Some(super::permission_discovery::VIEW_ID),
             items,
-            title: Some("Update Model Permissions".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Update Model Permissions", "更新模型权限").to_string(),
+            ),
             subtitle: discovery
                 .profiles
                 .is_empty()

@@ -269,6 +269,7 @@ impl CommandPopup {
                         "  ".into()
                     }],
                     selection_style: Some(selection_style()),
+                    selection_border: true,
                     match_indices: indices.map(|v| v.into_iter().map(|i| i + 1).collect()),
                     display_shortcut: None,
                     description: Some(description),

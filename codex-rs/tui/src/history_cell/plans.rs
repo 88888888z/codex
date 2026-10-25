@@ -270,7 +270,7 @@ impl HistoryCell for PlanUpdateCell {
         let mut lines = vec![clipped_line(
             Line::from(vec![
                 "• ".dim(),
-                "Updated Plan".bold(),
+                crate::i18n::ui_text("Updated Plan", "计划已更新").bold(),
                 format!(" · {completed}/{total} complete").dim(),
             ]),
             width,
@@ -338,7 +338,11 @@ impl HistoryCell for PlanUpdateCell {
         };
 
         let mut lines = vec![HyperlinkLine::new(
-            vec!["• ".dim(), "Updated Plan".bold()].into(),
+            vec![
+                "• ".dim(),
+                crate::i18n::ui_text("Updated Plan", "计划已更新").bold(),
+            ]
+            .into(),
         )];
 
         let mut indented_lines = vec![];
@@ -374,7 +378,10 @@ impl HistoryCell for PlanUpdateCell {
     }
 
     fn raw_lines(&self) -> Vec<Line<'static>> {
-        let mut lines = vec![Line::from("Updated Plan")];
+        let mut lines = vec![Line::from(crate::i18n::ui_text(
+            "Updated Plan",
+            "计划已更新",
+        ))];
         if let Some(explanation) = self
             .explanation
             .as_ref()

@@ -3521,7 +3521,11 @@ impl App {
                     Err(err) => {
                         tracing::error!(error = %err, "failed to persist language selection");
                         self.app_event_tx.send(AppEvent::FollowTranscript);
-                        let message = format!("Failed to save language: {err}");
+                        let message = if crate::i18n::is_chinese(language) {
+                            format!("保存语言设置失败：{err}")
+                        } else {
+                            format!("Failed to save language: {err}")
+                        };
                         self.chat_widget.report_config_save_error(message);
                     }
                 }
@@ -3544,14 +3548,14 @@ impl App {
                             &base_config_path,
                         )
                         .await
-                        .map(|_| ())
                     }
                     Err(error) => Err(anyhow::Error::from(error)),
                 };
                 match save_result {
-                    Ok(()) => {
-                        self.loader_overrides.user_config_path = None;
-                        self.loader_overrides.user_config_profile = None;
+                    Ok(profile_path) => {
+                        self.loader_overrides.user_config_path =
+                            Some(AbsolutePathBuf::from_absolute_path(profile_path)?);
+                        self.loader_overrides.user_config_profile = Some(profile.id.parse()?);
                         self.chat_widget.add_info_message(
                             format!("已保存并切换到模型配置 `{}`。", profile.id),
                             Some("当前会话将使用新配置重新开始。".to_string()),
@@ -3559,7 +3563,7 @@ impl App {
                         self.start_fresh_session(
                             tui,
                             app_server,
-                            Some(ThreadStartSource::Clear),
+                            /*session_start_source*/ None,
                             /*initial_user_message*/ None,
                             /*new_thread_name*/ None,
                         )
@@ -3572,22 +3576,17 @@ impl App {
                 }
             }
             AppEvent::ActivateProviderProfile(profile) => {
-                let codex_home = self.local_settings.codex_home.to_path_buf();
-                let base_config_path = codex_home.join(codex_config::CONFIG_TOML_FILE);
-                let activate_result = match std::env::current_exe() {
-                    Ok(executable) => crate::provider_profiles::activate_profile(
-                        &profile,
-                        &executable,
-                        &codex_home,
-                        &base_config_path,
-                    )
-                    .await,
-                    Err(error) => Err(anyhow::Error::from(error)),
-                };
+                let base_config_path = self
+                    .local_settings
+                    .codex_home
+                    .join(codex_config::CONFIG_TOML_FILE);
+                let activate_result =
+                    crate::provider_profiles::activate_profile(&profile, &base_config_path).await;
                 match activate_result {
                     Ok(()) => {
-                        self.loader_overrides.user_config_path = None;
-                        self.loader_overrides.user_config_profile = None;
+                        self.loader_overrides.user_config_path =
+                            Some(AbsolutePathBuf::from_absolute_path(profile.path)?);
+                        self.loader_overrides.user_config_profile = Some(profile.id.parse()?);
                         self.chat_widget.add_info_message(
                             format!("已切换到模型配置 `{}`。", profile.id),
                             Some("当前会话将使用新配置重新开始。".to_string()),
@@ -3595,7 +3594,7 @@ impl App {
                         self.start_fresh_session(
                             tui,
                             app_server,
-                            Some(ThreadStartSource::Clear),
+                            /*session_start_source*/ None,
                             /*initial_user_message*/ None,
                             /*new_thread_name*/ None,
                         )

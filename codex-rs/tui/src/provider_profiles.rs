@@ -5,15 +5,13 @@
 //! switch the running session and the last choice becomes the default.
 
 use crate::legacy_core::config::CONFIG_PROFILE_V2_SUFFIX;
-use crate::legacy_core::config::edit::ConfigEdit;
 use crate::legacy_core::config::edit::ConfigEditsBuilder;
 use codex_model_provider_info::WireApi;
+use codex_utils_cli::ProfileV2Name;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
-use toml_edit::Item;
-use toml_edit::value;
 
 const PROVIDER_TOKEN_COMMAND: &str = "provider";
 
@@ -174,6 +172,12 @@ struct ProfileDocument {
     model: String,
     model_provider: String,
     model_providers: BTreeMap<String, ProfileProviderDocument>,
+    tui: ProfileTuiDocument,
+}
+
+#[derive(Serialize)]
+struct ProfileTuiDocument {
+    provider_profile: String,
 }
 
 #[derive(Serialize)]
@@ -211,6 +215,20 @@ pub(crate) fn validate_profile_id(id: &str) -> Result<(), String> {
 
 pub(crate) fn profile_path(codex_home: &Path, id: &str) -> PathBuf {
     codex_home.join(format!("{id}{CONFIG_PROFILE_V2_SUFFIX}"))
+}
+
+pub(crate) fn active_profile(codex_home: &Path) -> Option<ProfileV2Name> {
+    let text = std::fs::read_to_string(codex_home.join(codex_config::CONFIG_TOML_FILE)).ok()?;
+    let config = toml::from_str::<toml::Value>(&text).ok()?;
+    let profile: ProfileV2Name = config
+        .get("tui")
+        .and_then(|tui| tui.get("provider_profile"))
+        .and_then(toml::Value::as_str)?
+        .parse()
+        .ok()?;
+    profile_path(codex_home, &profile.to_string())
+        .is_file()
+        .then_some(profile)
 }
 
 pub(crate) fn list_profiles(codex_home: &Path) -> Vec<ProfileSummary> {
@@ -297,6 +315,9 @@ pub(crate) async fn save_profile(
     let document = ProfileDocument {
         model: profile.model.clone(),
         model_provider: profile.provider_id.clone(),
+        tui: ProfileTuiDocument {
+            provider_profile: profile.id.clone(),
+        },
         model_providers: if profile.provider_id.starts_with("codex-") {
             BTreeMap::from([(
                 profile.provider_id.clone(),
@@ -321,60 +342,15 @@ pub(crate) async fn save_profile(
     let path = profile_path(codex_home, &profile.id);
     write_private_file(&path, toml::to_string_pretty(&document)?.as_bytes())?;
 
-    let edits = base_config_edits(profile, executable, codex_home, has_api_key);
-    ConfigEditsBuilder::for_config_path(base_config_path)
-        .with_edits(edits)
-        .apply()
-        .await?;
+    write_active_profile(base_config_path, &profile.id).await?;
     Ok(path)
 }
 
 pub(crate) async fn activate_profile(
     profile: &ProfileSummary,
-    executable: &Path,
-    codex_home: &Path,
     base_config_path: &Path,
 ) -> anyhow::Result<()> {
-    let value = toml::from_str::<toml::Value>(&std::fs::read_to_string(&profile.path)?)?;
-    let provider = value
-        .get("model_providers")
-        .and_then(|providers| providers.get(&profile.provider));
-    let default_wire = if matches!(profile.provider.as_str(), "ollama" | "lmstudio") {
-        "responses"
-    } else {
-        "chat"
-    };
-    let wire_api = provider
-        .and_then(|provider| provider.get("wire_api"))
-        .and_then(toml::Value::as_str)
-        .unwrap_or(default_wire);
-    let data = ProviderProfile {
-        id: profile.id.clone(),
-        provider_id: profile.provider.clone(),
-        display_name: provider
-            .and_then(|provider| provider.get("name"))
-            .and_then(toml::Value::as_str)
-            .unwrap_or(&profile.provider)
-            .to_string(),
-        base_url: provider
-            .and_then(|provider| provider.get("base_url"))
-            .and_then(toml::Value::as_str)
-            .unwrap_or_default()
-            .to_string(),
-        model: profile.model.clone(),
-        wire_api: if wire_api == "chat" {
-            WireApi::Chat
-        } else {
-            WireApi::Responses
-        },
-        api_key: None,
-    };
-    let has_auth = provider.is_some_and(|provider| provider.get("auth").is_some());
-    ConfigEditsBuilder::for_config_path(base_config_path)
-        .with_edits(base_config_edits(&data, executable, codex_home, has_auth))
-        .apply()
-        .await?;
-    Ok(())
+    write_active_profile(base_config_path, &profile.id).await
 }
 
 pub(crate) fn delete_profile(codex_home: &Path, profile: &ProfileSummary) -> anyhow::Result<()> {
@@ -392,102 +368,15 @@ fn token_args(profile_id: &str) -> Vec<String> {
     ]
 }
 
-fn base_config_edits(
-    profile: &ProviderProfile,
-    executable: &Path,
-    codex_home: &Path,
-    has_api_key: bool,
-) -> Vec<ConfigEdit> {
-    let provider_path = |field: &str| {
-        vec![
-            "model_providers".to_string(),
-            profile.provider_id.clone(),
-            field.to_string(),
-        ]
-    };
-    let auth_path = |field: &str| {
-        vec![
-            "model_providers".to_string(),
-            profile.provider_id.clone(),
-            "auth".to_string(),
-            field.to_string(),
-        ]
-    };
-    let mut edits = vec![
-        ConfigEdit::SetPath {
-            segments: vec!["model".to_string()],
-            value: value(profile.model.clone()),
-        },
-        ConfigEdit::SetPath {
-            segments: vec!["model_provider".to_string()],
-            value: value(profile.provider_id.clone()),
-        },
-    ];
-
-    if profile.provider_id.starts_with("codex-") {
-        edits.extend([
-            ConfigEdit::SetPath {
-                segments: provider_path("name"),
-                value: value(profile.display_name.clone()),
-            },
-            ConfigEdit::SetPath {
-                segments: provider_path("base_url"),
-                value: value(profile.base_url.trim_end_matches('/').to_string()),
-            },
-            ConfigEdit::SetPath {
-                segments: provider_path("wire_api"),
-                value: value(profile.wire_api.to_string()),
-            },
-            ConfigEdit::SetPath {
-                segments: provider_path("requires_openai_auth"),
-                value: value(false),
-            },
-            ConfigEdit::ClearPath {
-                segments: provider_path("env_key"),
-            },
-            ConfigEdit::ClearPath {
-                segments: provider_path("experimental_bearer_token"),
-            },
-        ]);
-    }
-
-    if has_api_key {
-        let mut args = toml_edit::Array::new();
-        for arg in token_args(&profile.id) {
-            args.push(arg);
-        }
-        edits.extend([
-            ConfigEdit::SetPath {
-                segments: auth_path("command"),
-                value: value(executable.to_string_lossy().into_owned()),
-            },
-            ConfigEdit::SetPath {
-                segments: auth_path("args"),
-                value: Item::Value(args.into()),
-            },
-            ConfigEdit::SetPath {
-                segments: auth_path("timeout_ms"),
-                value: value(5_000_i64),
-            },
-            ConfigEdit::SetPath {
-                segments: auth_path("refresh_interval_ms"),
-                value: value(0_i64),
-            },
-            ConfigEdit::SetPath {
-                segments: auth_path("cwd"),
-                value: value(codex_home.to_string_lossy().into_owned()),
-            },
-        ]);
-    } else {
-        edits.push(ConfigEdit::ClearPath {
-            segments: vec![
-                "model_providers".to_string(),
-                profile.provider_id.clone(),
-                "auth".to_string(),
-            ],
-        });
-    }
-    edits
+async fn write_active_profile(base_config_path: &Path, profile_id: &str) -> anyhow::Result<()> {
+    ConfigEditsBuilder::for_config_path(base_config_path)
+        .with_edits([crate::legacy_core::config::edit::ConfigEdit::SetPath {
+            segments: vec!["tui".to_string(), "provider_profile".to_string()],
+            value: toml_edit::value(profile_id),
+        }])
+        .apply()
+        .await?;
+    Ok(())
 }
 
 fn write_private_file(path: &Path, contents: &[u8]) -> anyhow::Result<()> {

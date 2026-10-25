@@ -31,7 +31,7 @@ impl ChatWidget {
         })
         .collect();
         self.show_selection_view(SelectionViewParams {
-            title: Some("TUI mode for next launch".into()),
+            title: Some(crate::i18n::ui_text("TUI mode for next launch", "下次启动的 TUI 模式").into()),
             description_layout: SelectionDescriptionLayout::Columns,
             footer_note: Some("Restart to apply. Launch overrides still apply.".into()),
             footer_hint: Some(picker_hint_line_for_keymap(&self.bottom_pane.list_keymap())),

@@ -51,8 +51,8 @@ impl ChatWidget {
         ];
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            title: Some("Skills".to_string()),
-            subtitle: Some("Choose an action".to_string()),
+            title: Some(crate::i18n::ui_text("Skills", "Skills").to_string()),
+            subtitle: Some(crate::i18n::ui_text("Choose an action", "选择操作").to_string()),
             footer_hint: Some(standard_popup_hint_line()),
             items,
             ..SelectionViewParams::picker()
@@ -61,7 +61,10 @@ impl ChatWidget {
 
     pub(crate) fn open_manage_skills_popup(&mut self) {
         if self.skills_all.is_empty() {
-            self.add_info_message("No skills available.".to_string(), /*hint*/ None);
+            self.add_info_message(
+                crate::i18n::ui_text("No skills available.", "没有可用的 Skills。").to_string(),
+                /*hint*/ None,
+            );
             return;
         }
 

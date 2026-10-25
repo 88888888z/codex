@@ -10,12 +10,25 @@ impl ChatWidget {
     pub(super) fn open_language_picker(&mut self) {
         let current = self.local_settings.tui.language;
         let effective = crate::i18n::effective_language(current);
+        let current_label = match current {
+            TuiLanguage::Auto => crate::i18n::text(effective, "Auto", "自动"),
+            TuiLanguage::Chinese => "简体中文",
+            TuiLanguage::English => "English",
+        };
+        let effective_label = match effective {
+            TuiLanguage::Chinese => "简体中文",
+            TuiLanguage::English | TuiLanguage::Auto => "English",
+        };
         let title = crate::i18n::text(effective, "Select Interface Language", "选择界面语言");
-        let subtitle = crate::i18n::text(
-            effective,
-            "Changes apply immediately and are saved for future sessions.",
-            "切换后立即生效，并保存到后续会话。",
-        );
+        let subtitle = if crate::i18n::is_chinese(effective) {
+            format!(
+                "当前设置：{current_label} · 实际生效：{effective_label}。切换后立即生效并保存到后续会话。"
+            )
+        } else {
+            format!(
+                "Current setting: {current_label} · Effective: {effective_label}. Changes apply immediately and are saved for future sessions."
+            )
+        };
         let auto_description =
             crate::i18n::text(effective, "Follow the system locale", "跟随系统语言环境");
         let chinese_description =
@@ -61,7 +74,7 @@ impl ChatWidget {
         ];
         self.bottom_pane.show_selection_view(SelectionViewParams {
             title: Some(title.to_string()),
-            subtitle: Some(subtitle.to_string()),
+            subtitle: Some(subtitle),
             items,
             initial_selected_idx: Some(match current {
                 TuiLanguage::Auto => 0,
@@ -101,10 +114,11 @@ impl ChatWidget {
 
     pub(super) fn open_theme_picker(&mut self) {
         let codex_home = codex_utils_home_dir::find_codex_home().ok();
-        let params = crate::theme_picker::build_theme_picker_params(
+        let params = crate::theme_picker::build_theme_picker_params_for_language(
             self.local_settings.tui.theme.as_deref(),
             codex_home.as_deref(),
             self.last_rendered_width.get(),
+            self.local_settings.tui.language,
         );
         self.bottom_pane.show_selection_view(params);
     }
@@ -112,7 +126,12 @@ impl ChatWidget {
     pub(crate) fn open_experimental_popup(&mut self) {
         let Some(thread_id) = self.thread_id() else {
             self.add_info_message(
-                "Experimental features are unavailable until startup completes.".to_string(),
+                crate::i18n::text(
+                    self.local_settings.tui.language,
+                    "Experimental features are unavailable until startup completes.",
+                    "启动完成前无法使用实验功能。",
+                )
+                .to_string(),
                 /*hint*/ None,
             );
             return;
@@ -128,6 +147,7 @@ impl ChatWidget {
             Some(response_rx),
             self.app_event_tx.clone(),
             self.bottom_pane.list_keymap(),
+            self.local_settings.tui.language,
         );
         self.bottom_pane.show_view(Box::new(view));
     }

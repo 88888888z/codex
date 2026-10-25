@@ -50,33 +50,77 @@ impl Search {
     ) -> Line<'static> {
         let previous = crate::key_hint::ctrl(crossterm::event::KeyCode::Char('p')).display_label();
         let next = crate::key_hint::ctrl(crossterm::event::KeyCode::Char('n')).display_label();
-        let retry_hint = format!("{previous} retry");
-        let unavailable_hint = format!("History unavailable · {retry_hint}");
-        let next_hint = format!("enter accept · {previous} older · {next} newer");
-        let exhausted_hint = format!("No more matches · {next_hint}");
+        let retry_hint = format!(
+            "{previous} {}",
+            crate::i18n::ui_text("retry", "重试")
+        );
+        let unavailable_hint = format!(
+            "{} · {retry_hint}",
+            crate::i18n::ui_text("History unavailable", "历史记录不可用")
+        );
+        let next_hint = format!(
+            "{} · {previous} {} · {next} {}",
+            crate::i18n::ui_text("enter accept", "Enter 接受"),
+            crate::i18n::ui_text("older", "上一条"),
+            crate::i18n::ui_text("newer", "下一条"),
+        );
+        let exhausted_hint = format!(
+            "{} · {next_hint}",
+            crate::i18n::ui_text("No more matches", "没有更多匹配")
+        );
         let (status, compact) = match self.progress {
             Progress::Idle | Progress::Found if self.is_reading() => {
-                ("ctrl+p older · ctrl+n newer", "ctrl+p older")
+                (
+                    crate::i18n::ui_text("ctrl+p older · ctrl+n newer", "Ctrl+P 上一条 · Ctrl+N 下一条"),
+                    crate::i18n::ui_text("ctrl+p older", "Ctrl+P 上一条"),
+                )
             }
-            Progress::Idle if !self.editor.is_empty() => (next_hint.as_str(), "enter accept"),
-            Progress::Idle => ("Type to find", "Type to find"),
-            Progress::Restart | Progress::Scanning(_) => ("Searching…", "Searching…"),
+            Progress::Idle if !self.editor.is_empty() => (
+                next_hint.as_str(),
+                crate::i18n::ui_text("enter accept", "Enter 接受"),
+            ),
+            Progress::Idle => (
+                crate::i18n::ui_text("Type to find", "输入以查找"),
+                crate::i18n::ui_text("Type to find", "输入以查找"),
+            ),
+            Progress::Restart | Progress::Scanning(_) => (
+                crate::i18n::ui_text("Searching…", "正在搜索…"),
+                crate::i18n::ui_text("Searching…", "正在搜索…"),
+            ),
             Progress::AwaitingHistory if history == TranscriptHistoryState::Failed => {
                 (unavailable_hint.as_str(), retry_hint.as_str())
             }
-            Progress::AwaitingHistory => ("Searching earlier history…", "Loading…"),
-            Progress::Found => (next_hint.as_str(), "enter accept"),
+            Progress::AwaitingHistory => (
+                crate::i18n::ui_text("Searching earlier history…", "正在搜索更早的记录…"),
+                crate::i18n::ui_text("Loading…", "正在加载…"),
+            ),
+            Progress::Found => (
+                next_hint.as_str(),
+                crate::i18n::ui_text("enter accept", "Enter 接受"),
+            ),
             Progress::Exhausted if self.is_reading() && self.current.is_some() => (
-                "No more matches · ctrl+p older · ctrl+n newer",
-                "ctrl+p older",
+                crate::i18n::ui_text(
+                    "No more matches · ctrl+p older · ctrl+n newer",
+                    "没有更多匹配 · Ctrl+P 上一条 · Ctrl+N 下一条",
+                ),
+                crate::i18n::ui_text("ctrl+p older", "Ctrl+P 上一条"),
             ),
             Progress::Exhausted if self.current.is_some() => {
-                (exhausted_hint.as_str(), "enter accept")
+                (
+                    exhausted_hint.as_str(),
+                    crate::i18n::ui_text("enter accept", "Enter 接受"),
+                )
             }
-            Progress::Exhausted => ("No matches", "No matches"),
+            Progress::Exhausted => (
+                crate::i18n::ui_text("No matches", "没有匹配"),
+                crate::i18n::ui_text("No matches", "没有匹配"),
+            ),
         };
         let limit = if self.query_truncated {
-            " · query limited to 4 KiB"
+            crate::i18n::ui_text(
+                " · query limited to 4 KiB",
+                " · 查询最多 4 KiB",
+            )
         } else {
             ""
         };

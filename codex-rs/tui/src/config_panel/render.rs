@@ -23,12 +23,12 @@ use crate::bottom_pane::SelectionToggle;
 use crate::bottom_pane::SelectionToggleState;
 use crate::bottom_pane::SelectionViewParams;
 use crate::bottom_pane::footer_hint_items_line;
-use crate::bottom_pane::popup_consts::picker_hint_line_for_keymap;
 use crate::key_hint::KeyBinding;
 use crate::keymap::ListAction;
 use crate::keymap::ListKeymap;
 use crate::render::renderable::Renderable;
 use crate::wrapping::word_wrap_lines;
+use codex_config::types::TuiLanguage;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use ratatui::buffer::Buffer;
@@ -40,6 +40,24 @@ use unicode_width::UnicodeWidthStr;
 
 pub(crate) const EFFECTS_VIEW_ID: &str = "config-effects";
 
+fn picker_hint_line(keymap: &ListKeymap, language: TuiLanguage) -> Line<'static> {
+    let labels = [
+        (ListAction::Accept, crate::i18n::text(language, "select", "选择")),
+        (ListAction::Cancel, crate::i18n::text(language, "back", "返回")),
+    ];
+    let mut spans = Vec::new();
+    for (action, label) in labels {
+        if let Some(hint) = keymap.primary_hint(action) {
+            if !spans.is_empty() {
+                spans.push(" · ".dim());
+            }
+            spans.extend(hint.spans());
+            spans.push(format!(" {label}").dim());
+        }
+    }
+    Line::from(spans)
+}
+
 pub(crate) fn effects(tui: &codex_config::types::Tui, keymap: &ListKeymap) -> SelectionViewParams {
     effects_with_toggle_states(tui, keymap, &[])
 }
@@ -49,7 +67,14 @@ pub(crate) fn effects_with_toggle_states(
     keymap: &ListKeymap,
     toggle_states: &[Option<SelectionToggleState>],
 ) -> SelectionViewParams {
-    let footer_hint = [(ListAction::Accept, "toggle"), (ListAction::Cancel, "back")]
+    let language = tui.language;
+    let footer_hint = [
+        (
+            ListAction::Accept,
+            crate::i18n::text(language, "toggle", "切换"),
+        ),
+        (ListAction::Cancel, crate::i18n::text(language, "back", "返回")),
+    ]
         .into_iter()
         .filter_map(|(action, label)| {
             keymap
@@ -59,13 +84,25 @@ pub(crate) fn effects_with_toggle_states(
         .collect::<Vec<_>>();
     let settings = [
         (
-            "Animations",
-            "Animate the welcome screen, working indicator, and transitions",
+            crate::i18n::text(
+                language,
+                "Animations",
+                "动画",
+            ),
+            crate::i18n::text(
+                language,
+                "Animate the welcome screen, working indicator, and transitions",
+                "欢迎页、运行指示和界面过渡使用动画",
+            ),
             ConfigToggle::Animations,
         ),
         (
-            "Composer stars",
-            "Show stars briefly for new Astra tasks",
+            crate::i18n::text(language, "Composer stars", "输入框星光"),
+            crate::i18n::text(
+                language,
+                "Show stars briefly for new Astra tasks",
+                "开始新的 Astra 任务时短暂显示星光",
+            ),
             ConfigToggle::ComposerStars,
         ),
     ];
@@ -77,8 +114,11 @@ pub(crate) fn effects_with_toggle_states(
         .unwrap_or(tui.animations);
     SelectionViewParams {
         view_id: Some(EFFECTS_VIEW_ID),
-        title: Some("Effects".to_string()),
-        subtitle: Some("Configure visual effects".to_string()),
+        title: Some(crate::i18n::text(language, "Effects", "视觉效果").to_string()),
+        subtitle: Some(
+            crate::i18n::text(language, "Configure visual effects", "配置界面视觉效果")
+                .to_string(),
+        ),
         footer_hint: Some(footer_hint_items_line(&footer_hint)),
         allow_input_when_disconnected: true,
         items: settings
@@ -108,7 +148,14 @@ pub(crate) fn effects_with_toggle_states(
                     toggle_placeholder: (!available).then_some(SELECTION_TOGGLE_UNAVAILABLE_PREFIX),
                     description: available.then(|| description.to_string()),
                     disabled_reason: (!available)
-                        .then(|| "Turn on Animations to show Astra task stars".to_string()),
+                        .then(|| {
+                            crate::i18n::text(
+                                language,
+                                "Turn on Animations to show Astra task stars",
+                                "开启动画后才能显示 Astra 任务星光",
+                            )
+                            .to_string()
+                        }),
                     dismiss_on_select: false,
                     ..Default::default()
                 }
@@ -124,17 +171,29 @@ pub(crate) fn notification_condition(
 ) -> SelectionViewParams {
     use codex_config::types::NotificationCondition;
 
+    let language = tui.language;
     let current = tui.notification_settings.condition;
     let conditions = [
-        ("Unfocused", NotificationCondition::Unfocused),
-        ("Always", NotificationCondition::Always),
+        (
+            crate::i18n::text(language, "Unfocused", "失焦时"),
+            NotificationCondition::Unfocused,
+        ),
+        (
+            crate::i18n::text(language, "Always", "始终"),
+            NotificationCondition::Always,
+        ),
     ];
     SelectionViewParams {
-        title: Some("Notify when".to_string()),
+        title: Some(crate::i18n::text(language, "Notify when", "通知时机").to_string()),
         subtitle: Some(
-            "Notify only while you are away or while this terminal is focused too".to_string(),
+            crate::i18n::text(
+                language,
+                "Notify only while you are away or while this terminal is focused too",
+                "仅在离开时通知，或终端处于焦点时也通知",
+            )
+            .to_string(),
         ),
-        footer_hint: Some(picker_hint_line_for_keymap(keymap)),
+        footer_hint: Some(picker_hint_line(keymap, language)),
         initial_selected_idx: conditions
             .iter()
             .position(|(_, condition)| *condition == current),
@@ -163,19 +222,33 @@ pub(crate) fn copy_on_select(
 ) -> SelectionViewParams {
     use codex_config::types::CopyOnSelect;
 
+    let language = tui.language;
     let current = tui.copy_on_select;
     let modes = [
-        ("Auto (default)", CopyOnSelect::Auto),
-        ("On", CopyOnSelect::Always),
-        ("Off", CopyOnSelect::Never),
+        (
+            crate::i18n::text(language, "Auto (default)", "自动（默认）"),
+            CopyOnSelect::Auto,
+        ),
+        (
+            crate::i18n::text(language, "On", "开"),
+            CopyOnSelect::Always,
+        ),
+        (
+            crate::i18n::text(language, "Off", "关"),
+            CopyOnSelect::Never,
+        ),
     ];
     SelectionViewParams {
-        title: Some("Copy on select".to_string()),
+        title: Some(crate::i18n::text(language, "Copy on select", "选中即复制").to_string()),
         subtitle: Some(
-            "Copy transcript, footer, and composer selections on release; Auto follows terminal defaults"
-                .to_string(),
+            crate::i18n::text(
+                language,
+                "Copy transcript, footer, and composer selections on release; Auto follows terminal defaults",
+                "松开鼠标时复制对话、底栏和输入框中的选区；自动会跟随终端默认行为",
+            )
+            .to_string(),
         ),
-        footer_hint: Some(picker_hint_line_for_keymap(keymap)),
+        footer_hint: Some(picker_hint_line(keymap, language)),
         initial_selected_idx: modes.iter().position(|(_, mode)| *mode == current),
         allow_input_when_disconnected: true,
         items: modes
@@ -202,16 +275,26 @@ pub(crate) fn right_click_paste(
 ) -> SelectionViewParams {
     use codex_config::types::RightClickPaste;
 
+    let language = tui.language;
     let current = tui.right_click_paste;
     let modes = [
-        ("Auto (default)", RightClickPaste::Auto),
-        ("On", RightClickPaste::On),
-        ("Off", RightClickPaste::Off),
+        (
+            crate::i18n::text(language, "Auto (default)", "自动（默认）"),
+            RightClickPaste::Auto,
+        ),
+        (
+            crate::i18n::text(language, "On", "开"),
+            RightClickPaste::On,
+        ),
+        (
+            crate::i18n::text(language, "Off", "关"),
+            RightClickPaste::Off,
+        ),
     ];
     SelectionViewParams {
-        title: Some("Right-click paste".to_string()),
-        subtitle: Some(super::RIGHT_CLICK_PASTE_DESCRIPTION.to_string()),
-        footer_hint: Some(picker_hint_line_for_keymap(keymap)),
+        title: Some(crate::i18n::text(language, "Right-click paste", "右键粘贴").to_string()),
+        subtitle: Some(super::right_click_paste_description(language).to_string()),
+        footer_hint: Some(picker_hint_line(keymap, language)),
         initial_selected_idx: modes.iter().position(|(_, mode)| *mode == current),
         allow_input_when_disconnected: true,
         items: modes
@@ -238,18 +321,29 @@ pub(crate) fn session_picker_layout(
 ) -> SelectionViewParams {
     use codex_config::types::SessionPickerViewMode;
 
+    let language = tui.language;
     let current = tui.session_picker_view.unwrap_or_default();
     let modes = [
-        ("Dense", SessionPickerViewMode::Dense),
-        ("Comfortable", SessionPickerViewMode::Comfortable),
+        (
+            crate::i18n::text(language, "Dense", "紧凑"),
+            SessionPickerViewMode::Dense,
+        ),
+        (
+            crate::i18n::text(language, "Comfortable", "舒适"),
+            SessionPickerViewMode::Comfortable,
+        ),
     ];
     SelectionViewParams {
-        title: Some("Session picker layout".to_string()),
+        title: Some(crate::i18n::text(language, "Session picker layout", "会话列表布局").to_string()),
         subtitle: Some(
-            "Choose tighter rows or a roomier list when resuming and forking conversations"
-                .to_string(),
+            crate::i18n::text(
+                language,
+                "Choose tighter rows or a roomier list when resuming and forking conversations",
+                "恢复或分叉会话时选择紧凑或宽松的列表",
+            )
+            .to_string(),
         ),
-        footer_hint: Some(picker_hint_line_for_keymap(keymap)),
+        footer_hint: Some(picker_hint_line(keymap, language)),
         initial_selected_idx: modes.iter().position(|(_, mode)| *mode == current),
         allow_input_when_disconnected: true,
         items: modes
@@ -277,19 +371,30 @@ pub(crate) fn resume_directory(
 ) -> SelectionViewParams {
     use codex_config::types::ResumeCwdMode;
 
+    let language = tui.language;
     let current = tui.resume_cwd;
     let modes = [
-        ("Ask", None),
-        ("Current directory", Some(ResumeCwdMode::Current)),
-        ("Session directory", Some(ResumeCwdMode::Session)),
+        (crate::i18n::text(language, "Ask", "询问"), None),
+        (
+            crate::i18n::text(language, "Current directory", "当前目录"),
+            Some(ResumeCwdMode::Current),
+        ),
+        (
+            crate::i18n::text(language, "Session directory", "会话目录"),
+            Some(ResumeCwdMode::Session),
+        ),
     ];
     SelectionViewParams {
-        title: Some("Resume directory".to_string()),
+        title: Some(crate::i18n::text(language, "Resume directory", "恢复目录").to_string()),
         subtitle: Some(
-            "Choose the working directory when resuming, with --cd taking precedence for this session"
-                .to_string(),
+            crate::i18n::text(
+                language,
+                "Choose the working directory when resuming, with --cd taking precedence for this session",
+                "选择恢复时使用的工作目录；当前会话的 --cd 参数优先",
+            )
+            .to_string(),
         ),
-        footer_hint: Some(picker_hint_line_for_keymap(keymap)),
+        footer_hint: Some(picker_hint_line(keymap, language)),
         initial_selected_idx: modes.iter().position(|(_, mode)| *mode == current),
         allow_input_when_disconnected: true,
         items: modes
@@ -303,7 +408,14 @@ pub(crate) fn resume_directory(
                         ResumeCurrentAvailability::RequiresCwdOverride
                     )
                 {
-                    Some("Requires --cd for remote sessions".to_string())
+                    Some(
+                        crate::i18n::text(
+                            language,
+                            "Requires --cd for remote sessions",
+                            "远程会话需要指定 --cd",
+                        )
+                        .to_string(),
+                    )
                 } else {
                     None
                 },
@@ -336,10 +448,12 @@ impl Renderable for ConfigPanelHeader {
     }
 }
 
-fn header(notice: Option<String>) -> Box<dyn Renderable> {
-    let subtitle = notice.unwrap_or_else(|| "Changes save automatically".to_string());
+fn header(notice: Option<String>, language: TuiLanguage) -> Box<dyn Renderable> {
+    let subtitle = notice.unwrap_or_else(|| {
+        crate::i18n::text(language, "Changes save automatically", "更改会自动保存").to_string()
+    });
     Box::new(ConfigPanelHeader(vec![
-        Line::from("Configuration".bold()),
+        Line::from(crate::i18n::text(language, "Configuration", "配置").bold()),
         Line::from(subtitle.dim()),
     ]))
 }
@@ -348,12 +462,13 @@ fn hint(
     keymap: &ListKeymap,
     search: Option<KeyBinding>,
     accept_label: Option<&str>,
+    language: TuiLanguage,
 ) -> Line<'static> {
     let key_label = |action| {
         keymap.primary_hint(action).map(|hint| {
             hint.display_label()
-                .replace('←', "left")
-                .replace('→', "right")
+                .replace('←', crate::i18n::text(language, "left", "左"))
+                .replace('→', crate::i18n::text(language, "right", "右"))
         })
     };
     let mut items = Vec::new();
@@ -363,16 +478,22 @@ fn hint(
         .collect::<Vec<_>>()
         .join("/");
     if !keys.is_empty() {
-        items.push((keys, "group".into()));
+        items.push((keys, crate::i18n::text(language, "group", "分组").into()));
     }
     if let Some(search) = search {
-        items.push((search.display_label(), "search".into()));
+        items.push((
+            search.display_label(),
+            crate::i18n::text(language, "search", "搜索").into(),
+        ));
     }
     items.extend(
         accept_label
             .map(|label| (ListAction::Accept, label))
             .into_iter()
-            .chain([(ListAction::Cancel, "clear search/close")])
+            .chain([(
+                ListAction::Cancel,
+                crate::i18n::text(language, "clear search/close", "清除搜索/关闭"),
+            )])
             .filter_map(|(action, label)| key_label(action).map(|key| (key, label.into()))),
     );
     footer_hint_items_line(&items)
@@ -389,6 +510,7 @@ fn setting_item(
     keymap: &ListKeymap,
     search_hint: Option<KeyBinding>,
     context: SettingItemContext,
+    language: TuiLanguage,
 ) -> SelectionItem {
     let (unavailable, accept_label) = match &setting.value {
         ConfigSettingValue::DependentToggle {
@@ -398,24 +520,29 @@ fn setting_item(
         } => (Some(*unavailable_reason), None),
         ConfigSettingValue::Unavailable { reason } => (Some(*reason), None),
         ConfigSettingValue::Toggle { .. } | ConfigSettingValue::DependentToggle { .. } => {
-            (None, Some("toggle"))
+            (None, Some(crate::i18n::text(language, "toggle", "切换")))
         }
-        ConfigSettingValue::Editor { .. } => (None, Some("open")),
-        ConfigSettingValue::NotificationTest => (None, Some("test")),
+        ConfigSettingValue::Editor { .. } => (None, Some(crate::i18n::text(language, "open", "打开"))),
+        ConfigSettingValue::NotificationTest => {
+            (None, Some(crate::i18n::text(language, "test", "测试")))
+        }
     };
-    let value_label = setting.value.label();
+    let value_label = setting.value.label(language);
     let description = unavailable.unwrap_or(setting.description);
     let search_footer_hint = footer_hint_items_line(
         &accept_label
             .map(|label| ("enter".to_string(), label.to_string()))
             .into_iter()
-            .chain([("esc".to_string(), "clear search".to_string())])
+            .chain([(
+                "esc".to_string(),
+                crate::i18n::text(language, "clear search", "清除搜索").to_string(),
+            )])
             .collect::<Vec<_>>(),
     );
     let description = match context {
         SettingItemContext::Group => description.to_string(),
         SettingItemContext::Search => {
-            format!("{} · {description}", setting.section.title())
+            format!("{} · {description}", setting.section.title_for(language))
         }
     };
     SelectionItem {
@@ -423,11 +550,11 @@ fn setting_item(
         category_tag: Some(format!("{value_label:<20}")),
         description: Some(description),
         is_disabled: unavailable.is_some(),
-        footer_hint: Some(hint(keymap, search_hint, accept_label)),
+        footer_hint: Some(hint(keymap, search_hint, accept_label, language)),
         search_footer_hint: Some(search_footer_hint),
         search_value: Some(format!(
             "{} {} {} {} {}",
-            setting.section.title(),
+            setting.section.title_for(language),
             setting.label,
             value_label,
             setting.keywords,
@@ -442,6 +569,7 @@ pub(super) fn picker(
     app_event_tx: AppEventSender,
     keymap: ListKeymap,
     state: PickerState,
+    language: TuiLanguage,
 ) -> ListSelectionView {
     let search = crate::key_hint::plain(KeyCode::Char('/'));
     let (search_code, search_modifiers) = search.parts();
@@ -467,13 +595,28 @@ pub(super) fn picker(
         description_layout: SelectionDescriptionLayout::SelectedBelowWhenNarrow {
             min_description_width: 45,
         },
-        footer_hint: Some(hint(&keymap, search_hint, /*accept_label*/ None)),
+        footer_hint: Some(hint(
+            &keymap,
+            search_hint,
+            /*accept_label*/ None,
+            language,
+        )),
         is_searchable: true,
         search_mode: SearchMode::OnDemand(search),
-        search_placeholder: Some("Type to search settings".to_string()),
+        search_placeholder: Some(
+            crate::i18n::text(language, "Type to search settings", "输入以搜索设置").to_string(),
+        ),
         search_items: settings
             .iter()
-            .map(|setting| setting_item(setting, &keymap, search_hint, SettingItemContext::Search))
+            .map(|setting| {
+                setting_item(
+                    setting,
+                    &keymap,
+                    search_hint,
+                    SettingItemContext::Search,
+                    language,
+                )
+            })
             .collect(),
         name_column_width: settings
             .iter()
@@ -482,16 +625,22 @@ pub(super) fn picker(
         tabs: ConfigSection::ALL
             .iter()
             .map(|section| {
-                let title = section.title();
+                let title = section.title_for(language);
                 SelectionTab {
                     id: title.to_string(),
                     label: title.to_string(),
-                    header: header(state.notice.clone()),
+                    header: header(state.notice.clone(), language),
                     items: settings
                         .iter()
                         .filter(|setting| setting.section == *section)
                         .map(|setting| {
-                            setting_item(setting, &keymap, search_hint, SettingItemContext::Group)
+                            setting_item(
+                                setting,
+                                &keymap,
+                                search_hint,
+                                SettingItemContext::Group,
+                                language,
+                            )
                         })
                         .collect(),
                 }

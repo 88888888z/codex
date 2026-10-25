@@ -218,12 +218,21 @@ impl HistoryCell for ComputerActivityCell {
             let failed = call.success() == Some(false);
             let summary = if failed {
                 match error_preview(call) {
-                    Some(error) if width < 60 => format!("Failed: {error}"),
+                    Some(error) if width < 60 => format!(
+                        "{}{error}",
+                        crate::i18n::ui_text("Failed: ", "失败：")
+                    ),
                     Some(error) => {
                         let title = preview(title, usize::from(width) / 3);
-                        format!("Failed: {title} — {error}")
+                        format!(
+                            "{}{title} — {error}",
+                            crate::i18n::ui_text("Failed: ", "失败：")
+                        )
                     }
-                    None => format!("Failed: {title}"),
+                    None => format!(
+                        "{}{title}",
+                        crate::i18n::ui_text("Failed: ", "失败：")
+                    ),
                 }
             } else if has_image(call) {
                 format!("Captured screenshot · {title}")

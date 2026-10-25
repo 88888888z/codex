@@ -141,7 +141,15 @@ impl Renderable for HooksBrowserView {
             HooksBrowserPage::Events => render_line_rows(body, buf, rows, self.state),
             HooksBrowserPage::Handlers(event) => {
                 if rows.is_empty() {
-                    Paragraph::new("  No hooks installed for this event.")
+                    Paragraph::new(
+                        format!(
+                            "  {}",
+                            crate::i18n::ui_text(
+                                "No hooks installed for this event.",
+                                "此事件没有已安装的 Hook。",
+                            )
+                        )
+                    )
                         .dim()
                         .render(body, buf);
                 } else {

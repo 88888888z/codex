@@ -47,12 +47,13 @@ impl ChatWidget {
             details: details.clone(),
             details_max_lines,
         });
-        let display_header =
-            if crate::i18n::is_chinese(self.local_settings.tui.language) && header == "Working" {
-                "正在处理".to_string()
-            } else {
-                header
-            };
+        let display_header = if crate::i18n::is_chinese(self.local_settings.tui.language)
+            && matches!(header.as_str(), "Working" | "处理中")
+        {
+            "正在处理".to_string()
+        } else {
+            header
+        };
         let status_indicator_updated = self.bottom_pane.update_status(
             display_header,
             details,
@@ -346,12 +347,13 @@ impl ChatWidget {
 
     pub(super) fn open_status_line_setup(&mut self) {
         let configured_status_line_items = self.configured_status_line_items();
-        let view = StatusLineSetupView::new(
+        let view = StatusLineSetupView::new_for_language(
             Some(configured_status_line_items.as_slice()),
             self.local_settings.tui.status_line_use_colors,
             self.status_surface_preview_data(),
             self.app_event_tx.clone(),
             self.bottom_pane.list_keymap(),
+            self.local_settings.tui.language,
         );
         self.bottom_pane.show_view(Box::new(view));
     }
@@ -360,11 +362,12 @@ impl ChatWidget {
         let configured_terminal_title_items = self.configured_terminal_title_items();
         self.terminal_title_setup_original_items =
             Some(self.local_settings.tui.terminal_title.clone());
-        let view = TerminalTitleSetupView::new(
+        let view = TerminalTitleSetupView::new_for_language(
             Some(configured_terminal_title_items.as_slice()),
             self.terminal_title_preview_data(),
             self.app_event_tx.clone(),
             self.bottom_pane.list_keymap(),
+            self.local_settings.tui.language,
         );
         self.bottom_pane.show_view(Box::new(view));
     }
@@ -467,8 +470,17 @@ impl ChatWidget {
         effort: Option<&ReasoningEffortConfig>,
     ) -> String {
         match effort {
-            None | Some(ReasoningEffortConfig::None) => "default".to_string(),
-            Some(effort) => effort.as_str().to_string(),
+            None | Some(ReasoningEffortConfig::None) => {
+                crate::i18n::ui_text("default", "默认").to_string()
+            }
+            Some(effort) => {
+                let label = ChatWidget::reasoning_effort_label(effort);
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    ChatWidget::reasoning_effort_label_zh(effort)
+                } else {
+                    label
+                }
+            }
         }
     }
 }

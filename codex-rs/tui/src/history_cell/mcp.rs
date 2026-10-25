@@ -162,9 +162,9 @@ impl McpToolCallCell {
             .unwrap_or_else(|| "•".dim()),
         };
         let header_text = if status.is_some() {
-            "Called"
+            crate::i18n::ui_text("Called", "已调用")
         } else {
-            "Calling"
+            crate::i18n::ui_text("Calling", "调用中")
         };
 
         let title = self
@@ -283,7 +283,10 @@ impl McpToolCallCell {
                 }
             }
             Some(Err(error)) => {
-                let text = format!("Error: {error}");
+                let text = format!(
+                    "{}{error}",
+                    crate::i18n::ui_text("Error: ", "错误：")
+                );
                 for segment in text.lines() {
                     if mode == McpToolCallRenderMode::Display {
                         preview.push_line(Line::from(segment.dim()));
@@ -382,9 +385,9 @@ impl HistoryCell for McpToolCallCell {
 
     fn raw_lines(&self) -> Vec<Line<'static>> {
         let header_text = if self.success().is_some() {
-            "Called"
+            crate::i18n::ui_text("Called", "已调用")
         } else {
-            "Calling"
+            crate::i18n::ui_text("Calling", "调用中")
         };
         let mut lines = vec![Line::from(format!(
             "{header_text} {}",
@@ -399,7 +402,10 @@ impl HistoryCell for McpToolCallCell {
                         lines.extend(raw_lines_from_source(text));
                     }
                 }
-                Err(err) => lines.push(Line::from(format!("Error: {err}"))),
+                Err(err) => lines.push(Line::from(format!(
+                    "{}{err}",
+                    crate::i18n::ui_text("Error: ", "错误：")
+                ))),
             }
         }
 
@@ -439,19 +445,36 @@ pub(crate) fn new_active_mcp_tool_call(
 }
 /// Render a summary of configured MCP servers from the current `Config`.
 pub(crate) fn empty_mcp_output() -> WebHyperlinkHistoryCell {
-    let mut docs_line = HyperlinkLine::new(Line::from("    See the "));
+    let mut docs_line =
+        HyperlinkLine::new(Line::from(crate::i18n::ui_text("    See the ", "    查看 ")));
     docs_line.push_span(
         "MCP docs".underlined(),
         Some("https://developers.openai.com/codex/mcp"),
     );
-    docs_line.push_span(" to configure them.".into(), /*destination*/ None);
+    docs_line.push_span(
+        crate::i18n::ui_text(" to configure them.", " 了解如何配置。").into(),
+        /*destination*/ None,
+    );
 
     let lines = vec![
         HyperlinkLine::new("/mcp".magenta().into()),
         HyperlinkLine::from(""),
-        HyperlinkLine::new(vec!["🔌  ".into(), "MCP Tools".bold()].into()),
+        HyperlinkLine::new(
+            vec![
+                "🔌  ".into(),
+                crate::i18n::ui_text("MCP Tools", "MCP 工具").bold(),
+            ]
+            .into(),
+        ),
         HyperlinkLine::from(""),
-        HyperlinkLine::new("  • No MCP servers configured.".italic().into()),
+        HyperlinkLine::new(
+            format!(
+                "  • {}",
+                crate::i18n::ui_text("No MCP servers configured.", "未配置 MCP 服务器。")
+            )
+            .italic()
+            .into(),
+        ),
         docs_line.style(Style::default().add_modifier(Modifier::DIM)),
     ];
 
@@ -470,12 +493,23 @@ pub(crate) fn new_mcp_tools_output(
     let mut lines: Vec<Line<'static>> = vec![
         "/mcp".magenta().into(),
         "".into(),
-        vec!["🔌  ".into(), "MCP Tools".bold()].into(),
+        vec![
+            "🔌  ".into(),
+            crate::i18n::ui_text("MCP Tools", "MCP 工具").bold(),
+        ]
+        .into(),
         "".into(),
     ];
 
     if tools.is_empty() {
-        lines.push("  • No MCP tools available.".italic().into());
+        lines.push(
+            format!(
+                "  • {}",
+                crate::i18n::ui_text("No MCP tools available.", "没有可用的 MCP 工具。")
+            )
+            .italic()
+            .into(),
+        );
         lines.push("".into());
     }
 
@@ -656,7 +690,14 @@ pub(crate) fn new_mcp_tools_output_from_statuses(
 
     let has_any_tools = statuses.iter().any(|status| !status.tools.is_empty());
     if !has_any_tools && matches!(detail, McpServerStatusDetail::Full) {
-        lines.push("  • No MCP tools available.".italic().into());
+        lines.push(
+            format!(
+                "  • {}",
+                crate::i18n::ui_text("No MCP tools available.", "没有可用的 MCP 工具。")
+            )
+            .italic()
+            .into(),
+        );
         lines.push("".into());
     }
 

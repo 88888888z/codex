@@ -26,6 +26,88 @@ pub(crate) const CHATGPT_BLUE_200: (u8, u8, u8) = (99, 168, 248);
 /// Shared accent for picker selection backgrounds and transcript foreground emphasis.
 pub(crate) const UI_ACCENT: (u8, u8, u8) = CHATGPT_BLUE_200;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SurfaceLevel {
+    Raised,
+    Floating,
+}
+
+/// Cool translucent-looking surfaces derived from the current terminal background.
+pub(crate) fn surface_style(level: SurfaceLevel) -> Style {
+    surface_style_for(default_bg(), level)
+}
+
+fn surface_style_for(terminal_bg: Option<(u8, u8, u8)>, level: SurfaceLevel) -> Style {
+    let Some(background) = terminal_bg else {
+        return Style::default();
+    };
+    let overlay = if is_light(background) {
+        (0, 0, 0)
+    } else {
+        (255, 255, 255)
+    };
+    let alpha = match level {
+        SurfaceLevel::Raised => {
+            if is_light(background) {
+                0.025
+            } else {
+                0.045
+            }
+        }
+        SurfaceLevel::Floating => {
+            if is_light(background) {
+                0.045
+            } else {
+                0.075
+            }
+        }
+    };
+    Style::default().bg(best_color(blend(overlay, background, alpha)))
+}
+
+/// Hairline borders define layers without competing with content.
+pub(crate) fn hairline_style() -> Style {
+    let (Some(foreground), Some(background)) = (default_fg(), default_bg()) else {
+        return Style::default().dim();
+    };
+    Style::default().fg(best_color(blend(
+        foreground, background, /*alpha*/ 0.28,
+    )))
+}
+
+/// Focused surfaces use a restrained tint of the shared accent.
+pub(crate) fn focused_border_style() -> Style {
+    let Some(background) = default_bg() else {
+        return Style::default().dim();
+    };
+    let preferred = if is_light(background) {
+        LIGHT_BG_ACCENT_RGB
+    } else {
+        UI_ACCENT
+    };
+    Style::default().fg(best_color(blend(
+        preferred, background, /*alpha*/ 0.62,
+    )))
+}
+
+pub(crate) fn composer_surface_style() -> Style {
+    surface_style(SurfaceLevel::Raised)
+}
+
+pub(crate) fn panel_surface_style() -> Style {
+    surface_style(SurfaceLevel::Floating)
+}
+
+/// Dim the content behind a modal without changing foreground colors.
+pub(crate) fn dim_backdrop(area: ratatui::layout::Rect, buffer: &mut ratatui::buffer::Buffer) {
+    let Some(background) = default_bg() else {
+        buffer.set_style(area, Style::default().dim());
+        return;
+    };
+    let dimmed = blend((0, 0, 0), background, /*alpha*/ 0.14);
+    buffer.set_style(area, Style::default().bg(best_color(dimmed)));
+}
+
 #[derive(Clone, Copy)]
 pub(crate) enum StatusTone {
     Success,
@@ -67,11 +149,16 @@ pub(crate) fn history_prompt_style() -> Style {
         return Style::default();
     };
     let (foreground, alpha) = if is_light(background) {
-        ((0, 0, 0), 0.02)
+        ((0, 0, 0), 0.018)
     } else {
-        ((255, 255, 255), 0.16)
+        ((255, 255, 255), 0.10)
     };
     Style::default().bg(best_color(blend(foreground, background, alpha)))
+}
+
+/// A quiet outline keeps submitted prompts distinct without competing with their content.
+pub(crate) fn history_prompt_border_style() -> Style {
+    history_prompt_style().patch(hairline_style())
 }
 
 pub fn proposed_plan_style() -> Style {
@@ -257,9 +344,9 @@ pub fn user_message_bg(terminal_bg: (u8, u8, u8)) -> Color {
 
 pub(crate) fn user_message_bg_rgb(terminal_bg: (u8, u8, u8)) -> (u8, u8, u8) {
     let (top, alpha) = if is_light(terminal_bg) {
-        ((0, 0, 0), 0.04)
+        ((0, 0, 0), 0.03)
     } else {
-        ((255, 255, 255), 0.12)
+        ((255, 255, 255), 0.07)
     };
     blend(top, terminal_bg, alpha)
 }

@@ -35,7 +35,10 @@ impl ChatWidget {
         if self.ide_context.is_enabled() {
             self.ide_context.disable();
             self.sync_ide_context_status_indicator();
-            self.add_info_message("IDE context is off.".to_string(), /*hint*/ None);
+            self.add_info_message(
+                crate::i18n::ui_text("IDE context is off.", "IDE 上下文已关闭。").to_string(),
+                /*hint*/ None,
+            );
         } else {
             self.ide_context.enable();
             self.add_ide_context_status_message();
@@ -52,13 +55,22 @@ impl ChatWidget {
             "off" => {
                 self.ide_context.disable();
                 self.sync_ide_context_status_indicator();
-                self.add_info_message("IDE context is off.".to_string(), /*hint*/ None);
+                self.add_info_message(
+                    crate::i18n::ui_text("IDE context is off.", "IDE 上下文已关闭。").to_string(),
+                    /*hint*/ None,
+                );
             }
             "status" => {
                 self.add_ide_context_status_message();
             }
             _ => {
-                self.add_error_message("Usage: /ide [on|off|status]".to_string());
+            self.add_error_message(
+                crate::i18n::ui_text(
+                    "Usage: /ide [on|off|status]",
+                    "用法：/ide [on|off|status]",
+                )
+                .to_string(),
+            );
             }
         }
     }
@@ -91,7 +103,10 @@ impl ChatWidget {
     fn add_ide_context_status_message(&mut self) {
         if !self.ide_context.is_enabled() {
             self.sync_ide_context_status_indicator();
-            self.add_info_message("IDE context is off.".to_string(), /*hint*/ None);
+            self.add_info_message(
+                crate::i18n::ui_text("IDE context is off.", "IDE 上下文已关闭。").to_string(),
+                /*hint*/ None,
+            );
             return;
         }
 

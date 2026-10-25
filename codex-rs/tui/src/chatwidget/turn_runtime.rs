@@ -293,7 +293,7 @@ impl ChatWidget {
         let info = self.token_info.as_ref()?;
         let percent = self.context_remaining_percent(info);
 
-        let used_tokens = self.context_used_tokens(info, percent.is_some());
+        let used_tokens = self.context_used_tokens(info);
         if let Some(percent) = percent {
             let used_percent = 100 - percent.clamp(0, 100);
             if used_percent <= 0 {
@@ -302,10 +302,8 @@ impl ChatWidget {
             return Some(format!("{used_percent}% used"));
         }
 
-        if let Some(tokens) = used_tokens
-            && tokens > 0
-        {
-            return Some(format!("{} used", format_tokens_compact(tokens)));
+        if used_tokens > 0 {
+            return Some(format!("{} used", format_tokens_compact(used_tokens)));
         }
 
         None

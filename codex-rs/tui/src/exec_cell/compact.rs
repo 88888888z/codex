@@ -91,13 +91,17 @@ impl ExecCell {
             "•".green().bold()
         };
         let title = if let Some(output) = nonzero_exit {
-            format!("Exited (status {})", output.exit_code)
+            if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("已退出（状态 {}）", output.exit_code)
+            } else {
+                format!("Exited (status {})", output.exit_code)
+            }
         } else if self.is_active() {
-            "Running".to_owned()
+            crate::i18n::ui_text("Running", "运行中").to_owned()
         } else if call.is_unified_exec_interaction() {
-            "Background output".to_owned()
+            crate::i18n::ui_text("Background output", "后台输出").to_owned()
         } else {
-            "Ran".to_owned()
+            crate::i18n::ui_text("Ran", "已运行").to_owned()
         };
         let script = strip_bash_lc_and_escape(&call.command);
         // Highlight before clipping so the compact row keeps the same shell token colors.
@@ -124,7 +128,16 @@ impl ExecCell {
                 lines.push(clipped_line(line, width));
             }
             if lines.len() == 1 && !call.is_unified_exec_interaction() {
-                lines.push(clipped_line(Line::from("  └ (no output)".dim()), width));
+                lines.push(clipped_line(
+                    Line::from(
+                        format!(
+                            "  └ {}",
+                            crate::i18n::ui_text("(no output)", "（无输出）")
+                        )
+                        .dim(),
+                    ),
+                    width,
+                ));
             }
         }
         lines

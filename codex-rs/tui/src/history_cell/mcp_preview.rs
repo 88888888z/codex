@@ -20,8 +20,14 @@ impl McpToolCallCell {
     pub(super) fn compact_mcp_lines(&self, width: u16) -> Vec<HyperlinkLine> {
         let status = self.success();
         let (marker, verb) = match status {
-            Some(true) => ("•".green().bold(), "Called"),
-            Some(false) => ("•".red().bold(), "Failed"),
+            Some(true) => (
+                "•".green().bold(),
+                crate::i18n::ui_text("Called", "已调用"),
+            ),
+            Some(false) => (
+                "•".red().bold(),
+                crate::i18n::ui_text("Failed", "失败"),
+            ),
             None => (
                 activity_indicator(
                     Some(self.start_time),
@@ -29,7 +35,7 @@ impl McpToolCallCell {
                     ReducedMotionIndicator::StaticBullet,
                 )
                 .unwrap_or_else(|| "•".dim()),
-                "Calling",
+                crate::i18n::ui_text("Calling", "调用中"),
             ),
         };
         let title = self
@@ -110,9 +116,14 @@ impl McpToolCallCell {
                     if error.lines().take(DETAIL_PREVIEW_LINES + 1).count() <= DETAIL_PREVIEW_LINES
                     {
                         if let Some(first) = details.front_mut() {
-                            first.insert_str(0, "Error: ");
+                            first.insert_str(
+                                0,
+                                crate::i18n::ui_text("Error: ", "错误："),
+                            );
                         } else {
-                            details.push_front("Error: ".to_owned());
+                            details.push_front(
+                                crate::i18n::ui_text("Error: ", "错误：").to_owned(),
+                            );
                         }
                     }
                 }

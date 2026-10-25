@@ -84,16 +84,32 @@ impl ChatWidget {
 
     pub(super) fn show_managed_worktree_picker(&mut self) {
         if !self.managed_worktree_available() {
-            self.add_error_message("Managed worktrees require a local Git repository.".to_string());
+            self.add_error_message(
+                crate::i18n::ui_text(
+                    "Managed worktrees require a local Git repository.",
+                    "托管 Worktree 需要本地 Git 仓库。",
+                )
+                .to_string(),
+            );
             return;
         }
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            title: Some("Worktrees".into()),
+            title: Some(crate::i18n::ui_text("Worktrees", "Worktree").into()),
             items: vec![
                 SelectionItem {
-                    name: "Continue current conversation".to_string(),
-                    description: Some("Preserve this conversation in the new checkout".to_string()),
+                    name: crate::i18n::ui_text(
+                        "Continue current conversation",
+                        "继续当前会话",
+                    )
+                    .to_string(),
+                    description: Some(
+                        crate::i18n::ui_text(
+                            "Preserve this conversation in the new checkout",
+                            "在新的检出目录中保留此会话",
+                        )
+                        .to_string(),
+                    ),
                     actions: vec![Box::new(|tx| {
                         tx.send(AppEvent::StartManagedWorktree {
                             mode: ManagedWorktreeMode::Fork,
@@ -104,8 +120,18 @@ impl ChatWidget {
                     ..Default::default()
                 },
                 SelectionItem {
-                    name: "Start new conversation".to_string(),
-                    description: Some("Open a fresh conversation in the new checkout".to_string()),
+                    name: crate::i18n::ui_text(
+                        "Start new conversation",
+                        "开始新会话",
+                    )
+                    .to_string(),
+                    description: Some(
+                        crate::i18n::ui_text(
+                            "Open a fresh conversation in the new checkout",
+                            "在新的检出目录中开始全新会话",
+                        )
+                        .to_string(),
+                    ),
                     actions: vec![Box::new(|tx| {
                         tx.send(AppEvent::StartManagedWorktree {
                             mode: ManagedWorktreeMode::New,
@@ -116,9 +142,13 @@ impl ChatWidget {
                     ..Default::default()
                 },
                 SelectionItem {
-                    name: "Browse worktrees".to_string(),
+                    name: crate::i18n::ui_text("Browse worktrees", "浏览 Worktree").to_string(),
                     description: Some(
-                        "Resume an owner thread or copy a working directory".to_string(),
+                        crate::i18n::ui_text(
+                            "Resume an owner thread or copy a working directory",
+                            "恢复所属会话或复制工作目录",
+                        )
+                        .to_string(),
                     ),
                     actions: vec![Box::new(|tx| tx.send(AppEvent::BrowseManagedWorktrees))],
                     dismiss_on_select: true,
@@ -144,9 +174,10 @@ impl ChatWidget {
         self.bottom_pane.show_selection_view(SelectionViewParams {
             view_id: Some(BROWSER_VIEW_ID),
             picker_surface: PickerSurface::Panel,
-            title: Some("Managed worktrees".into()),
+            title: Some(crate::i18n::ui_text("Managed worktrees", "托管 Worktree").into()),
             items: vec![SelectionItem {
-                name: "Loading worktrees…".to_string(),
+                name: crate::i18n::ui_text("Loading worktrees…", "正在加载 Worktree…")
+                    .to_string(),
                 is_disabled: true,
                 ..Default::default()
             }],
@@ -186,12 +217,20 @@ impl ChatWidget {
             }
         };
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            title: Some("Managed worktrees".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Managed worktrees", "托管 Worktree").to_string(),
+            ),
             subtitle: Some(
                 if entries.is_empty() {
-                    "No worktrees in this repository's configured pool"
+                    crate::i18n::ui_text(
+                        "No worktrees in this repository's configured pool",
+                        "此仓库的配置池中没有 Worktree",
+                    )
                 } else {
-                    "Select a worktree to resume, copy its path, or delete it"
+                    crate::i18n::ui_text(
+                        "Select a worktree to resume, copy its path, or delete it",
+                        "选择 Worktree 以恢复、复制路径或删除",
+                    )
                 }
                 .to_string(),
             ),
@@ -347,19 +386,25 @@ impl ChatWidget {
             return;
         }
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            title: Some("Delete this worktree?".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Delete this worktree?", "删除此 Worktree？").to_string(),
+            ),
             subtitle: Some(root.display().to_string()),
             items: vec![
                 SelectionItem {
-                    name: "Cancel".to_string(),
+                    name: crate::i18n::ui_text("Cancel", "取消").to_string(),
                     actions: vec![],
                     dismiss_on_select: true,
                     ..Default::default()
                 },
                 SelectionItem {
-                    name: "Delete worktree".to_string(),
+                    name: crate::i18n::ui_text("Delete worktree", "删除 Worktree").to_string(),
                     description: Some(
-                        "Keeps thread history; may disrupt other sessions".to_string(),
+                        crate::i18n::ui_text(
+                            "Keeps thread history; may disrupt other sessions",
+                            "保留会话历史；可能影响其他会话",
+                        )
+                        .to_string(),
                     ),
                     actions: vec![Box::new(move |tx| {
                         tx.send(AppEvent::ManagedWorktreeAction {

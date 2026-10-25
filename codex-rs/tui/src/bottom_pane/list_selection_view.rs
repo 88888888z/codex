@@ -14,6 +14,9 @@ use ratatui::layout::Rect;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
+use ratatui::widgets::Block;
+use ratatui::widgets::BorderType;
+use ratatui::widgets::Borders;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::widgets::Wrap;
@@ -40,7 +43,6 @@ use super::bottom_pane_view::BottomPaneView;
 use super::bottom_pane_view::ViewCompletion;
 pub(crate) use super::picker_style::PickerSurface;
 use super::picker_style::render_scroll_indicators;
-use super::picker_style::selection_style;
 use super::popup_consts::MAX_POPUP_ROWS;
 use super::scroll_state::ScrollState;
 use super::selection_popup_common::ColumnWidthConfig;
@@ -753,7 +755,7 @@ impl ListSelectionView {
             .to_string()
             .len();
         let mut enabled_row_number = 0;
-        let row_selection_style = Some(selection_style());
+        let row_selection_style = None;
         self.filtered_indices
             .iter()
             .enumerate()
@@ -762,8 +764,12 @@ impl ListSelectionView {
                     let is_selected = self.state.selected_idx == Some(visible_idx);
                     let prefix = if is_selected { '›' } else { ' ' };
                     let name = item.name.as_str();
-                    let marker = if item.is_current { " (current)" } else { "" };
-                    let name_with_marker = format!("{name}{marker}");
+                    let marker = if item.is_current {
+                        crate::i18n::ui_text("✓ ", "✓ ")
+                    } else {
+                        ""
+                    };
+                    let name_with_marker = format!("{marker}{name}");
                     let is_disabled = item.is_disabled || item.disabled_reason.is_some();
                     let wrap_prefix = if self.is_searchable {
                         // The number keys don't work when search is enabled (since we let the
@@ -806,6 +812,7 @@ impl ListSelectionView {
                     GenericDisplayRow {
                         category_tag: item.category_tag.clone(),
                         selection_style: row_selection_style,
+                        selection_border: true,
                         name: name_with_marker,
                         name_prefix_spans,
                         display_shortcut: self
@@ -1548,6 +1555,9 @@ impl Renderable for ListSelectionView {
         let effective_rows_width = if let Some(side_w) = self.side_layout_width(inner_width) {
             // Leave the preview's right inset outside the full-width focus row.
             width.saturating_sub(MENU_SURFACE_HORIZONTAL_INSET / 2 + SIDE_CONTENT_GAP + side_w)
+        } else if self.picker_surface == PickerSurface::Panel {
+            // The focus row is painted from the panel's inner-left edge; stop at inner-right.
+            width.saturating_sub(/*panel borders*/ 2)
         } else {
             width
         };
@@ -1578,7 +1588,8 @@ impl Renderable for ListSelectionView {
         height = height.saturating_add(tab_height + tab_gap);
         height = height.saturating_add(rows_height + 2 + header_gap);
         if self.picker_surface == PickerSurface::Panel {
-            height = height.saturating_add(/*rhs*/ 1);
+            // Panel drawing reserves both its outline and an internal top gap.
+            height = height.saturating_add(/*rhs*/ 3);
         }
         if search_field_visible {
             height = height.saturating_add(/*rhs*/ 1);
@@ -1626,6 +1637,8 @@ impl Renderable for ListSelectionView {
         let effective_rows_width = if let Some(sw) = side_w {
             area.width
                 .saturating_sub(MENU_SURFACE_HORIZONTAL_INSET / 2 + SIDE_CONTENT_GAP + sw)
+        } else if self.picker_surface == PickerSurface::Panel {
+            area.width.saturating_sub(/*panel borders*/ 2)
         } else {
             area.width
         };
@@ -1654,16 +1667,24 @@ impl Renderable for ListSelectionView {
             + u16::from(search_field_visible)
             + 1;
         footer_rows = footer_rows.min(area.height.saturating_sub(minimum_content));
+        let panel = (self.picker_surface == PickerSurface::Panel).then(|| {
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(crate::style::focused_border_style())
+                .style(crate::style::panel_surface_style())
+        });
+        let body_area = panel.as_ref().map_or(area, |block| block.inner(area));
+        if let Some(block) = panel.as_ref() {
+            block.render(area, buf);
+        } else {
+            Self::clear_to_terminal_bg(buf, area);
+        }
         let [content_area, footer_area] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(footer_rows)]).areas(area);
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(footer_rows)])
+                .areas(body_area);
 
         let outer_content_area = content_area;
-        Self::clear_to_terminal_bg(buf, outer_content_area);
-        if self.picker_surface == PickerSurface::Panel {
-            ratatui::widgets::Block::default()
-                .style(crate::style::user_message_style())
-                .render(outer_content_area, buf);
-        }
         // The list owns its vertical spacer rows so hints remain adjacent
         // to results even when search, tabs, or a header are present.
         let content_area = outer_content_area.inset(Insets::vh(/*v*/ 0, /*h*/ 2));
@@ -1762,7 +1783,7 @@ impl Renderable for ListSelectionView {
                 self.search_query.clone().into()
             };
             if self.on_demand_search_active() {
-                let label = "Search › ";
+                let label = crate::i18n::ui_text("Search › ", "搜索 › ");
                 buf.set_style(search_area, crate::bottom_pane::active_tab_style());
                 Line::from(vec![label.cyan().bold(), query_span]).render(search_area, buf);
                 let cursor_offset = (label.width() + self.search_query.width())

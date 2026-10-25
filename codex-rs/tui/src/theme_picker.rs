@@ -25,8 +25,8 @@ use crate::app_event::AppEvent;
 use crate::bottom_pane::SelectionItem;
 use crate::bottom_pane::SelectionViewParams;
 use crate::bottom_pane::SideContentWidth;
-use crate::bottom_pane::popup_consts::standard_popup_hint_line;
 use crate::bottom_pane::popup_content_width;
+use crate::bottom_pane::footer_hint_items_line;
 use crate::bottom_pane::side_by_side_layout_widths;
 use crate::diff_render::DiffLineType;
 use crate::diff_render::current_diff_render_style_context;
@@ -36,6 +36,7 @@ use crate::diff_render::push_wrapped_diff_line_with_syntax_and_style_context;
 use crate::render::highlight;
 use crate::render::renderable::Renderable;
 use crate::status::format_directory_display;
+use codex_config::types::TuiLanguage;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::text::Line;
@@ -281,6 +282,14 @@ fn subtitle_available_width(terminal_width: Option<u16>) -> usize {
 }
 
 fn theme_picker_subtitle(codex_home: Option<&Path>, terminal_width: Option<u16>) -> String {
+    theme_picker_subtitle_for_language(codex_home, terminal_width, TuiLanguage::English)
+}
+
+fn theme_picker_subtitle_for_language(
+    codex_home: Option<&Path>,
+    terminal_width: Option<u16>,
+    language: TuiLanguage,
+) -> String {
     let themes_dir = codex_home.map(|home| home.join("themes"));
     let themes_dir_display = themes_dir
         .as_deref()
@@ -290,13 +299,22 @@ fn theme_picker_subtitle(codex_home: Option<&Path>, terminal_width: Option<u16>)
     if let Some(path) = themes_dir_display
         && path.starts_with('~')
     {
-        let subtitle = format!("Custom .tmTheme files can be added to the {path} directory.");
+        let subtitle = if crate::i18n::is_chinese(language) {
+            format!("可以将自定义 .tmTheme 文件添加到 {path} 目录。")
+        } else {
+            format!("Custom .tmTheme files can be added to the {path} directory.")
+        };
         if UnicodeWidthStr::width(subtitle.as_str()) <= available_width {
             return subtitle;
         }
     }
 
-    PREVIEW_FALLBACK_SUBTITLE.to_string()
+    crate::i18n::text(
+        language,
+        PREVIEW_FALLBACK_SUBTITLE,
+        "上下移动可实时预览主题",
+    )
+    .to_string()
 }
 
 /// Builds [`SelectionViewParams`] for the `/theme` picker dialog.
@@ -313,6 +331,20 @@ pub(crate) fn build_theme_picker_params(
     current_name: Option<&str>,
     codex_home: Option<&Path>,
     terminal_width: Option<u16>,
+) -> SelectionViewParams {
+    build_theme_picker_params_for_language(
+        current_name,
+        codex_home,
+        terminal_width,
+        TuiLanguage::English,
+    )
+}
+
+pub(crate) fn build_theme_picker_params_for_language(
+    current_name: Option<&str>,
+    codex_home: Option<&Path>,
+    terminal_width: Option<u16>,
+    language: TuiLanguage,
 ) -> SelectionViewParams {
     // Snapshot the current theme so we can restore on cancel.
     let original_theme = highlight::current_syntax_theme();
@@ -339,7 +371,11 @@ pub(crate) fn build_theme_picker_params(
         .enumerate()
         .map(|(idx, entry)| {
             let display_name = if entry.is_custom {
-                format!("{} (custom)", entry.name)
+                if crate::i18n::is_chinese(language) {
+                    format!("{}（自定义）", entry.name)
+                } else {
+                    format!("{} (custom)", entry.name)
+                }
             } else {
                 entry.name.clone()
             };
@@ -389,15 +425,30 @@ pub(crate) fn build_theme_picker_params(
     );
     SelectionViewParams {
         allow_input_when_disconnected: true,
-        title: Some("Select Syntax Theme".to_string()),
-        subtitle: Some(theme_picker_subtitle(
+        title: Some(
+            crate::i18n::text(language, "Select Syntax Theme", "选择语法主题").to_string(),
+        ),
+        subtitle: Some(theme_picker_subtitle_for_language(
             codex_home_owned.as_deref(),
             terminal_width,
+            language,
         )),
-        footer_hint: Some(standard_popup_hint_line()),
+        footer_hint: Some(footer_hint_items_line(&[
+            (
+                "enter".to_string(),
+                crate::i18n::text(language, "select", "选择").to_string(),
+            ),
+            (
+                "esc".to_string(),
+                crate::i18n::text(language, "back", "返回").to_string(),
+            ),
+        ])),
         items,
         is_searchable: true,
-        search_placeholder: Some("Type to filter themes...".to_string()),
+        search_placeholder: Some(
+            crate::i18n::text(language, "Type to filter themes...", "输入以筛选主题…")
+                .to_string(),
+        ),
         initial_selected_idx: initial_idx,
         side_content: Box::new(ThemePreviewWideRenderable),
         side_content_width: SideContentWidth::Half,

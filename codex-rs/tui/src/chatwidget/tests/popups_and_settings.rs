@@ -3119,6 +3119,7 @@ async fn experimental_features_popup_snapshot() {
         /*catalog_rx*/ None,
         chat.app_event_tx.clone(),
         crate::keymap::RuntimeKeymap::defaults().list,
+        codex_config::types::TuiLanguage::English,
     );
     chat.bottom_pane.show_view(Box::new(view));
 
@@ -3143,6 +3144,7 @@ async fn experimental_features_popup_snapshot() {
         /*catalog_rx*/ None,
         chat.app_event_tx.clone(),
         keymap.list,
+        codex_config::types::TuiLanguage::English,
     );
     chat.bottom_pane.show_view(Box::new(view));
     let popup = render_bottom_popup(&chat, /*width*/ 80);
@@ -3168,6 +3170,7 @@ async fn experimental_features_toggle_saves_on_exit() {
         /*catalog_rx*/ None,
         chat.app_event_tx.clone(),
         keymap,
+        codex_config::types::TuiLanguage::English,
     );
     chat.bottom_pane.show_view(Box::new(view));
 
@@ -4317,17 +4320,6 @@ async fn auto_model_advertising_advanced_effort_opens_reasoning_picker() {
             .iter()
             .any(|event| matches!(event, AppEvent::OpenReasoningPopup { .. }))
     );
-}
-
-#[tokio::test]
-async fn feedback_selection_popup_snapshot() {
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-
-    // Open the feedback category selection popup via slash command.
-    chat.dispatch_command(SlashCommand::Feedback);
-
-    let popup = render_bottom_popup(&chat, /*width*/ 80);
-    assert_chatwidget_snapshot!("feedback_selection_popup", popup);
 }
 
 #[tokio::test]

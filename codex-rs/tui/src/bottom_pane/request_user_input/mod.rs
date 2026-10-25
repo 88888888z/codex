@@ -194,7 +194,7 @@ impl RequestUserInputOverlay {
             has_input_focus,
             app_event_tx.clone(),
             enhanced_keys_supported,
-            ANSWER_PLACEHOLDER.to_string(),
+            crate::i18n::ui_text(ANSWER_PLACEHOLDER, "输入你的回答（可选）").to_string(),
             disable_paste_burst,
             ChatComposerConfig::plain_text(),
         );
@@ -335,7 +335,7 @@ impl RequestUserInputOverlay {
                 base
             }
         } else {
-            "No questions".to_string()
+            crate::i18n::ui_text("No questions", "没有问题").to_string()
         }
     }
 
@@ -460,8 +460,17 @@ impl RequestUserInputOverlay {
                     let wrap_indent = UnicodeWidthStr::width(prefix_label.as_str());
                     rows.push(GenericDisplayRow {
                         selection_style: Some(crate::bottom_pane::selection_style()),
-                        name: format!("{prefix_label}{OTHER_OPTION_LABEL}"),
-                        description: Some(OTHER_OPTION_DESCRIPTION.to_string()),
+                        name: format!(
+                            "{prefix_label}{}",
+                            crate::i18n::ui_text(OTHER_OPTION_LABEL, "以上都不是")
+                        ),
+                        description: Some(
+                            crate::i18n::ui_text(
+                                OTHER_OPTION_DESCRIPTION,
+                                "可在备注中补充详情（Tab）",
+                            )
+                            .to_string(),
+                        ),
                         wrap_indent: Some(wrap_indent),
                         ..Default::default()
                     });
@@ -561,11 +570,11 @@ impl RequestUserInputOverlay {
 
     fn notes_placeholder(&self) -> &'static str {
         if self.has_options() && self.selected_option_index().is_none() {
-            SELECT_OPTION_PLACEHOLDER
+            crate::i18n::ui_text(SELECT_OPTION_PLACEHOLDER, "选择选项后可添加备注")
         } else if self.has_options() {
-            NOTES_PLACEHOLDER
+            crate::i18n::ui_text(NOTES_PLACEHOLDER, "添加备注")
         } else {
-            ANSWER_PLACEHOLDER
+            crate::i18n::ui_text(ANSWER_PLACEHOLDER, "输入你的回答（可选）")
         }
     }
 
@@ -760,7 +769,7 @@ impl RequestUserInputOverlay {
             return options.get(idx).map(|opt| opt.label.clone());
         }
         if idx == options.len() && Self::other_option_enabled_for_question(question) {
-            return Some(OTHER_OPTION_LABEL.to_string());
+            return Some(crate::i18n::ui_text(OTHER_OPTION_LABEL, "以上都不是").to_string());
         }
         None
     }
@@ -975,6 +984,9 @@ impl RequestUserInputOverlay {
 
     fn unanswered_submit_description(&self) -> String {
         let count = self.unanswered_question_count();
+        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+            return format!("仍有 {count} 个问题未回答，仍要提交？");
+        }
         let suffix = if count == 1 {
             UNANSWERED_CONFIRM_SUBMIT_DESC_SINGULAR
         } else {
@@ -1001,12 +1013,16 @@ impl RequestUserInputOverlay {
             .unwrap_or(0);
         let entries = [
             (
-                UNANSWERED_CONFIRM_SUBMIT,
+                crate::i18n::ui_text(UNANSWERED_CONFIRM_SUBMIT, "仍然提交"),
                 self.unanswered_submit_description(),
             ),
             (
-                UNANSWERED_CONFIRM_GO_BACK,
-                UNANSWERED_CONFIRM_GO_BACK_DESC.to_string(),
+                crate::i18n::ui_text(UNANSWERED_CONFIRM_GO_BACK, "返回"),
+                crate::i18n::ui_text(
+                    UNANSWERED_CONFIRM_GO_BACK_DESC,
+                    "回到第一个未回答的问题",
+                )
+                .to_string(),
             ),
         ];
         entries

@@ -195,7 +195,7 @@ impl HistoryCell for UserHistoryCell {
         };
         let wrap_width = width
             .saturating_sub(
-                LIVE_PREFIX_COLS + 1, /* keep a one-column right margin for wrapping */
+                LIVE_PREFIX_COLS + 4, /* prompt gutter and the rounded frame */
             )
             .max(/*other*/ 1);
 
@@ -242,7 +242,6 @@ impl HistoryCell for UserHistoryCell {
 
         lines.push(HyperlinkLine::new(Line::from("").style(style)));
         for source in lines.iter_mut().filter_map(|line| line.source.as_mut()) {
-            source.right_reserve = 1;
             source.copy_as_prose = true;
         }
         lines

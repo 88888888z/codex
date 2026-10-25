@@ -28,6 +28,8 @@ use strum_macros::Display;
 use strum_macros::EnumIter;
 use strum_macros::EnumString;
 
+use codex_config::types::TuiLanguage;
+
 use crate::app_event::AppEvent;
 use crate::app_event_sender::AppEventSender;
 use crate::bottom_pane::CancellationEvent;
@@ -222,6 +224,89 @@ impl StatusLineItem {
         }
     }
 
+    fn description_for(self, language: TuiLanguage) -> &'static str {
+        if !crate::i18n::is_chinese(language) {
+            return self.description();
+        }
+        match self {
+            StatusLineItem::ModelName => "当前模型名称",
+            StatusLineItem::ModelWithReasoning => "当前模型名称和思考强度",
+            StatusLineItem::Reasoning => "当前思考强度",
+            StatusLineItem::CurrentDir => "当前工作目录",
+            StatusLineItem::ProjectRoot => "项目名称（不可用时省略）",
+            StatusLineItem::Hostname => "当前机器主机名（不可用时省略）",
+            StatusLineItem::GitBranch => "当前 Git 分支（不可用时省略）",
+            StatusLineItem::PullRequestNumber => "当前分支的开放 PR 编号（不可用时省略）",
+            StatusLineItem::BranchChanges => "相对默认分支的已提交改动（不可用时省略）",
+            StatusLineItem::Status => "简洁的运行状态（就绪、运行中、思考中）",
+            StatusLineItem::Permissions => "当前权限配置或沙箱模式",
+            StatusLineItem::ApprovalMode => "当前命令审批模式",
+            StatusLineItem::ContextRemaining => "上下文窗口剩余百分比（未知时省略）",
+            StatusLineItem::ContextUsed => "上下文窗口已用百分比（未知时省略）",
+            StatusLineItem::FiveHourLimit => "主要用量额度的剩余量（不可用时省略）",
+            StatusLineItem::WeeklyLimit => "次要用量额度的剩余量（不可用时省略）",
+            StatusLineItem::CodexVersion => "Codex 应用版本",
+            StatusLineItem::ContextWindowSize => "上下文窗口总 token 数（未知时省略）",
+            StatusLineItem::UsedTokens => "当前会话已用 token 总数（为零时省略）",
+            StatusLineItem::TotalInputTokens => "当前会话输入 token 总数",
+            StatusLineItem::TotalOutputTokens => "当前会话输出 token 总数",
+            StatusLineItem::ThreadCredits => {
+                "当前会话预计额度（仅企业工作区，不可用时省略）"
+            }
+            StatusLineItem::EstimatedThreadCost => {
+                "当前会话预计美元费用（仅企业工作区，不可用时省略）"
+            }
+            StatusLineItem::SessionId => "当前会话标识符（会话开始前省略）",
+            StatusLineItem::FastMode => "Fast 模式是否已启用",
+            StatusLineItem::Daybreak => "当前会话是否启用 Daybreak",
+            StatusLineItem::RawOutput => "原始回滚模式是否已启用",
+            StatusLineItem::ThreadName => "当前会话名称（未命名时省略）",
+            StatusLineItem::ThreadTitle => "当前会话标题，未命名时显示标识符",
+            StatusLineItem::WorkspaceHeadline => "工作区通知标题（仅企业工作区，不可用时省略）",
+            StatusLineItem::TaskProgress => "update_plan 的最新任务进度（可用后显示）",
+        }
+    }
+
+    fn name_for(self, language: TuiLanguage) -> String {
+        if !crate::i18n::is_chinese(language) {
+            return self.to_string();
+        }
+        match self {
+            StatusLineItem::ModelName => "模型",
+            StatusLineItem::ModelWithReasoning => "模型与思考强度",
+            StatusLineItem::Reasoning => "思考强度",
+            StatusLineItem::CurrentDir => "当前目录",
+            StatusLineItem::ProjectRoot => "项目名称",
+            StatusLineItem::Hostname => "主机名",
+            StatusLineItem::GitBranch => "Git 分支",
+            StatusLineItem::PullRequestNumber => "PR 编号",
+            StatusLineItem::BranchChanges => "分支改动",
+            StatusLineItem::Status => "运行状态",
+            StatusLineItem::Permissions => "权限",
+            StatusLineItem::ApprovalMode => "审批模式",
+            StatusLineItem::ContextRemaining => "上下文剩余",
+            StatusLineItem::ContextUsed => "上下文已用",
+            StatusLineItem::FiveHourLimit => "5 小时额度",
+            StatusLineItem::WeeklyLimit => "每周额度",
+            StatusLineItem::CodexVersion => "Codex 版本",
+            StatusLineItem::ContextWindowSize => "上下文窗口",
+            StatusLineItem::UsedTokens => "已用 Token",
+            StatusLineItem::TotalInputTokens => "输入 Token",
+            StatusLineItem::TotalOutputTokens => "输出 Token",
+            StatusLineItem::ThreadCredits => "会话额度",
+            StatusLineItem::EstimatedThreadCost => "会话费用",
+            StatusLineItem::SessionId => "会话 ID",
+            StatusLineItem::FastMode => "Fast 模式",
+            StatusLineItem::Daybreak => "Daybreak",
+            StatusLineItem::RawOutput => "原始输出",
+            StatusLineItem::ThreadName => "会话名称",
+            StatusLineItem::ThreadTitle => "会话标题",
+            StatusLineItem::WorkspaceHeadline => "工作区标题",
+            StatusLineItem::TaskProgress => "任务进度",
+        }
+        .to_string()
+    }
+
     pub(crate) fn preview_item(self) -> StatusSurfacePreviewItem {
         match self {
             StatusLineItem::ModelName => StatusSurfacePreviewItem::Model,
@@ -291,11 +376,36 @@ impl StatusLineSetupView {
         app_event_tx: AppEventSender,
         list_keymap: ListKeymap,
     ) -> Self {
+        Self::new_for_language(
+            status_line_items,
+            use_theme_colors,
+            preview_data,
+            app_event_tx,
+            list_keymap,
+            TuiLanguage::English,
+        )
+    }
+
+    pub(crate) fn new_for_language(
+        status_line_items: Option<&[String]>,
+        use_theme_colors: bool,
+        preview_data: StatusSurfacePreviewData,
+        app_event_tx: AppEventSender,
+        list_keymap: ListKeymap,
+        language: TuiLanguage,
+    ) -> Self {
         let mut used_ids = HashSet::new();
         let mut items = vec![MultiSelectItem {
             id: STATUS_LINE_USE_THEME_COLORS_ITEM_ID.to_string(),
-            name: "Use theme colors".to_string(),
-            description: Some("Apply colors from the active /theme".to_string()),
+            name: crate::i18n::text(language, "Use theme colors", "使用主题颜色").to_string(),
+            description: Some(
+                crate::i18n::text(
+                    language,
+                    "Apply colors from the active /theme",
+                    "应用当前 /theme 的颜色",
+                )
+                .to_string(),
+            ),
             enabled: use_theme_colors,
             orderable: false,
             section_break_after: true,
@@ -314,6 +424,7 @@ impl StatusLineSetupView {
                     item,
                     /*enabled*/ true,
                     &preview_data,
+                    language,
                 ));
             }
         }
@@ -327,13 +438,21 @@ impl StatusLineSetupView {
                 item,
                 /*enabled*/ false,
                 &preview_data,
+                language,
             ));
         }
 
         Self {
             picker: MultiSelectPicker::builder(
-                "Configure Status Line".to_string(),
-                Some("Select which items to display in the status line.".to_string()),
+                crate::i18n::text(language, "Configure Status Line", "配置状态栏").to_string(),
+                Some(
+                    crate::i18n::text(
+                        language,
+                        "Select which items to display in the status line.",
+                        "选择状态栏中显示的内容。",
+                    )
+                    .to_string(),
+                ),
                 app_event_tx,
             )
             .list_keymap(list_keymap)
@@ -378,9 +497,10 @@ impl StatusLineSetupView {
         item: StatusLineItem,
         enabled: bool,
         preview_data: &StatusSurfacePreviewData,
+        language: TuiLanguage,
     ) -> MultiSelectItem {
-        let default_name = item.to_string();
-        let default_description = item.description();
+        let default_name = item.name_for(language);
+        let default_description = item.description_for(language);
         let (name, description) = match item {
             StatusLineItem::FiveHourLimit | StatusLineItem::WeeklyLimit => (
                 preview_data.rate_limit_item_name(item.preview_item(), &default_name),

@@ -321,10 +321,19 @@ pub(crate) fn sub_agent_activity_history_cell(item: &ThreadItem) -> Option<Plain
 
 fn sub_agent_activity_title(kind: SubAgentActivityKind, agent_path: &str) -> Line<'static> {
     let (prefix, path) = match kind {
-        SubAgentActivityKind::Started => ("Started ", agent_path),
+        SubAgentActivityKind::Started => (
+            crate::i18n::ui_text("Started ", "已启动 "),
+            agent_path,
+        ),
         SubAgentActivityKind::Interacted => ("Interacted with ", agent_path),
-        SubAgentActivityKind::Interrupted => ("Interrupted ", agent_path),
-        SubAgentActivityKind::Completed => ("Completed ", agent_path),
+        SubAgentActivityKind::Interrupted => (
+            crate::i18n::ui_text("Interrupted ", "已中断 "),
+            agent_path,
+        ),
+        SubAgentActivityKind::Completed => (
+            crate::i18n::ui_text("Completed ", "已完成 "),
+            agent_path,
+        ),
     };
     title_spans_line(vec![
         Span::from(prefix).bold(),
@@ -384,12 +393,18 @@ fn waiting_begin(
 
     let title = match receiver_agents.as_slice() {
         [(thread_id, metadata)] => title_with_agent(
-            "Waiting for",
+            crate::i18n::ui_text("Waiting for", "等待"),
             agent_label(*thread_id, metadata),
             /*spawn_request*/ None,
         ),
-        [] => title_text("Waiting for agents"),
-        _ => title_text(format!("Waiting for {} agents", receiver_agents.len())),
+        [] => title_text(crate::i18n::ui_text("Waiting for agents", "等待 Agent")),
+        _ => {
+            if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                title_text(format!("等待 {} 个 Agent", receiver_agents.len()))
+            } else {
+                title_text(format!("Waiting for {} agents", receiver_agents.len()))
+            }
+        }
     };
 
     let details = if receiver_agents.len() > 1 {
@@ -419,7 +434,7 @@ fn close_end(
 ) -> PlainHistoryCell {
     collab_event(
         title_with_agent(
-            "Closed",
+            crate::i18n::ui_text("Closed", "已关闭"),
             agent_label(receiver_thread_id, &agent_metadata(receiver_thread_id)),
             /*spawn_request*/ None,
         ),
@@ -449,7 +464,7 @@ fn resume_end(
 ) -> PlainHistoryCell {
     collab_event(
         title_with_agent(
-            "Resumed",
+            crate::i18n::ui_text("Resumed", "已恢复"),
             agent_label(receiver_thread_id, &agent_metadata(receiver_thread_id)),
             /*spawn_request*/ None,
         ),
@@ -586,7 +601,10 @@ fn wait_complete_lines(
     entries.extend(extras);
 
     if entries.is_empty() {
-        vec![Line::from(Span::from("No agents completed yet"))]
+        vec![Line::from(Span::from(crate::i18n::ui_text(
+            "No agents completed yet",
+            "还没有 Agent 完成",
+        )))]
     } else {
         entries
             .into_iter()
@@ -625,12 +643,20 @@ fn status_summary_line(status: Option<&CollabAgentState>, fallback_error: &str) 
 fn status_summary_spans(status: &CollabAgentState) -> Vec<Span<'static>> {
     match status.status {
         CollabAgentStatus::PendingInit => vec![Span::from("Pending init").fg(accent_color())],
-        CollabAgentStatus::Running => vec![Span::from("Running").fg(accent_color()).bold()],
+        CollabAgentStatus::Running => vec![
+            Span::from(crate::i18n::ui_text("Running", "运行中"))
+                .fg(accent_color())
+                .bold(),
+        ],
         // Allow `.yellow()`
         #[allow(clippy::disallowed_methods)]
-        CollabAgentStatus::Interrupted => vec![Span::from("Interrupted").yellow()],
+        CollabAgentStatus::Interrupted => vec![
+            Span::from(crate::i18n::ui_text("Interrupted", "已中断")).yellow(),
+        ],
         CollabAgentStatus::Completed => {
-            let mut spans = vec![Span::from("Completed").green()];
+            let mut spans = vec![
+                Span::from(crate::i18n::ui_text("Completed", "已完成")).green(),
+            ];
             if let Some(message) = status.message.as_ref() {
                 let message_preview = truncate_text(
                     &message.split_whitespace().collect::<Vec<_>>().join(" "),
@@ -652,7 +678,7 @@ fn status_summary_spans(status: &CollabAgentState) -> Vec<Span<'static>> {
 }
 
 fn error_summary_spans(error: &str) -> Vec<Span<'static>> {
-    let mut spans = vec![Span::from("Error").red()];
+    let mut spans = vec![Span::from(crate::i18n::ui_text("Error", "错误")).red()];
     let error_preview = truncate_text(
         &error.split_whitespace().collect::<Vec<_>>().join(" "),
         COLLAB_AGENT_ERROR_PREVIEW_GRAPHEMES,

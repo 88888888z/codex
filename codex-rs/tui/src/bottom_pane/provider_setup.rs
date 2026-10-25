@@ -19,6 +19,7 @@ use ratatui::style::Modifier;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::widgets::Block;
+use ratatui::widgets::BorderType;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
@@ -250,7 +251,13 @@ impl ProviderSetupForm {
         }
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
-            .block(Block::default().borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(crate::style::focused_border_style())
+                    .style(crate::style::panel_surface_style()),
+            )
             .render(area, buf);
     }
 }

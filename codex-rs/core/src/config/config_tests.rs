@@ -1390,6 +1390,7 @@ fn config_toml_deserializes_model_availability_nux() {
         Tui {
             notification_settings: TuiNotificationSettings::default(),
             language: codex_config::types::TuiLanguage::Chinese,
+            provider_profile: None,
             animations: true,
             screen_reader_detection_done: None,
             effects: Default::default(),
@@ -4639,6 +4640,7 @@ fn tui_config_missing_notifications_field_defaults_to_enabled() {
         Tui {
             notification_settings: TuiNotificationSettings::default(),
             language: codex_config::types::TuiLanguage::Chinese,
+            provider_profile: None,
             animations: true,
             screen_reader_detection_done: None,
             effects: Default::default(),

@@ -8,6 +8,8 @@ use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::widgets::Block;
+use ratatui::widgets::BorderType;
+use ratatui::widgets::Borders;
 use ratatui::widgets::Widget;
 
 use crate::key_hint::ShortcutHint;
@@ -33,11 +35,12 @@ use hyperlinks::wrap_two_column_row;
 /// This type contains presentation-focused fields that are intentionally more
 /// concrete than source domain models. `match_indices` are character offsets
 /// into `name`, and `wrap_indent` is interpreted in terminal cell columns.
-#[derive(Default)]
 pub(crate) struct GenericDisplayRow {
     pub name: String,
     /// Optional full-width selection treatment; other rows use the shared text accent.
     pub selection_style: Option<Style>,
+    /// Draw a rounded outline around the selected row instead of filling it.
+    pub selection_border: bool,
     pub name_prefix_spans: Vec<Span<'static>>,
     pub display_shortcut: Option<ShortcutHint>,
     pub match_indices: Option<Vec<usize>>, // indices to bold (char positions)
@@ -47,6 +50,24 @@ pub(crate) struct GenericDisplayRow {
     pub disabled_reason: Option<String>, // optional disabled message
     pub is_disabled: bool,
     pub wrap_indent: Option<usize>, // optional indent for wrapped lines
+}
+
+impl Default for GenericDisplayRow {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            selection_style: None,
+            selection_border: true,
+            name_prefix_spans: Vec::new(),
+            display_shortcut: None,
+            match_indices: None,
+            description: None,
+            category_tag: None,
+            disabled_reason: None,
+            is_disabled: false,
+            wrap_indent: None,
+        }
+    }
 }
 
 /// Controls how selection rows choose the split between left/right name/description columns.
@@ -445,36 +466,70 @@ fn render_rows_inner(
             break;
         }
 
-        let mut wrapped =
-            wrap_row_lines(row, desc_col, area.width, column_width.description_layout);
-        clipped |= wrapped.len() > usize::from(area.bottom().saturating_sub(cur_y));
+        let selected = Some(i) == state.selected_idx && !row.is_disabled;
+        let bordered = selected && row.selection_border && area.width > 2;
+        let row_width = if bordered {
+            area.width.saturating_sub(2)
+        } else {
+            area.width
+        };
+        let row_desc_col = desc_col.min(usize::from(row_width));
+        let mut wrapped = wrap_row_lines(
+            row,
+            row_desc_col,
+            row_width,
+            column_width.description_layout,
+        );
+        let border_rows = u16::from(bordered) * 2;
+        clipped |= wrapped.len()
+            > usize::from(area.bottom().saturating_sub(cur_y).saturating_sub(border_rows));
         for line in &mut wrapped {
             apply_row_state_style(
                 std::slice::from_mut(&mut line.line),
-                Some(i) == state.selected_idx && !row.is_disabled,
+                selected && !bordered,
                 row.is_disabled,
                 row.selection_style,
             );
         }
 
         // Render the wrapped lines.
-        let mut rendered_item = false;
-        for line in wrapped {
-            if cur_y >= area.y + area.height {
-                break;
-            }
-            (&line).render(
+        if bordered && cur_y.saturating_add(border_rows) < area.bottom() {
+            Widget::render(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(crate::style::focused_border_style()),
                 Rect {
                     x: area.x,
                     y: cur_y,
                     width: area.width,
+                    height: (wrapped.len() as u16).saturating_add(border_rows),
+                },
+                buf,
+            );
+        }
+        let mut rendered_item = false;
+        for line in wrapped {
+            let line_y = cur_y.saturating_add(u16::from(bordered));
+            if line_y >= area.y + area.height {
+                break;
+            }
+            (&line).render(
+                Rect {
+                    x: area.x.saturating_add(u16::from(bordered)),
+                    y: line_y,
+                    width: row_width,
                     height: 1,
                 },
                 buf,
             );
-            cur_y = cur_y.saturating_add(1);
+            cur_y = line_y.saturating_add(1);
             rendered_lines = rendered_lines.saturating_add(1);
             rendered_item = true;
+        }
+        if bordered && rendered_item {
+            cur_y = cur_y.saturating_add(/*bottom border*/ 1);
+            rendered_lines = rendered_lines.saturating_add(border_rows);
         }
         if rendered_item {
             rendered_items += 1;
@@ -597,19 +652,27 @@ pub(crate) fn render_rows_single_line_with_col_width_mode(
             break;
         }
 
+        let selected = Some(i) == state.selected_idx && !row.is_disabled;
+        let selected_border = selected && row.selection_border && area.width >= 4;
+        let row_width = if selected_border {
+            area.width.saturating_sub(2)
+        } else {
+            area.width
+        };
+        let row_desc_col = desc_col.min(usize::from(row_width));
         let mut full_line =
-            build_full_line(row, desc_col, area.width, column_width.description_layout);
+            build_full_line(row, row_desc_col, row_width, column_width.description_layout);
         apply_row_state_style(
             std::slice::from_mut(&mut full_line),
-            Some(i) == state.selected_idx && !row.is_disabled,
+            selected && !selected_border,
             row.is_disabled,
             row.selection_style,
         );
 
         let mut full_line = full_hyperlink_row(row, full_line);
-        let clipped = line_width(&full_line.line) > usize::from(area.width);
+        let clipped = line_width(&full_line.line) > usize::from(row_width);
         full_line.line =
-            truncate_line_with_ellipsis_if_overflow(full_line.line, area.width as usize);
+            truncate_line_with_ellipsis_if_overflow(full_line.line, row_width as usize);
         let visible_width = line_width(&full_line.line).saturating_sub(usize::from(clipped));
         full_line.hyperlinks.retain_mut(|link| {
             link.columns.end = link.columns.end.min(visible_width);
@@ -617,13 +680,22 @@ pub(crate) fn render_rows_single_line_with_col_width_mode(
         });
         (&full_line).render(
             Rect {
-                x: area.x,
+                x: area.x.saturating_add(u16::from(selected_border)),
                 y: cur_y,
-                width: area.width,
+                width: row_width,
                 height: 1,
             },
             buf,
         );
+        if selected_border {
+            let border_style = crate::style::focused_border_style();
+            Line::from("│")
+                .style(border_style)
+                .render(Rect::new(area.x, cur_y, 1, 1), buf);
+            Line::from("│")
+                .style(border_style)
+                .render(Rect::new(area.right().saturating_sub(1), cur_y, 1, 1), buf);
+        }
         cur_y = cur_y.saturating_add(1);
         rendered_lines = rendered_lines.saturating_add(1);
     }
@@ -709,21 +781,29 @@ fn measure_rows_height_inner(
     );
 
     let mut total: u16 = 0;
-    for row in rows_all
+    for (index, row) in rows_all
         .iter()
         .enumerate()
         .skip(start_idx)
         .take(visible_items)
-        .map(|(_, r)| r)
     {
+        let selected = Some(index) == state.selected_idx;
+        let bordered = selected && row.selection_border && content_width > 2;
+        let row_width = if bordered {
+            content_width.saturating_sub(2)
+        } else {
+            content_width
+        };
         let wrapped_lines = wrap_row_lines(
             row,
-            desc_col,
-            content_width,
+            desc_col.min(usize::from(row_width)),
+            row_width,
             column_width.description_layout,
         )
         .len();
-        total = total.saturating_add(wrapped_lines as u16);
+        total = total.saturating_add(
+            (wrapped_lines as u16).saturating_add(u16::from(bordered) * 2),
+        );
     }
     total.max(1)
 }
