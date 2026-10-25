@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
@@ -9,6 +10,8 @@ use crate::clipboard_paste::normalize_pasted_search_query;
 use crate::clock_format::ClockFormat;
 use crate::color::blend;
 use crate::color::is_light;
+use crate::history_cell::HistoryRenderMode;
+use crate::history_cell::UserHistoryCell;
 use crate::key_hint::KeyBindingListExt;
 use crate::key_hint::is_plain_text_key_event;
 use crate::keymap::ListAction;
@@ -27,6 +30,7 @@ use crate::text_formatting::truncate_text;
 use crate::thread_transcript::RawReasoningVisibility;
 use crate::thread_transcript::TranscriptCells;
 use crate::thread_transcript::load_session_transcript;
+use crate::transcript_view::TranscriptView;
 use crate::tui::FrameRequester;
 use crate::tui::Tui;
 use crate::tui::TuiEvent;
@@ -54,6 +58,7 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use crossterm::event::KeyModifiers;
+use crossterm::event::MouseEventKind;
 use ratatui::layout::Rect;
 use ratatui::layout::Size;
 use ratatui::style::Color;
@@ -96,6 +101,7 @@ pub(crate) use transcript_preview::load_transcript_preview;
 
 const PAGE_SIZE: usize = 25;
 const LOAD_NEAR_THRESHOLD: usize = 5;
+const RESUME_PREVIEW_TURNS: usize = 6;
 const SESSION_META_INDENT_WIDTH: usize = 2;
 const SESSION_META_DATE_WIDTH: usize = 12;
 const SESSION_META_FIELD_GAP_WIDTH: usize = 2;
@@ -204,6 +210,10 @@ enum PickerLoadRequest {
         thread_id: ThreadId,
     },
     Transcript {
+        thread_id: ThreadId,
+        cancellation: oneshot::Receiver<()>,
+    },
+    TranscriptPreview {
         thread_id: ThreadId,
         cancellation: oneshot::Receiver<()>,
     },
@@ -389,10 +399,9 @@ struct SessionPickerRunOptions {
 /// Interactive session picker that lists app-server threads with simple search,
 /// lazy transcript previews, and pagination.
 ///
-/// Sessions render as compact multi-line records with stable metadata first and
-/// the conversation preview last. Users can focus the toolbar controls with
-/// Tab, change the focused control with the arrow keys, and expand the
-/// selected session with Ctrl+E to load recent transcript context on demand.
+/// Sessions render in a tree grouped by working directory. Tab switches between
+/// the session tree and transcript preview, while Shift+Tab focuses the toolbar.
+/// The selected session's transcript preview loads on demand.
 ///
 /// Sessions are loaded on-demand via cursor-based pagination. The backend
 /// `thread/list` API returns pages ordered by the selected sort key, and the
@@ -624,9 +633,9 @@ async fn run_session_picker_with_loader(
     state.request_frame();
 
     if let Ok(size) = alt.tui.terminal.size() {
-        let list_height = usize::from(layout::areas(Rect::from(size)).list.height);
-        state.update_viewport(list_height, list_viewport_width(size.width));
-        state.ensure_minimum_rows_for_view(list_height);
+        update_viewports(&mut state, Rect::from(size));
+        let minimum_rows = state.available_content_rows(state.view_rows.unwrap_or_default());
+        state.ensure_minimum_rows_for_view(minimum_rows);
     }
     draw_picker(alt.tui, &state, alt.tui.terminal.last_known_screen_size)?;
     if state.launch_context == SessionPickerLaunchContext::Startup {
@@ -671,17 +680,19 @@ async fn run_session_picker_with_loader(
                         state.handle_paste(pasted);
                     }
                     TuiEvent::Draw | TuiEvent::Resume | TuiEvent::Resize(_) | TuiEvent::FocusGained => {
-                        let list_width = list_viewport_width(screen_size.width);
-                        let list_height =
-                            usize::from(layout::areas(Rect::from(screen_size)).list.height);
-                        state.update_viewport(list_height, list_width);
-                        state.ensure_minimum_rows_for_view(list_height);
+                        update_viewports(&mut state, Rect::from(screen_size));
+                        let minimum_rows =
+                            state.available_content_rows(state.view_rows.unwrap_or_default());
+                        state.ensure_minimum_rows_for_view(minimum_rows);
                         draw_picker(alt.tui, &state, screen_size)?;
                         if state.note_transcript_loading_frame_drawn() {
                             state.open_pending_transcript_if_ready();
                         }
                     }
-                    TuiEvent::FocusLost | TuiEvent::Mouse(_) => {}
+                    TuiEvent::Mouse(mouse) => {
+                        state.handle_mouse(mouse.kind);
+                    }
+                    TuiEvent::FocusLost => {}
                 }
             }
             Some(event) = background_events.next() => {
@@ -826,6 +837,25 @@ fn spawn_app_server_page_loader(
                         _ = cancellation => {}
                     }
                 }
+                PickerLoadRequest::TranscriptPreview {
+                    thread_id,
+                    cancellation,
+                } => {
+                    tokio::select! {
+                        transcript = load_session_transcript(
+                            &mut app_server,
+                            thread_id,
+                            raw_reasoning_visibility,
+                            config.as_ref(),
+                        ) => {
+                            let _ = bg_tx.send(BackgroundEvent::Transcript {
+                                thread_id,
+                                transcript,
+                            });
+                        }
+                        _ = cancellation => {}
+                    }
+                }
                 PickerLoadRequest::Archive { thread_id } => {
                     let result = archive_request_handle
                         .request_typed::<ThreadArchiveResponse>(ClientRequest::ThreadArchive {
@@ -921,6 +951,10 @@ struct PickerState {
     seen_rows: HashSet<SeenRowKey>,
     selected: usize,
     scroll_top: usize,
+    focus: PickerPaneFocus,
+    preview_transcript_view: RefCell<TranscriptView>,
+    preview_transcript_thread_id: Option<ThreadId>,
+    preview_transcript_cancellation: Option<oneshot::Sender<()>>,
     pending_page_down_target: Option<usize>,
     frozen_footer_percent: Option<u8>,
     query: String,
@@ -954,6 +988,14 @@ struct PickerState {
     keymap: RuntimeKeymap,
     initial_page_mode: PageLoadMode,
     chord_matcher: crate::keymap::KeyChordMatcher,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum PickerPaneFocus {
+    #[default]
+    Tree,
+    View,
+    Toolbar,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1100,6 +1142,22 @@ impl Row {
     }
 }
 
+fn rows_by_cwd(rows: Vec<Row>) -> Vec<Row> {
+    let mut grouped: Vec<(PathBuf, Vec<Row>)> = Vec::new();
+    for row in rows {
+        let cwd = row.cwd.clone().unwrap_or_default();
+        if let Some((_, group)) = grouped.iter_mut().find(|(path, _)| *path == cwd) {
+            group.push(row);
+        } else {
+            grouped.push((cwd, vec![row]));
+        }
+    }
+    grouped
+        .into_iter()
+        .flat_map(|(_, rows)| rows)
+        .collect()
+}
+
 impl PickerState {
     fn new(
         backend_id: crate::backend_id::BackendId,
@@ -1125,6 +1183,10 @@ impl PickerState {
             seen_rows: HashSet::new(),
             selected: 0,
             scroll_top: 0,
+            focus: PickerPaneFocus::Tree,
+            preview_transcript_view: RefCell::new(TranscriptView::default()),
+            preview_transcript_thread_id: None,
+            preview_transcript_cancellation: None,
             pending_page_down_target: None,
             frozen_footer_percent: None,
             query: String::new(),
@@ -1358,7 +1420,9 @@ impl PickerState {
                 modifiers,
                 ..
             } if modifiers.contains(KeyModifiers::CONTROL) => {
-                self.toggle_selected_expansion();
+                self.focus = PickerPaneFocus::View;
+                self.ensure_selected_preview_loaded();
+                self.request_frame();
             }
             KeyEvent {
                 code: KeyCode::Char('\u{0014}'),
@@ -1372,7 +1436,9 @@ impl PickerState {
                 modifiers: KeyModifiers::NONE,
                 ..
             } /* ^E */ => {
-                self.toggle_selected_expansion();
+                self.focus = PickerPaneFocus::View;
+                self.ensure_selected_preview_loaded();
+                self.request_frame();
             }
             KeyEvent {
                 code: KeyCode::Char('o'),
@@ -1418,44 +1484,69 @@ impl PickerState {
                 }
             }
             _ if allow_plain_char_navigation && self.keymap.list.move_up.is_pressed(key) => {
-                if self.selected > 0 {
+                if self.focus == PickerPaneFocus::View {
+                    self.move_view(-1);
+                } else if self.selected > 0 {
                     self.selected -= 1;
                     self.ensure_selected_visible();
+                    self.ensure_selected_preview_loaded();
                 }
                 self.request_frame();
             }
             _ if allow_plain_char_navigation && self.keymap.list.move_down.is_pressed(key) => {
-                if self.selected + 1 < self.filtered_rows.len() {
+                if self.focus == PickerPaneFocus::View {
+                    self.move_view(1);
+                } else if self.selected + 1 < self.filtered_rows.len() {
                     self.selected += 1;
                     self.ensure_selected_visible();
+                    self.ensure_selected_preview_loaded();
                 }
                 self.maybe_load_more_for_scroll();
                 self.request_frame();
             }
             _ if allow_plain_char_navigation && self.keymap.list.page_up.is_pressed(key) => {
-                let step = self.view_rows.unwrap_or(10).max(1);
-                if self.selected > 0 {
+                let step = self.page_step();
+                if self.focus == PickerPaneFocus::View {
+                    self.move_view(-(step as isize));
+                    self.request_frame();
+                } else if self.selected > 0 {
                     self.selected = self.selected.saturating_sub(step);
                     self.ensure_selected_visible();
+                    self.ensure_selected_preview_loaded();
                     self.request_frame();
                 }
             }
             _ if allow_plain_char_navigation && self.keymap.list.jump_top.is_pressed(key)
                 && !self.filtered_rows.is_empty() => {
+                if self.focus == PickerPaneFocus::View {
+                    self.jump_preview_to_top();
+                } else {
                     self.selected = 0;
                     self.ensure_selected_visible();
-                    self.request_frame();
+                    self.ensure_selected_preview_loaded();
                 }
+                self.request_frame();
+            }
             _ if allow_plain_char_navigation && self.keymap.list.jump_bottom.is_pressed(key)
                 && !self.filtered_rows.is_empty() => {
+                if self.focus == PickerPaneFocus::View {
+                    self.jump_preview_to_bottom();
+                } else {
                     self.selected = self.filtered_rows.len().saturating_sub(1);
                     self.ensure_selected_visible();
-                    self.maybe_load_more_for_scroll();
-                    self.request_frame();
+                    self.ensure_selected_preview_loaded();
                 }
+                self.maybe_load_more_for_scroll();
+                self.request_frame();
+            }
             _ if allow_plain_char_navigation && self.keymap.list.page_down.is_pressed(key)
                 && !self.filtered_rows.is_empty() => {
-                    let step = self.view_rows.unwrap_or(10).max(1);
+                    let step = self.page_step();
+                    if self.focus == PickerPaneFocus::View {
+                        self.move_view(step as isize);
+                        self.request_frame();
+                        return Ok(None);
+                    }
                     let target = self.selected.saturating_add(step);
                     let max_index = self.filtered_rows.len().saturating_sub(1);
                     if target > max_index && self.pagination.next_cursor.is_some() {
@@ -1464,6 +1555,7 @@ impl PickerState {
                     } else {
                         self.selected = target.min(max_index);
                         self.ensure_selected_visible();
+                        self.ensure_selected_preview_loaded();
                         self.maybe_load_more_for_scroll();
                     }
                     self.request_frame();
@@ -1471,23 +1563,35 @@ impl PickerState {
             KeyEvent {
                 code: KeyCode::Tab, ..
             } => {
-                self.focus_next_toolbar_control();
+                self.focus = match self.focus {
+                    PickerPaneFocus::Tree => PickerPaneFocus::View,
+                    PickerPaneFocus::View | PickerPaneFocus::Toolbar => PickerPaneFocus::Tree,
+                };
+                self.ensure_selected_preview_loaded();
                 self.request_frame();
             }
             KeyEvent {
                 code: KeyCode::BackTab,
                 ..
             } => {
-                self.focus_previous_toolbar_control();
+                if self.focus == PickerPaneFocus::Toolbar {
+                    self.focus_previous_toolbar_control();
+                } else {
+                    self.focus = PickerPaneFocus::Toolbar;
+                }
                 self.request_frame();
             }
             _ if allow_plain_char_navigation && self.keymap.list.move_left.is_pressed(key) => {
-                self.change_focused_toolbar_value(ToolbarValueDirection::Previous);
-                self.request_frame();
+                if self.focus == PickerPaneFocus::Toolbar {
+                    self.change_focused_toolbar_value(ToolbarValueDirection::Previous);
+                    self.request_frame();
+                }
             }
             _ if allow_plain_char_navigation && self.keymap.list.move_right.is_pressed(key) => {
-                self.change_focused_toolbar_value(ToolbarValueDirection::Next);
-                self.request_frame();
+                if self.focus == PickerPaneFocus::Toolbar {
+                    self.change_focused_toolbar_value(ToolbarValueDirection::Next);
+                    self.request_frame();
+                }
             }
             KeyEvent {
                 code: KeyCode::Backspace,
@@ -1518,6 +1622,28 @@ impl PickerState {
             _ => {}
         }
         Ok(None)
+    }
+
+    fn handle_mouse(&mut self, kind: MouseEventKind) {
+        let delta = match kind {
+            MouseEventKind::ScrollUp => -scaled_mouse_step(self.mouse_scroll_speed),
+            MouseEventKind::ScrollDown => scaled_mouse_step(self.mouse_scroll_speed),
+            _ => return,
+        };
+        match self.focus {
+            PickerPaneFocus::Tree => {
+                self.selected = self
+                    .selected
+                    .saturating_add_signed(delta)
+                    .min(self.filtered_rows.len().saturating_sub(1));
+                self.ensure_selected_visible();
+                self.ensure_selected_preview_loaded();
+                self.maybe_load_more_for_scroll();
+            }
+            PickerPaneFocus::View => self.move_view(delta),
+            PickerPaneFocus::Toolbar => {}
+        }
+        self.request_frame();
     }
 
     fn handle_paste(&mut self, pasted: String) {
@@ -1657,6 +1783,9 @@ impl PickerState {
                     let should_open = self.pending_transcript_open == Some(thread_id);
                     self.transcript_cells
                         .insert(thread_id, SessionTranscriptState::Loaded(cells.clone()));
+                    if self.preview_transcript_thread_id == Some(thread_id) {
+                        self.preview_transcript_cancellation = None;
+                    }
                     if should_open {
                         self.pending_transcript_cancellation = None;
                         self.open_pending_transcript_if_ready();
@@ -1671,6 +1800,15 @@ impl PickerState {
                         self.pending_transcript_cancellation = None;
                         self.pending_transcript_open = None;
                         self.transcript_loading_frame_shown = false;
+                        self.inline_error = Some(
+                            crate::i18n::ui_text(
+                                "Could not load transcript preview",
+                                "无法加载对话预览",
+                            )
+                            .to_string(),
+                        );
+                    } else if self.preview_transcript_thread_id == Some(thread_id) {
+                        self.preview_transcript_cancellation = None;
                         self.inline_error = Some(
                             crate::i18n::ui_text(
                                 "Could not load transcript preview",
@@ -1753,21 +1891,38 @@ impl PickerState {
         self.pending_page_down_target = None;
         self.selected = target.min(max_index);
         self.ensure_selected_visible();
+        self.ensure_selected_preview_loaded();
         self.maybe_load_more_for_scroll();
         self.request_frame();
     }
 
     fn apply_filter(&mut self) {
         self.chord_matcher.cancel();
+        let selected_key = self
+            .filtered_rows
+            .get(self.selected)
+            .and_then(Row::seen_key);
         let base_iter = self
             .all_rows
             .iter()
             .filter(|row| self.row_matches_filter(row));
-        if self.query.is_empty() {
-            self.filtered_rows = base_iter.cloned().collect();
+        let rows = if self.query.is_empty() {
+            base_iter.cloned().collect()
         } else {
             let q = self.query.to_lowercase();
-            self.filtered_rows = base_iter.filter(|r| r.matches_query(&q)).cloned().collect();
+            base_iter
+                .filter(|r| r.matches_query(&q))
+                .cloned()
+                .collect()
+        };
+        self.filtered_rows = rows_by_cwd(rows);
+        if let Some(selected_key) = selected_key
+            && let Some(index) = self
+                .filtered_rows
+                .iter()
+                .position(|row| row.seen_key().as_ref() == Some(&selected_key))
+        {
+            self.selected = index;
         }
         if self.selected >= self.filtered_rows.len() {
             self.selected = self.filtered_rows.len().saturating_sub(1);
@@ -1776,6 +1931,7 @@ impl PickerState {
             self.scroll_top = 0;
         }
         self.ensure_selected_visible();
+        self.ensure_selected_preview_loaded();
         self.request_frame();
     }
 
@@ -1923,6 +2079,10 @@ impl PickerState {
         self.ensure_selected_visible();
     }
 
+    fn page_step(&self) -> usize {
+        self.view_rows.unwrap_or(10).max(1)
+    }
+
     fn maybe_load_more_for_scroll(&mut self) {
         if self.pagination.is_loading() || self.pagination.next_cursor.is_none() {
             return;
@@ -2063,26 +2223,99 @@ impl PickerState {
         Ok(())
     }
 
-    fn toggle_selected_expansion(&mut self) {
+    fn ensure_selected_preview_loaded(&mut self) {
         let Some(row) = self.filtered_rows.get(self.selected) else {
             return;
         };
         let Some(thread_id) = row.thread_id else {
             return;
         };
-        if self.expanded_thread_id == Some(thread_id) {
-            self.expanded_thread_id = None;
+        if self.preview_transcript_thread_id != Some(thread_id) {
+            let previous_thread_id = self.preview_transcript_thread_id;
+            let cancelled = if let Some(cancellation) =
+                self.preview_transcript_cancellation.take()
+            {
+                let _ = cancellation.send(());
+                true
+            } else {
+                false
+            };
+            if cancelled
+                && let Some(previous_thread_id) = previous_thread_id
+                && matches!(
+                    self.transcript_cells.get(&previous_thread_id),
+                    Some(SessionTranscriptState::Loading)
+                )
+            {
+                self.transcript_cells.remove(&previous_thread_id);
+            }
+            self.preview_transcript_thread_id = Some(thread_id);
+            let mut preview_view = TranscriptView::default();
+            preview_view
+                .set_presentation(/*detailed*/ true, HistoryRenderMode::Rich);
+            preview_view.mouse_scroll_speed = self.mouse_scroll_speed;
+            preview_view.copy_on_select = self.copy_on_select;
+            preview_view.copy_on_select_clear_selection =
+                self.copy_on_select_clear_selection;
+            preview_view.primary_selection = crate::clipboard_copy::primary::available();
+            *self.preview_transcript_view.borrow_mut() = preview_view;
+        }
+        self.expanded_thread_id = Some(thread_id);
+        if self.transcript_cells.contains_key(&thread_id)
+            || self.preview_transcript_cancellation.is_some()
+        {
             self.request_frame();
             return;
         }
-        self.expanded_thread_id = Some(thread_id);
-        if let std::collections::hash_map::Entry::Vacant(e) =
-            self.transcript_previews.entry(thread_id)
-        {
-            e.insert(TranscriptPreviewState::Loading);
-            (self.picker_loader)(PickerLoadRequest::Preview { thread_id });
-        }
+        let (cancellation_tx, cancellation) = oneshot::channel();
+        self.preview_transcript_cancellation = Some(cancellation_tx);
+        self.transcript_cells
+            .insert(thread_id, SessionTranscriptState::Loading);
+        (self.picker_loader)(PickerLoadRequest::TranscriptPreview {
+            thread_id,
+            cancellation,
+        });
         self.request_frame();
+    }
+
+    fn move_view(&mut self, delta: isize) {
+        let Some(cells) = self.selected_preview_transcript_cells() else {
+            return;
+        };
+        self.preview_transcript_view.borrow_mut().scroll(&cells, delta);
+    }
+
+    fn jump_preview_to_top(&mut self) {
+        let Some(cells) = self.selected_preview_transcript_cells() else {
+            return;
+        };
+        self.preview_transcript_view
+            .borrow_mut()
+            .jump_to_beginning(&cells);
+    }
+
+    fn jump_preview_to_bottom(&mut self) {
+        self.preview_transcript_view.borrow_mut().jump_to_latest();
+    }
+
+    fn selected_preview_transcript_cells(&self) -> Option<TranscriptCells> {
+        let Some(row) = self.filtered_rows.get(self.selected) else {
+            return None;
+        };
+        let thread_id = row.thread_id?;
+        let Some(SessionTranscriptState::Loaded(cells)) = self.transcript_cells.get(&thread_id)
+        else {
+            return None;
+        };
+        Some(latest_transcript_turns(cells, RESUME_PREVIEW_TURNS))
+    }
+
+    fn selected_preview_transcript_failed(&self) -> bool {
+        self.filtered_rows
+            .get(self.selected)
+            .and_then(|row| row.thread_id)
+            .and_then(|thread_id| self.transcript_cells.get(&thread_id))
+            .is_some_and(|state| matches!(state, SessionTranscriptState::Failed))
     }
 
     fn rendered_height_between(&self, start: usize, end_inclusive: usize) -> usize {
@@ -2093,22 +2326,14 @@ impl PickerState {
             .enumerate()
             .map(|(offset, row)| {
                 let row_idx = start + offset;
-                let is_selected = row_idx == self.selected;
-                let is_expanded = is_selected
-                    && row.thread_id.is_some()
-                    && self.expanded_thread_id == row.thread_id;
-                render_session_lines(
-                    row,
-                    self,
-                    is_selected,
-                    is_expanded,
-                    /*is_zebra*/ false,
-                    self.view_width.unwrap_or(u16::MAX),
-                )
-                .len()
+                let starts_group = row_idx == 0
+                    || self
+                        .filtered_rows
+                        .get(row_idx.saturating_sub(1))
+                        .is_none_or(|previous| previous.cwd != row.cwd);
+                1 + usize::from(starts_group)
             })
             .sum::<usize>()
-            + self.row_separator_height() * end_inclusive.saturating_sub(start)
     }
 
     fn has_more_above(&self) -> bool {
@@ -2126,23 +2351,15 @@ impl PickerState {
         let mut used = 0usize;
         for (offset, row) in self.filtered_rows[self.scroll_top..].iter().enumerate() {
             let row_idx = self.scroll_top + offset;
-            let is_selected = row_idx == self.selected;
-            let is_expanded =
-                is_selected && row.thread_id.is_some() && self.expanded_thread_id == row.thread_id;
-            let row_height = render_session_lines(
-                row,
-                self,
-                is_selected,
-                is_expanded,
-                /*is_zebra*/ false,
-                self.view_width.unwrap_or(u16::MAX),
-            )
-            .len();
-            let separator_height = usize::from(offset > 0) * self.row_separator_height();
-            if used + separator_height + row_height > capacity {
+            let starts_group = row_idx == 0
+                || self
+                    .filtered_rows
+                    .get(row_idx.saturating_sub(1))
+                    .is_none_or(|previous| previous.cwd != row.cwd);
+            if used + 1 + usize::from(starts_group) > capacity {
                 return true;
             }
-            used += separator_height + row_height;
+            used += 1 + usize::from(starts_group);
         }
         false
     }
@@ -2157,12 +2374,23 @@ impl PickerState {
             .max(1)
     }
 
-    fn row_separator_height(&self) -> usize {
-        match self.density {
-            SessionListDensity::Comfortable => 1,
-            SessionListDensity::Dense => 0,
-        }
+}
+
+fn latest_transcript_turns(
+    cells: &[Arc<dyn crate::history_cell::HistoryCell>],
+    turns: usize,
+) -> TranscriptCells {
+    let user_turns = cells
+        .iter()
+        .enumerate()
+        .filter_map(|(index, cell)| {
+            cell.as_any().is::<UserHistoryCell>().then_some(index)
+        })
+        .collect::<Vec<_>>();
+    if user_turns.len() <= turns {
+        return cells.to_vec();
     }
+    cells[user_turns[user_turns.len() - turns]..].to_vec()
 }
 
 fn row_from_app_server_thread(thread: Thread) -> Option<Row> {
@@ -2267,6 +2495,25 @@ fn parse_timestamp_str(ts: &str) -> Option<DateTime<Utc>> {
 
 fn draw_picker(tui: &mut Tui, state: &PickerState, screen_size: Size) -> std::io::Result<()> {
     tui.draw(screen_size.height, |frame| layout::render(frame, state))
+}
+
+fn update_viewports(state: &mut PickerState, screen_area: Rect) {
+    let picker_areas = layout::areas(screen_area);
+    let body = Rect::new(
+        picker_areas.list.x.saturating_add(/*rhs*/ 2),
+        picker_areas.list.y,
+        list_viewport_width(picker_areas.list.width),
+        picker_areas.list.height,
+    );
+    let (tree_area, _) = layout::body_areas(body);
+    state.update_viewport(
+        usize::from(tree_area.height.saturating_sub(/*borders*/ 2)),
+        tree_area.width.saturating_sub(/*borders*/ 2),
+    );
+}
+
+fn scaled_mouse_step(speed: f64) -> isize {
+    (3.0 * speed.clamp(0.25, 8.0)).round().max(1.0) as isize
 }
 
 fn list_viewport_width(width: u16) -> u16 {
@@ -2629,16 +2876,6 @@ fn footer_hint_lines(state: &PickerState, width: u16) -> Vec<Line<'static>> {
             crate::i18n::ui_text("exit", "退出")
         }
     };
-    let density_label = match state.density {
-        SessionListDensity::Comfortable => crate::i18n::ui_text("dense view", "紧凑视图"),
-        SessionListDensity::Dense => {
-            crate::i18n::ui_text("comfortable view", "宽松视图")
-        }
-    };
-    let density_compact_label = match state.density {
-        SessionListDensity::Comfortable => crate::i18n::ui_text("dense", "紧凑"),
-        SessionListDensity::Dense => crate::i18n::ui_text("comfy", "宽松"),
-    };
     let mut first_row_hints = Vec::new();
     if let Some(accept) = state.keymap.list.primary_hint(ListAction::Accept) {
         first_row_hints.push(PickerFooterHint {
@@ -2673,9 +2910,15 @@ fn footer_hint_lines(state: &PickerState, width: u16) -> Vec<Line<'static>> {
         },
         PickerFooterHint {
             key: "tab".to_string(),
-            wide_label: crate::i18n::ui_text("focus sort/filter", "聚焦排序/筛选").to_string(),
-            compact_label: crate::i18n::ui_text("focus", "聚焦").to_string(),
+            wide_label: crate::i18n::ui_text("switch tree / preview", "切换树 / 预览").to_string(),
+            compact_label: crate::i18n::ui_text("switch pane", "切换区域").to_string(),
             priority: 7,
+        },
+        PickerFooterHint {
+            key: "shift+tab".to_string(),
+            wide_label: crate::i18n::ui_text("toolbar", "工具栏").to_string(),
+            compact_label: crate::i18n::ui_text("toolbar", "工具栏").to_string(),
+            priority: 8,
         },
     ]);
     let option_keys = [ListAction::MoveLeft, ListAction::MoveRight]
@@ -2692,26 +2935,12 @@ fn footer_hint_lines(state: &PickerState, width: u16) -> Vec<Line<'static>> {
             priority: 8,
         });
     }
-    let mut second_row_hints = vec![
-        PickerFooterHint {
-            key: crate::key_hint::ctrl(KeyCode::Char('o')).display_label(),
-            wide_label: density_label.to_string(),
-            compact_label: density_compact_label.to_string(),
-            priority: 3,
-        },
-        PickerFooterHint {
-            key: crate::key_hint::ctrl(KeyCode::Char('t')).display_label(),
-            wide_label: crate::i18n::ui_text("transcript", "对话记录").to_string(),
-            compact_label: crate::i18n::ui_text("preview", "预览").to_string(),
-            priority: 4,
-        },
-        PickerFooterHint {
-            key: crate::key_hint::ctrl(KeyCode::Char('e')).display_label(),
-            wide_label: crate::i18n::ui_text("expand", "展开").to_string(),
-            compact_label: crate::i18n::ui_text("exp", "展开").to_string(),
-            priority: 6,
-        },
-    ];
+    let mut second_row_hints = vec![PickerFooterHint {
+        key: crate::key_hint::ctrl(KeyCode::Char('t')).display_label(),
+        wide_label: crate::i18n::ui_text("full transcript", "完整对话").to_string(),
+        compact_label: crate::i18n::ui_text("transcript", "对话").to_string(),
+        priority: 4,
+    }];
     let browse_keys = [ListAction::MoveUp, ListAction::MoveDown]
         .into_iter()
         .filter_map(|action| state.keymap.list.primary_hint(action))
@@ -2979,6 +3208,176 @@ fn render_list(frame: &mut crate::custom_terminal::Frame, area: Rect, state: &Pi
             ),
         );
     }
+}
+
+fn render_tree_list(
+    frame: &mut crate::custom_terminal::Frame,
+    area: Rect,
+    state: &PickerState,
+) {
+    if area.is_empty() {
+        return;
+    }
+    let rows = &state.filtered_rows;
+    if rows.is_empty() {
+        frame.render_widget_ref(&render_empty_state_line(state), area);
+        return;
+    }
+
+    let start = state.scroll_top.min(rows.len().saturating_sub(1));
+    let show_more_above = state.has_more_above();
+    let show_more_below = state.has_more_below(area.height as usize);
+    let content_area = Rect::new(
+        area.x,
+        area.y.saturating_add(u16::from(show_more_above)),
+        area.width,
+        area.height
+            .saturating_sub(u16::from(show_more_above))
+            .saturating_sub(u16::from(show_more_below)),
+    );
+    if show_more_above {
+        let label = if start > 0 && rows[start].cwd == rows[start - 1].cwd {
+            let directory = rows[start]
+                .cwd
+                .as_ref()
+                .map(|path| {
+                    format_directory_display(
+                        path,
+                        Some(usize::from(area.width).saturating_sub(/*prefix*/ 8)),
+                    )
+                })
+                .unwrap_or_else(|| crate::i18n::ui_text("No directory", "无目录").to_string());
+            format!(
+                "↑ {} · {directory}",
+                crate::i18n::ui_text("more", "更多")
+            )
+        } else {
+            crate::i18n::ui_text("↑ more", "↑ 更多").to_string()
+        };
+        frame.render_widget_ref(
+            &Line::from(truncate_text(&label, usize::from(area.width)))
+                .fg(crate::style::accent_color_on(/*background*/ None))
+                .not_dim(),
+            Rect::new(area.x, area.y, area.width, 1),
+        );
+    }
+
+    let mut y = content_area.y;
+    for (index, row) in rows.iter().enumerate().skip(start) {
+        if y >= content_area.bottom() {
+            break;
+        }
+        let starts_group = index == 0 || row.cwd != rows[index - 1].cwd;
+        if starts_group {
+            let group_count = rows[index..]
+                .iter()
+                .take_while(|candidate| candidate.cwd == row.cwd)
+                .count();
+            let path = row
+                .cwd
+                .as_ref()
+                .map(|path| format_directory_display(path, Some(usize::from(area.width).saturating_sub(8))))
+                .unwrap_or_else(|| crate::i18n::ui_text("No directory", "无目录").to_string());
+            Line::from(vec![
+                format!("{SESSION_META_CWD_ICON} {path} ").bold(),
+                format!("({group_count})").set_style(secondary_text_style()),
+            ])
+            .render(Rect::new(area.x, y, area.width, 1), frame.buffer);
+            y = y.saturating_add(1);
+            if y >= content_area.bottom() {
+                break;
+            }
+        }
+        let is_selected = index == state.selected;
+        let line = render_tree_session_line(
+            row,
+            state,
+            is_selected,
+            index.is_multiple_of(2),
+            area.width,
+        );
+        if y < content_area.bottom() {
+            frame.render_widget_ref(&line, Rect::new(area.x, y, area.width, 1));
+            y = y.saturating_add(1);
+        } else {
+            break;
+        }
+    }
+
+    if state.pagination.is_loading() && y < content_area.bottom() {
+        frame.render_widget_ref(
+            &Line::from(vec![
+                "  ".into(),
+                crate::i18n::ui_text("Loading older sessions…", "正在加载更早的会话…")
+                    .set_style(secondary_text_style())
+                    .italic(),
+            ]),
+            Rect::new(area.x, y, area.width, 1),
+        );
+    }
+    if show_more_below {
+        let label = if state.pagination.is_loading() {
+            crate::i18n::ui_text("↓ loading more", "↓ 正在加载更多")
+        } else {
+            crate::i18n::ui_text("↓ more", "↓ 更多")
+        };
+        frame.render_widget_ref(
+            &more_line(label),
+            Rect::new(area.x, area.bottom().saturating_sub(1), area.width, 1),
+        );
+    }
+}
+
+fn render_tree_session_line(
+    row: &Row,
+    state: &PickerState,
+    is_selected: bool,
+    is_zebra: bool,
+    width: u16,
+) -> Line<'static> {
+    let marker = selection_marker(is_selected, /*is_expanded*/ false);
+    let marker_width = marker.width();
+    let reference = state.relative_time_reference.unwrap_or_else(Utc::now);
+    let created = format_relative_time(reference, row.created_at);
+    let updated = format_relative_time(reference, row.updated_at.or(row.created_at));
+    let date = match state.sort_key {
+        ThreadSortKey::CreatedAt => created,
+        ThreadSortKey::UpdatedAt | ThreadSortKey::RecencyAt | ThreadSortKey::SectionPosition => {
+            updated
+        }
+    };
+    let date_suffix = format!(" {date}");
+    let show_date = width >= 48
+        && marker_width
+            .saturating_add(UnicodeWidthStr::width(date_suffix.as_str()))
+            .saturating_add(/*minimum title*/ 12)
+            <= usize::from(width);
+    let date_width = if show_date {
+        UnicodeWidthStr::width(date_suffix.as_str())
+    } else {
+        0
+    };
+    let title_width = usize::from(width)
+        .saturating_sub(marker_width)
+        .saturating_sub(date_width);
+    let title = session_title_span(
+        dense_column_text(row.display_preview(), title_width),
+        row.thread_id,
+        state.use_theme_colors,
+        is_selected,
+    );
+    let mut spans = vec![marker, title];
+    if show_date {
+        spans.push(date_suffix.set_style(secondary_text_style()));
+    }
+    let row_style = if is_selected {
+        dense_selected_style()
+    } else if is_zebra {
+        dense_zebra_style()
+    } else {
+        Style::default()
+    };
+    apply_line_background(Line::from(spans), row_style, width)
 }
 
 fn more_line(label: &'static str) -> Line<'static> {
