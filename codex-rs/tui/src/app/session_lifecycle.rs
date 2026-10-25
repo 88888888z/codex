@@ -948,8 +948,7 @@ impl App {
                     ThreadBufferedEvent::Request(request) => {
                         server_request_thread_id(request) == Some(thread_id)
                     }
-                    ThreadBufferedEvent::HistoryEntryResponse(_)
-                    | ThreadBufferedEvent::FeedbackSubmission(_) => true,
+                    ThreadBufferedEvent::HistoryEntryResponse(_) => true,
                 });
                 let previous_pending = std::mem::take(&mut self.pending_app_server_requests);
                 for event in &self.pending_primary_events {

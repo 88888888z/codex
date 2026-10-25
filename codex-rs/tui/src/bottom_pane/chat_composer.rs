@@ -9453,7 +9453,6 @@ mod tests {
             ("/mo", "model"),
             ("/res", "resume"),
             ("/ar", "archive"),
-            ("/pet", "pets"),
             ("/bt", "btw"),
             ("/si", "side"),
         ] {

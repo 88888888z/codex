@@ -748,7 +748,6 @@ pub async fn run_main_with_transport_options(
     let log_write_warning = log_write_warning::LogWriteWarningReporter::new(
         feedback.clone(),
         &outgoing_message_sender,
-        &config,
     );
     let feedback_layer = feedback.logger_layer();
     let feedback_metadata_layer = feedback.metadata_layer();

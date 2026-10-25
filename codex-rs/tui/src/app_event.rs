@@ -54,7 +54,6 @@ use crate::bottom_pane::ApprovalRequest;
 use crate::bottom_pane::StatusLineItem;
 use crate::bottom_pane::TerminalTitleItem;
 use crate::chatwidget::AstraModelPickerAction;
-use crate::chatwidget::ConfiguredPetLoadGeneration;
 use crate::chatwidget::ConnectorScopeGeneration;
 use crate::chatwidget::ThreadUsageOutcome;
 use crate::chatwidget::UserMessage;
@@ -680,8 +679,6 @@ pub(crate) enum AppEvent {
         thread_id: ThreadId,
     },
 
-    /// Request app-server account logout, then exit after it succeeds.
-    Logout,
 
     /// Request to exit the application due to a fatal error.
     #[allow(dead_code)]
@@ -889,39 +886,6 @@ pub(crate) enum AppEvent {
     /// Open the current thread in Codex Desktop.
     OpenDesktopThread {
         thread_id: ThreadId,
-    },
-
-    /// Persist a pet selection and reload the ambient pet.
-    PetSelected {
-        pet_id: String,
-    },
-
-    /// Persist terminal pets as disabled and remove the ambient pet.
-    PetDisabled,
-
-    /// Start loading the side preview for the pet picker.
-    PetPreviewRequested {
-        pet_id: String,
-    },
-
-    /// Result of loading the side preview for the pet picker.
-    PetPreviewLoaded {
-        request_id: u64,
-        result: Result<crate::pets::AmbientPet, String>,
-    },
-
-    /// Result of loading the selected ambient pet before config persistence.
-    PetSelectionLoaded {
-        request_id: u64,
-        pet_id: String,
-        result: Result<Option<crate::pets::AmbientPet>, String>,
-    },
-
-    /// Result of restoring the configured ambient pet during startup.
-    ConfiguredPetLoaded {
-        generation: ConfiguredPetLoadGeneration,
-        pet_id: String,
-        result: Result<Option<crate::pets::AmbientPet>, String>,
     },
 
     /// Refresh app connector state and mention bindings.
@@ -1598,33 +1562,6 @@ pub(crate) enum AppEvent {
         crate::bottom_pane::user_verification::UserVerificationRequest,
     ),
 
-    /// Open the feedback note entry overlay after the user selects a category.
-    OpenFeedbackNote {
-        category: FeedbackCategory,
-        include_logs: bool,
-    },
-
-    /// Open the upload consent popup for feedback after selecting a category.
-    OpenFeedbackConsent {
-        category: FeedbackCategory,
-    },
-
-    /// Submit feedback for the current thread via the app-server feedback RPC.
-    SubmitFeedback {
-        category: FeedbackCategory,
-        reason: Option<String>,
-        turn_id: Option<String>,
-        include_logs: bool,
-    },
-
-    /// Result of a feedback upload request initiated by the TUI.
-    FeedbackSubmitted {
-        origin_thread_id: Option<ThreadId>,
-        category: FeedbackCategory,
-        include_logs: bool,
-        result: Result<String, String>,
-    },
-
     /// Launch the external editor after a normal draw has completed.
     LaunchExternalEditor,
 
@@ -1823,13 +1760,4 @@ pub(crate) enum RunningTaskExitAction {
     CancelTask,
     RunInBackground,
     Exit,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FeedbackCategory {
-    BadResult,
-    GoodResult,
-    Bug,
-    SafetyCheck,
-    Other,
 }

@@ -57,7 +57,6 @@ use codex_config::types::ToolSuggestDiscoverable;
 use codex_config::types::TuiKeymap;
 use codex_config::types::TuiLanguage;
 use codex_config::types::TuiNotificationSettings;
-use codex_config::types::TuiPetAnchor;
 use codex_config::types::UriBasedFileOpener;
 use codex_config::types::WindowsSandboxModeToml;
 use codex_core_plugins::PluginLoadOutcome;
@@ -876,12 +875,6 @@ pub struct Config {
 
     /// Last selected third-party model provider profile.
     pub tui_provider_profile: Option<String>,
-
-    /// Pet id preselected by the terminal pet picker.
-    pub tui_pet: Option<String>,
-
-    /// Vertical anchor used by terminal pet rendering.
-    pub tui_pet_anchor: TuiPetAnchor,
 
     /// Preferred layout for resume/fork session picker results.
     pub tui_session_picker_view: SessionPickerViewMode,
@@ -4780,12 +4773,6 @@ impl Config {
                 .tui
                 .as_ref()
                 .and_then(|tui| tui.provider_profile.clone()),
-            tui_pet: cfg.tui.as_ref().and_then(|t| t.pet.clone()),
-            tui_pet_anchor: cfg
-                .tui
-                .as_ref()
-                .map(|t| t.pet_anchor)
-                .unwrap_or_default(),
             tui_session_picker_view: cfg
                 .tui
                 .as_ref()

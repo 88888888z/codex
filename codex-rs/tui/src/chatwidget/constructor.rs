@@ -23,7 +23,6 @@ impl ChatWidget {
             requires_openai_auth,
             has_codex_backend_auth,
             model_catalog,
-            feedback,
             is_first_run,
             status_account_display,
             initial_plan_type,
@@ -84,17 +83,6 @@ impl ChatWidget {
             .as_ref()
             .map(|keymap| keymap.chat.clone())
             .unwrap_or_else(|| default_keymap.chat.clone());
-        let pet_http_client = codex_http_client::RouteAwareClientPool::new(
-            config.http_client_factory(),
-            codex_http_client::ClientRouteClass::Other,
-        );
-        let configured_pet_load_generation = pets::start_configured_pet_load_if_needed(
-            &local_settings,
-            /*ambient_pet_missing*/ true,
-            frame_requester.clone(),
-            app_event_tx.clone(),
-            pet_http_client.clone(),
-        );
         let config_panel_tui = local_settings.tui.clone();
         let mut widget = Self {
             empty_state_animation: std::cell::RefCell::new(empty_state_animation),
@@ -222,16 +210,8 @@ impl ChatWidget {
             status_state: StatusState::default(),
             review: ReviewState::default(),
             active_hook_cell: None,
-            pet_http_client,
-            ambient_pet: None,
-            configured_pet_load_generation,
-            pet_picker_preview_state: crate::pets::PetPickerPreviewState::default(),
-            pet_picker_preview_pet: None,
-            pet_picker_preview_request_id: 0,
-            pet_picker_preview_image_visible: std::cell::Cell::new(/*value*/ false),
-            pet_selection_load_request_id: 0,
             #[cfg(test)]
-            pet_image_support_override: None,
+            image_protocol_override: None,
             thread_id: None,
             thread_name: None,
             thread_rename_block_message: None,
@@ -260,7 +240,6 @@ impl ChatWidget {
             quit_shortcut_key: None,
             turn_runtime_metrics: RuntimeMetricsSummary::default(),
             last_rendered_width: std::cell::Cell::new(None),
-            feedback,
             current_rollout_path: None,
             current_cwd,
             workspace_command_runner,

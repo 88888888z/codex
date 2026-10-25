@@ -1068,19 +1068,6 @@ impl App {
                     }
                 }
             },
-            AppEvent::Logout => match app_server.logout_account().await {
-                Ok(()) => {
-                    self.show_shutdown_feedback(tui)?;
-                    return Ok(self
-                        .handle_exit_mode(app_server, ExitMode::ShutdownFirst)
-                        .await);
-                }
-                Err(err) => {
-                    tracing::error!("failed to logout: {err}");
-                    self.chat_widget
-                        .add_error_message(format!("Logout failed: {err}"));
-                }
-            },
             AppEvent::FatalExitRequest(message) => {
                 return Ok(AppRunControl::Exit(ExitReason::Fatal(message)));
             }
@@ -1398,34 +1385,6 @@ impl App {
             }
             AppEvent::OpenDesktopThread { thread_id } => {
                 self.open_desktop_thread(thread_id);
-            }
-            AppEvent::PetSelected { pet_id } => {
-                self.handle_pet_selected(tui, pet_id);
-            }
-            AppEvent::PetDisabled => {
-                self.handle_pet_disabled(tui).await;
-            }
-            AppEvent::PetPreviewRequested { pet_id } => {
-                self.chat_widget.start_pet_picker_preview(pet_id);
-            }
-            AppEvent::PetPreviewLoaded { request_id, result } => {
-                self.handle_pet_preview_loaded(tui, request_id, result);
-            }
-            AppEvent::PetSelectionLoaded {
-                request_id,
-                pet_id,
-                result,
-            } => {
-                return self
-                    .handle_pet_selection_loaded(tui, request_id, pet_id, result)
-                    .await;
-            }
-            AppEvent::ConfiguredPetLoaded {
-                generation,
-                pet_id,
-                result,
-            } => {
-                self.handle_configured_pet_loaded(tui, generation, pet_id, result);
             }
             AppEvent::RefreshConnectors { force_refetch } => {
                 self.chat_widget.refresh_connectors(force_refetch);
@@ -2427,32 +2386,6 @@ impl App {
             }
             AppEvent::ApplyPermissionShortcut { thread_id, selection } => {
                 self.apply_permission_shortcut(app_server, thread_id, selection).await;
-            }
-            AppEvent::OpenFeedbackNote {
-                category,
-                include_logs,
-            } => {
-                self.chat_widget.open_feedback_note(category, include_logs, self.feedback_audience);
-            }
-            AppEvent::OpenFeedbackConsent { category } => {
-                self.chat_widget.open_feedback_consent(category);
-            }
-            AppEvent::SubmitFeedback {
-                category,
-                reason,
-                turn_id,
-                include_logs,
-            } => {
-                self.submit_feedback(app_server, category, reason, turn_id, include_logs);
-            }
-            AppEvent::FeedbackSubmitted {
-                origin_thread_id,
-                category,
-                include_logs,
-                result,
-            } => {
-                self.handle_feedback_submitted(origin_thread_id, category, include_logs, result)
-                    .await;
             }
             AppEvent::LaunchExternalEditor => {
                 if self.chat_widget.external_editor_state() == ExternalEditorState::Active {

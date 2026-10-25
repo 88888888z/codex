@@ -99,14 +99,6 @@ pub fn tui_language_edit(language: TuiLanguage) -> ConfigEdit {
     }
 }
 
-/// Produces a config edit that sets [tui].pet = "<name>".
-pub fn tui_pet_edit(name: &str) -> ConfigEdit {
-    ConfigEdit::SetPath {
-        segments: vec!["tui".to_string(), "pet".to_string()],
-        value: value(name.to_string()),
-    }
-}
-
 /// Produces a config edit that sets `[tui].session_picker_view = "<mode>"`.
 pub fn session_picker_view_edit(mode: SessionPickerViewMode) -> ConfigEdit {
     ConfigEdit::SetPath {

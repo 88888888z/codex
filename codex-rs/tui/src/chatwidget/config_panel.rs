@@ -108,11 +108,6 @@ impl ChatWidget {
             | ConfigToggle::StartInVimMode
             | ConfigToggle::Tips => {}
         }
-        if setting == ConfigToggle::Animations
-            && let Some(pet) = self.ambient_pet.as_mut()
-        {
-            pet.set_animations_enabled(tui.animations);
-        }
     }
 
     pub(crate) fn observe_config_editor_transition_key_event(&mut self, key: KeyEvent) {

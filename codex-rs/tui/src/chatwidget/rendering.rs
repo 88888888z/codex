@@ -225,7 +225,7 @@ impl ChatWidget {
                 .bottom_pane_renderable(crate::bottom_pane::ComposerRenderOptions::default());
         }
 
-        let active_cell_right_reserve = self.ambient_pet_wrap_reserved_cols();
+        let active_cell_right_reserve = 0;
         let active_cell_renderable = match &self.transcript.active_cell {
             Some(cell) => RenderableItem::Owned(Box::new(TranscriptAreaRenderable {
                 child: cell.as_ref(),
@@ -323,7 +323,7 @@ impl ChatWidget {
             {
                 0
             } else {
-                self.ambient_pet_wrap_reserved_cols()
+                0
             };
             options.rendered_selection = Some(&self.rendered_selection);
             options.warning_count = self.warning_display_state.count;

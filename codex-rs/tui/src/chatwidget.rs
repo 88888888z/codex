@@ -177,8 +177,6 @@ const PLAN_MODE_REASONING_SCOPE_TITLE: &str = "Apply reasoning change";
 const PLAN_MODE_REASONING_SCOPE_PLAN_ONLY: &str = "Apply to Plan mode override";
 const PLAN_MODE_REASONING_SCOPE_ALL_MODES: &str = "Apply to global default and Plan mode override";
 const CONNECTORS_SELECTION_VIEW_ID: &str = "connectors-selection";
-const PET_SELECTION_LOADING_VIEW_ID: &str = "pet-selection-loading";
-const AMBIENT_PET_WRAP_GAP_COLUMNS: u16 = 2;
 const TUI_STUB_MESSAGE: &str = "Not available in TUI yet.";
 const PARENT_OWNED_INPUT_MESSAGE: &str =
     "This sub-agent is controlled by its parent. Direct input is disabled.";
@@ -297,8 +295,6 @@ use self::mcp_startup::McpStartupStatus;
 mod misalignment_policy;
 pub(crate) use misalignment_policy::MisalignmentReview;
 pub(crate) use misalignment_policy::MisalignmentTurnSource;
-mod pets;
-pub(crate) use self::pets::ConfiguredPetLoadGeneration;
 mod session_flow;
 mod session_header;
 use self::session_header::SessionHeader;
@@ -488,7 +484,6 @@ pub(crate) struct ChatWidgetInit {
     pub(crate) requires_openai_auth: bool,
     pub(crate) has_codex_backend_auth: bool,
     pub(crate) model_catalog: Arc<ModelCatalog>,
-    pub(crate) feedback: codex_feedback::CodexFeedback,
     pub(crate) is_first_run: bool,
     pub(crate) status_account_display: Option<StatusAccountDisplay>,
     pub(crate) initial_plan_type: Option<PlanType>,
@@ -667,18 +662,8 @@ pub(crate) struct ChatWidget {
     review: ReviewState,
     // Active hook runs render in a dedicated live cell so they can run alongside tools.
     active_hook_cell: Option<HookCell>,
-    // Reused for built-in pet CDN requests so redirects remain route-aware.
-    pub(crate) pet_http_client: codex_http_client::RouteAwareClientPool,
-    // Ambient companion rendered over the transcript area, never inside the footer rows.
-    ambient_pet: Option<crate::pets::AmbientPet>,
-    configured_pet_load_generation: ConfiguredPetLoadGeneration,
-    pet_picker_preview_state: crate::pets::PetPickerPreviewState,
-    pet_picker_preview_pet: Option<crate::pets::AmbientPet>,
-    pet_picker_preview_request_id: u64,
-    pet_picker_preview_image_visible: std::cell::Cell<bool>,
-    pet_selection_load_request_id: u64,
     #[cfg(test)]
-    pet_image_support_override: Option<crate::pets::PetImageSupport>,
+    image_protocol_override: Option<crate::terminal_image::ImageProtocol>,
     thread_id: Option<ThreadId>,
     thread_name: Option<String>,
     thread_rename_block_message: Option<String>,
@@ -727,8 +712,6 @@ pub(crate) struct ChatWidget {
     // Runtime metrics accumulated across delta snapshots for the active turn.
     turn_runtime_metrics: RuntimeMetricsSummary,
     last_rendered_width: std::cell::Cell<Option<u16>>,
-    // Diagnostics sink for feedback uploads.
-    feedback: codex_feedback::CodexFeedback,
     // Current session rollout path (if known)
     current_rollout_path: Option<PathBuf>,
     // Current working directory (if known)
@@ -995,23 +978,6 @@ impl ChatWidget {
         }
     }
 
-    pub(crate) fn open_feedback_note(
-        &mut self,
-        category: crate::app_event::FeedbackCategory,
-        include_logs: bool,
-        feedback_audience: crate::bottom_pane::FeedbackAudience,
-    ) {
-        let view = crate::bottom_pane::FeedbackNoteView::new(
-            category,
-            self.turn_lifecycle.last_turn_id.clone(),
-            self.app_event_tx.clone(),
-            include_logs,
-            feedback_audience,
-        );
-        self.bottom_pane.show_view(Box::new(view));
-        self.request_redraw();
-    }
-
     pub(crate) fn open_app_link_view(&mut self, params: crate::bottom_pane::AppLinkViewParams) {
         let view = crate::bottom_pane::AppLinkView::new_with_keymap(
             params,
@@ -1046,29 +1012,6 @@ impl ChatWidget {
         if removed_deferred || removed_visible {
             self.request_redraw();
         }
-    }
-
-    pub(crate) fn open_feedback_consent(&mut self, category: crate::app_event::FeedbackCategory) {
-        let snapshot = self.feedback.snapshot(self.thread_id);
-        #[cfg(target_os = "windows")]
-        let include_windows_sandbox_log =
-            codex_windows_sandbox::current_log_file_path_for_codex_home(
-                &self.local_settings.codex_home,
-            )
-            .is_file();
-        #[cfg(not(target_os = "windows"))]
-        let include_windows_sandbox_log = false;
-        let params = crate::bottom_pane::feedback_upload_consent_params(
-            self.app_event_tx.clone(),
-            category,
-            self.current_rollout_path.clone(),
-            self.thread_id
-                .map(|thread_id| format!("auto-review-rollout-{thread_id}.jsonl")),
-            include_windows_sandbox_log,
-            snapshot.feedback_diagnostics(),
-        );
-        self.bottom_pane.show_selection_view(params);
-        self.request_redraw();
     }
 
     pub(crate) fn open_feature_enable_prompt(&mut self, feature: Feature) {
@@ -1212,15 +1155,29 @@ impl ChatWidget {
         self.bottom_pane.on_history_lookup_response(event);
     }
 
+    pub(crate) fn terminal_image_protocol(&self) -> Option<crate::terminal_image::ImageProtocol> {
+        #[cfg(test)]
+        if let Some(protocol) = self.image_protocol_override {
+            return Some(protocol);
+        }
+
+        crate::terminal_image::detect_image_protocol()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_image_protocol_for_tests(
+        &mut self,
+        protocol: crate::terminal_image::ImageProtocol,
+    ) {
+        self.image_protocol_override = Some(protocol);
+    }
+
     pub(crate) fn pre_draw_tick(&mut self) {
         self.update_due_hook_visibility();
         self.schedule_hook_timer_if_needed();
         self.bottom_pane.pre_draw_tick();
         self.flush_realtime_transcript_history();
         self.refresh_realtime_microphone_level();
-        if let Some(pet) = self.ambient_pet.as_ref() {
-            pet.schedule_next_frame();
-        }
         self.refresh_goal_status_indicator_for_time_tick();
         if self.terminal_title_shows_action_required() != self.last_terminal_title_requires_action {
             self.refresh_terminal_title();
@@ -2014,6 +1971,10 @@ impl ChatWidget {
     /// message is recorded.
     pub(crate) fn rollout_path(&self) -> Option<PathBuf> {
         self.current_rollout_path.clone()
+    }
+
+    pub(crate) fn history_wrap_width(&self, width: u16) -> u16 {
+        width.max(1)
     }
 
     /// Returns a cache key describing the current in-flight cells for the transcript overlay.

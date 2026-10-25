@@ -1170,18 +1170,6 @@ impl App {
         self.chat_widget.set_tui_theme(Some(name));
     }
 
-    #[cfg(test)]
-    pub(super) fn sync_tui_pet_selection(&mut self, pet: String) {
-        self.local_settings.tui.pet = Some(pet.clone());
-        self.chat_widget.set_tui_pet(Some(pet));
-    }
-
-    pub(super) fn sync_tui_pet_disabled(&mut self) {
-        let pet = crate::pets::DISABLED_PET_ID.to_string();
-        self.local_settings.tui.pet = Some(pet.clone());
-        self.chat_widget.set_tui_pet(Some(pet));
-    }
-
     pub(super) fn restore_runtime_theme_from_config(&self) {
         if let Some(name) = self.local_settings.tui.theme.as_deref()
             && let Some(theme) = crate::render::highlight::resolve_theme_by_name(
@@ -1837,15 +1825,14 @@ enabled = false
         let permission_config = app
             .rebuild_config_for_permission_profile(":workspace")
             .await?;
-        let pet_url =
-            "https://persistent.oaistatic.com/codex/pets/v1/dewey-spritesheet-v4.webp".parse()?;
+        let asset_url = "https://example.com/asset.webp".parse()?;
         for config in [&app.config, &new_config, &permission_config] {
             assert_eq!(config.application_network_policy, controller.policy());
             assert_eq!(
                 config
                     .http_client_factory()
                     .network_policy()
-                    .acquire(&pet_url)
+                    .acquire(&asset_url)
                     .map(|_| ()),
                 Err(NetworkPolicyDenied::Destination),
             );
@@ -2108,32 +2095,4 @@ theme = "dracula"
         Ok(())
     }
 
-    #[tokio::test]
-    async fn sync_tui_pet_selection_updates_chat_widget_config_copy() {
-        let mut app = make_test_app().await;
-
-        app.sync_tui_pet_selection("chefito".to_string());
-
-        assert_eq!(app.local_settings.tui.pet.as_deref(), Some("chefito"));
-        assert_eq!(
-            app.chat_widget.local_settings.tui.pet.as_deref(),
-            Some("chefito")
-        );
-    }
-
-    #[tokio::test]
-    async fn sync_tui_pet_disabled_updates_chat_widget_config_copy() {
-        let mut app = make_test_app().await;
-
-        app.sync_tui_pet_disabled();
-
-        assert_eq!(
-            app.local_settings.tui.pet.as_deref(),
-            Some(crate::pets::DISABLED_PET_ID)
-        );
-        assert_eq!(
-            app.chat_widget.local_settings.tui.pet.as_deref(),
-            Some(crate::pets::DISABLED_PET_ID)
-        );
-    }
 }

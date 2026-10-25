@@ -241,7 +241,6 @@ impl App {
         initial_prompt: Option<String>,
         initial_images: Vec<PathBuf>,
         session_selection: SessionSelection,
-        feedback: codex_feedback::CodexFeedback,
         is_first_run: bool,
         should_prompt_windows_sandbox_nux_at_startup: bool,
         app_server_target: AppServerTarget,
@@ -520,7 +519,6 @@ impl App {
             ModelCatalog::new(available_models.clone())
                 .with_collaboration_modes(bootstrap.collaboration_modes),
         );
-        let feedback_audience = bootstrap.feedback_audience;
         let auth_mode = bootstrap.auth_mode;
         let has_chatgpt_account = bootstrap.has_chatgpt_account;
         let has_codex_backend_auth = matches!(auth_mode, Some(TelemetryAuthMode::Chatgpt));
@@ -625,7 +623,6 @@ impl App {
                     requires_openai_auth,
                     has_codex_backend_auth,
                     model_catalog: model_catalog.clone(),
-                    feedback: feedback.clone(),
                     is_first_run,
                     status_account_display: status_account_display.clone(),
                     initial_plan_type,
@@ -776,7 +773,6 @@ impl App {
                     requires_openai_auth,
                     has_codex_backend_auth,
                     model_catalog: model_catalog.clone(),
-                    feedback: feedback.clone(),
                     is_first_run,
                     status_account_display: status_account_display.clone(),
                     initial_plan_type,
@@ -889,7 +885,6 @@ impl App {
                     requires_openai_auth,
                     has_codex_backend_auth,
                     model_catalog: model_catalog.clone(),
-                    feedback: feedback.clone(),
                     is_first_run,
                     status_account_display: status_account_display.clone(),
                     initial_plan_type,
@@ -1008,8 +1003,6 @@ See the Codex keymap documentation for supported actions and examples."
             skill_load_warnings: SkillLoadWarningState::default(),
             backtrack: BacktrackState::default(),
             backtrack_render_pending: false,
-            feedback: feedback.clone(),
-            feedback_audience,
             environment_manager,
             app_server_target,
             pending_right_click_paste: None,
@@ -1676,7 +1669,6 @@ See the Codex keymap documentation for supported actions and examples."
         if let Err(err) = backends.shutdown().await {
             tracing::warn!(error = %err, "failed to shut down embedded app server");
         }
-        let clear_pet_result = tui.clear_ambient_pet_image();
         let clear_result = tui.terminal.clear();
         if let Some(task) = app.daemon_restart.take()
             && let Err(err) = task.await.unwrap_or_else(|err| Err(err.into()))
@@ -1686,14 +1678,10 @@ See the Codex keymap documentation for supported actions and examples."
         // Keep the alternate screen active until the outer guard restores both keyboard stacks.
         let exit_reason = match exit_reason_result {
             Ok(exit_reason) => {
-                clear_pet_result?;
                 clear_result?;
                 exit_reason
             }
             Err(err) => {
-                if let Err(clear_pet_err) = clear_pet_result {
-                    tracing::warn!(error = %clear_pet_err, "failed to clear ambient pet image");
-                }
                 if let Err(clear_err) = clear_result {
                     tracing::warn!(error = %clear_err, "failed to clear terminal UI");
                 }

@@ -552,7 +552,7 @@ async fn flush(
     let result = state_db.insert_logs(entries.as_slice()).await;
     let duration = started.elapsed();
     // if log flushing failed it means that likely something is wrong with the logs database,
-    // so store the logs in the memory buffer to avoid them being lost during /feedback
+    // so store the logs in the memory buffer to avoid losing them during diagnostics export.
     // the entries are dropped because the in memory buffer has it's own space-constrainted rules for preserving logs
     if let Err(error) = &result {
         let error = crate::telemetry::classify_error(error);

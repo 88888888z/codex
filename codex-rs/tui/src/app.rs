@@ -9,7 +9,6 @@ use crate::app_backtrack::BacktrackState;
 use crate::app_command::AppCommand;
 use crate::app_event::AppEvent;
 use crate::app_event::ExitMode;
-use crate::app_event::FeedbackCategory;
 use crate::app_event::HistoryLookupResponse;
 use crate::app_event::PermissionProfileSelection;
 use crate::app_event::PluginLocation;
@@ -29,7 +28,6 @@ use crate::bottom_pane::AppLinkViewParams;
 use crate::bottom_pane::ApplyPatchApprovalRequest;
 use crate::bottom_pane::ApprovalRequest;
 use crate::bottom_pane::ExecApprovalRequest;
-use crate::bottom_pane::FeedbackAudience;
 use crate::bottom_pane::McpElicitationApprovalRequest;
 use crate::bottom_pane::McpServerElicitationFormRequest;
 use crate::bottom_pane::PermissionsApprovalRequest;
@@ -103,7 +101,6 @@ use codex_app_server_protocol::ConfigBatchWriteParams;
 use codex_app_server_protocol::ConfigReadResponse;
 use codex_app_server_protocol::ConfigValueWriteParams;
 use codex_app_server_protocol::ConfigWriteResponse;
-use codex_app_server_protocol::FeedbackUploadParams;
 use codex_app_server_protocol::GetAccountRateLimitsResponse;
 use codex_app_server_protocol::HooksListEntry;
 use codex_app_server_protocol::ListMcpServerStatusParams;
@@ -175,7 +172,6 @@ use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Wrap;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -228,7 +224,6 @@ mod empty_state_policy;
 mod event_dispatch;
 mod exit_summary;
 mod experimental_features;
-mod feedback_upload;
 mod file_change_approvals;
 mod history_pagination;
 mod history_ui;
@@ -248,7 +243,6 @@ mod native_history;
 mod owned_transcript;
 mod pending_interactive_replay;
 mod permission_shortcuts;
-mod pets;
 mod platform_actions;
 mod plugin_mentions;
 mod rate_limit_refresh;
@@ -601,8 +595,6 @@ pub(crate) struct App {
     ///
     /// This keeps scrollback consistent with the retained transcript after backtracking.
     pub(crate) backtrack_render_pending: bool,
-    pub(crate) feedback: codex_feedback::CodexFeedback,
-    feedback_audience: FeedbackAudience,
     environment_manager: Arc<EnvironmentManager>,
     app_server_target: AppServerTarget,
     reconnect: reconnect::ReconnectState,
@@ -846,7 +838,6 @@ impl App {
             requires_openai_auth: self.chat_widget.requires_openai_auth,
             has_codex_backend_auth: self.chat_widget.has_codex_backend_auth(),
             model_catalog: self.model_catalog.clone(),
-            feedback: self.feedback.clone(),
             is_first_run: false,
             status_account_display: self.chat_widget.status_account_display().cloned(),
             initial_plan_type: self.chat_widget.current_plan_type(),
@@ -1165,7 +1156,7 @@ impl App {
                     }
                     self.chat_widget.pre_draw_tick();
                     self.refresh_agents_overview_usage(app_server, tui.frame_requester());
-                    let rendered_area = self.render_chat_widget_frame(tui, screen_size)?;
+                    self.render_chat_widget_frame(tui, screen_size)?;
                     if tui.is_owned_screen()
                         && self.transcript_view.history
                             != crate::pager_overlay::TranscriptHistoryState::Failed
@@ -1177,29 +1168,6 @@ impl App {
                         && self.startup_protected_input_boundary
                     {
                         self.discard_startup_modal_input(tui)?;
-                    }
-                    if self.chat_widget.ambient_pet_image_enabled() {
-                        let ambient_pet_area = Rect::new(
-                            /*x*/ 0,
-                            /*y*/ 0,
-                            screen_size.width,
-                            screen_size.height,
-                        );
-                        if let Err(err) = tui.draw_ambient_pet_image(
-                            self.chat_widget
-                                .ambient_pet_draw(ambient_pet_area, rendered_area.bottom()),
-                        ) {
-                            self.handle_ambient_pet_image_render_error(tui, err)?;
-                        }
-                    }
-                    if let Some(request) = self.chat_widget.pet_picker_preview_draw() {
-                        if let Err(err) = tui.draw_pet_picker_preview_image(Some(request)) {
-                            self.handle_pet_picker_preview_image_render_error(tui, err)?;
-                        }
-                    } else if self.chat_widget.should_clear_pet_picker_preview_image()
-                        && let Err(err) = tui.draw_pet_picker_preview_image(/*request*/ None)
-                    {
-                        self.handle_pet_picker_preview_image_render_error(tui, err)?;
                     }
                     if self.chat_widget.external_editor_state() == ExternalEditorState::Requested {
                         self.chat_widget
@@ -1219,7 +1187,6 @@ impl App {
     }
 
     pub(super) fn show_shutdown_feedback(&mut self, tui: &mut tui::Tui) -> Result<()> {
-        self.disable_ambient_pet_before_shutdown(tui)?;
         self.chat_widget.show_shutdown_in_progress();
         let screen_size = tui.terminal.last_known_screen_size;
         self.handle_draw_pre_render(tui, screen_size)?;

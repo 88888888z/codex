@@ -2,7 +2,6 @@
 # Tips may use {key:context.action} to insert the configured primary key or chord.
 # A tip is skipped if any referenced action is unbound or unavailable.
 Start a fresh idea with **/new**; the previous session stays in history.
-Use **/feedback** to send logs to the maintainers when something looks off.
 Switch models or reasoning effort quickly with **/model**.
 Use **/permissions** to control when Codex asks for confirmation.
 Run **/review** to get a code review of your current changes.

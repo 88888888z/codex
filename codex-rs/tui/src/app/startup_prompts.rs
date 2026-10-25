@@ -7,6 +7,7 @@ use super::*;
 use codex_config::ConfigLayerSource;
 use codex_model_provider_info::AMAZON_BEDROCK_PROVIDER_ID;
 use codex_model_provider_info::OPENAI_PROVIDER_ID;
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 

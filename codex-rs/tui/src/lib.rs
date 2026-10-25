@@ -137,7 +137,7 @@ mod daybreak;
 mod experimental_features;
 mod markdown_copy;
 mod permission_discovery;
-mod pets;
+mod terminal_image;
 mod provider_profiles;
 mod security_setup;
 mod worktree_browser;
@@ -2181,7 +2181,6 @@ async fn run_ratatui_app(
         prompt,
         images,
         session_selection,
-        feedback,
         is_first_run,
         should_prompt_windows_sandbox_nux_at_startup,
         app_server_target,

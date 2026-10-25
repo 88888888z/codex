@@ -80,7 +80,7 @@ impl App {
         let chat_widget = &self.chat_widget;
         let transcript_width = chat_widget.history_wrap_width(width);
         let view = &mut self.transcript_view;
-        view.image_protocol = chat_widget.pet_image_support().protocol().filter(|_| {
+        view.image_protocol = chat_widget.terminal_image_protocol().filter(|_| {
             !self.app_server_target.uses_remote_workspace()
                 && crate::projectless::has_only_local_environments(&self.environment_manager)
         });

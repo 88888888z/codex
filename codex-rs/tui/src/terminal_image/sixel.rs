@@ -1,9 +1,8 @@
-//! Minimal Sixel encoder for pet sprites.
+//! Minimal Sixel encoder for terminal images.
 //!
-//! This is intentionally not a general-purpose Sixel implementation. Pet frames
-//! are already small RGBA images by the time they reach this module, so the
-//! encoder uses deterministic RGB332 color reduction and transparent pixels are
-//! simply omitted from the emitted color planes.
+//! This is intentionally not a general-purpose Sixel implementation. Inputs are
+//! already bounded RGBA images, so the encoder uses deterministic RGB332 color
+//! reduction and transparent pixels are omitted from the emitted color planes.
 
 use anyhow::Context;
 use anyhow::Result;

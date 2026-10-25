@@ -890,7 +890,6 @@ fn set_test_initial_prompt(app: &mut App, initial_prompt: String) {
         has_chatgpt_account: false,
         has_codex_backend_auth: false,
         model_catalog: app.model_catalog.clone(),
-        feedback: codex_feedback::CodexFeedback::new(),
         is_first_run: false,
         status_account_display: None,
         initial_plan_type: None,
@@ -6440,8 +6439,6 @@ async fn make_test_app() -> Box<App> {
         skill_load_warnings: SkillLoadWarningState::default(),
         backtrack: BacktrackState::default(),
         backtrack_render_pending: false,
-        feedback: codex_feedback::CodexFeedback::new(),
-        feedback_audience: FeedbackAudience::External,
         environment_manager: Arc::new(EnvironmentManager::default_for_tests()),
         app_server_target: crate::AppServerTarget::Embedded,
         reconnect: Default::default(),
@@ -6566,8 +6563,6 @@ pub(super) async fn make_test_app_with_channels() -> (
             skill_load_warnings: SkillLoadWarningState::default(),
             backtrack: BacktrackState::default(),
             backtrack_render_pending: false,
-            feedback: codex_feedback::CodexFeedback::new(),
-            feedback_audience: FeedbackAudience::External,
             environment_manager: Arc::new(EnvironmentManager::default_for_tests()),
             app_server_target: crate::AppServerTarget::Embedded,
             reconnect: Default::default(),
@@ -7077,32 +7072,6 @@ async fn uncapped_resize_reflow_renders_all_cells_when_row_cap_absent() {
     assert_eq!(rendered.lines.len(), 39);
     assert_eq!(rendered_line_text(&rendered.lines[0]), "cell 0");
     assert_eq!(rendered_line_text(&rendered.lines[38]), "cell 19");
-}
-
-#[tokio::test]
-async fn resize_reflow_wraps_transcript_early_when_pet_is_enabled() {
-    let (mut app, _rx, _op_rx) = make_test_app_with_channels().await;
-    app.local_settings.tui.terminal_resize_reflow_max_rows = Some(0);
-    app.transcript_cells = vec![Arc::new(AgentMarkdownCell::new(
-        "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda".to_string(),
-        Path::new("/tmp"),
-    ))];
-
-    let without_pet = app.render_transcript_lines_for_reflow(/*width*/ 40);
-    app.chat_widget
-        .set_pet_image_support_for_tests(crate::pets::PetImageSupport::Supported(
-            crate::pets::ImageProtocol::Kitty,
-        ));
-    app.chat_widget
-        .install_test_ambient_pet_for_tests(/*animations_enabled*/ false);
-    let width = app.chat_widget.history_wrap_width(/*width*/ 40);
-    assert!(width < 40);
-    let with_pet = app.render_transcript_lines_for_reflow(width);
-
-    assert!(
-        with_pet.lines.len() > without_pet.lines.len(),
-        "expected pet-enabled transcript reflow to wrap earlier"
-    );
 }
 
 #[tokio::test]
@@ -7626,178 +7595,6 @@ fn request_user_input_request(thread_id: ThreadId, turn_id: &str, item_id: &str)
             auto_resolution_ms: None,
         },
     }
-}
-
-#[tokio::test]
-async fn feedback_submission_stages_logs_cleans_up_and_emits_error_history_cell() -> Result<()> {
-    use base64::Engine;
-    use base64::engine::general_purpose::STANDARD;
-    use std::io::Write;
-    use tracing_subscriber::fmt::writer::MakeWriter;
-
-    let (mut app, mut app_event_rx, _op_rx) = make_test_app_with_channels().await;
-    let (server, requests, proxy) =
-        session_lifecycle_requests::start_recording_remote_app_server(&app.config).await?;
-    let diagnostic = "SQLITE LOG WRITE FAILURE: disk full\n";
-    let expected_logs = format!("{}{diagnostic}", "x".repeat(1024 * 1024 - diagnostic.len()));
-    let mut writer = app.feedback.make_writer().make_writer();
-    writer.write_all(&vec![b'x'; 1024 * 1024])?;
-    writer.write_all(diagnostic.as_bytes())?;
-    for (include_logs, staging_fails) in [(true, false), (false, false), (true, true)] {
-        let home = tempdir()?;
-        let tmp = home.path().join("tmp");
-        if staging_fails {
-            std::fs::write(&tmp, "not a directory")?;
-        }
-        let mut params = background_requests::build_feedback_upload_params(
-            /*origin_thread_id*/ None,
-            Some(PathBuf::from("existing-rollout.jsonl")),
-            FeedbackCategory::Bug,
-            /*reason*/ None,
-            /*turn_id*/ None,
-            include_logs,
-        );
-        // Reject before network upload, after the client has staged its diagnostics.
-        params.thread_id = Some("invalid-thread-id".into());
-        let error = feedback_upload::fetch_feedback_upload(
-            server.request_handle(),
-            Some(AppServerPath::from_app_server(
-                home.path().display().to_string(),
-            )),
-            params,
-            app.feedback.clone(),
-        )
-        .await
-        .unwrap_err();
-        assert!(format!("{error:#}").contains("invalid thread id"));
-        let recorded = std::mem::take(&mut *requests.lock().unwrap());
-        let upload = recorded
-            .iter()
-            .find(|r| r.method == "feedback/upload")
-            .unwrap();
-        let upload: FeedbackUploadParams = serde_json::from_value(upload.params.clone().unwrap())?;
-        if include_logs && !staging_fails {
-            let write = recorded
-                .iter()
-                .find(|r| r.method == "fs/writeFile")
-                .unwrap();
-            let write = write.params.as_ref().unwrap();
-            assert_eq!(
-                STANDARD.decode(write["dataBase64"].as_str().unwrap())?,
-                expected_logs.as_bytes()
-            );
-            assert_eq!(
-                upload.extra_log_files,
-                Some(vec![
-                    PathBuf::from("existing-rollout.jsonl"),
-                    PathBuf::from(write["path"].as_str().unwrap())
-                ])
-            );
-            assert_eq!(std::fs::read_dir(&tmp)?.count(), 0);
-        } else if staging_fails {
-            assert_eq!(
-                upload.extra_log_files,
-                Some(vec![PathBuf::from("existing-rollout.jsonl")])
-            );
-            assert!(
-                upload
-                    .reason
-                    .unwrap()
-                    .contains("TUI client logs were omitted")
-            );
-        } else {
-            assert_eq!(recorded.len(), 1);
-            assert_eq!(upload.extra_log_files, None);
-            assert!(!tmp.exists());
-        }
-    }
-    server.shutdown().await?;
-    proxy.await??;
-
-    app.handle_feedback_submitted(
-        /*origin_thread_id*/ None,
-        FeedbackCategory::Bug,
-        /*include_logs*/ true,
-        Err("boom".to_string()),
-    )
-    .await;
-
-    let cell = match app_event_rx.try_recv() {
-        Ok(AppEvent::InsertHistoryCell(cell)) => cell,
-        other => panic!("expected feedback error history cell, saw {other:?}"),
-    };
-    assert_eq!(
-        lines_to_single_string(&cell.display_lines(/*width*/ 120)),
-        "■ Failed to upload feedback: boom"
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn feedback_submission_for_inactive_thread_replays_into_origin_thread() {
-    let (mut app, mut app_event_rx, _op_rx) = make_test_app_with_channels().await;
-    let origin_thread_id = ThreadId::new();
-    let active_thread_id = ThreadId::new();
-    let origin_session = test_thread_session(origin_thread_id, test_path_buf("/tmp/origin"));
-    let active_session = test_thread_session(active_thread_id, test_path_buf("/tmp/active"));
-    app.thread_event_channels.insert(
-        origin_thread_id,
-        ThreadEventChannel::new_with_session(
-            THREAD_EVENT_CHANNEL_CAPACITY,
-            origin_session.clone(),
-            Vec::new(),
-        ),
-    );
-    app.thread_event_channels.insert(
-        active_thread_id,
-        ThreadEventChannel::new_with_session(
-            THREAD_EVENT_CHANNEL_CAPACITY,
-            active_session.clone(),
-            Vec::new(),
-        ),
-    );
-    app.activate_thread_channel(active_thread_id).await;
-    app.chat_widget.handle_thread_session(active_session);
-    while app_event_rx.try_recv().is_ok() {}
-
-    app.handle_feedback_submitted(
-        Some(origin_thread_id),
-        FeedbackCategory::Bug,
-        /*include_logs*/ true,
-        Ok("uploaded-thread".to_string()),
-    )
-    .await;
-
-    assert_matches!(
-        app_event_rx.try_recv(),
-        Err(tokio::sync::mpsc::error::TryRecvError::Empty)
-    );
-
-    let snapshot = {
-        let channel = app
-            .thread_event_channels
-            .get(&origin_thread_id)
-            .expect("origin thread channel should exist");
-        let store = channel.store.lock().await;
-        assert!(matches!(
-            store.buffer.back(),
-            Some(ThreadBufferedEvent::FeedbackSubmission(_))
-        ));
-        store.snapshot()
-    };
-
-    app.replay_thread_snapshot(snapshot, /*resume_restored_queue*/ false);
-
-    let mut rendered_cells = Vec::new();
-    while let Ok(event) = app_event_rx.try_recv() {
-        if let AppEvent::InsertHistoryCell(cell) = event {
-            rendered_cells.push(lines_to_single_string(&cell.display_lines(/*width*/ 120)));
-        }
-    }
-    assert!(rendered_cells.iter().any(|cell| {
-        cell.contains("• Feedback uploaded. Please open an issue using the following URL:")
-            && cell.contains("uploaded-thread")
-    }));
 }
 
 fn next_history_message(events: &mut tokio::sync::mpsc::UnboundedReceiver<AppEvent>) -> String {
@@ -9206,7 +9003,6 @@ async fn replace_chat_widget_reseeds_collab_agent_metadata_for_replay() {
         has_chatgpt_account: app.chat_widget.has_chatgpt_account(),
         has_codex_backend_auth: app.chat_widget.has_codex_backend_auth(),
         model_catalog: app.model_catalog.clone(),
-        feedback: app.feedback.clone(),
         is_first_run: false,
         status_account_display: app.chat_widget.status_account_display().cloned(),
         initial_plan_type: app.chat_widget.current_plan_type(),

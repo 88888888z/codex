@@ -1,26 +1,19 @@
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::path::PathBuf;
-use std::str::FromStr;
 
 use anyhow::Context;
 use anyhow::Result;
-use anyhow::bail;
 use base64::Engine as _;
 use base64::engine::general_purpose;
 use codex_terminal_detection::Multiplexer;
 use codex_terminal_detection::TerminalInfo;
 use codex_terminal_detection::TerminalName;
 use codex_terminal_detection::terminal_info;
-use image::imageops::FilterType;
-
-use super::sixel;
 
 const ESC: &str = "\x1b";
 const ST: &str = "\x1b\\";
 const KITTY_CHUNK_SIZE: usize = 4096;
-const SIXEL_CACHE_VERSION: &str = "v2";
 const ITERM2_KITTY_MIN_VERSION: (u64, u64, u64) = (3, 6, 0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,148 +23,57 @@ pub enum ImageProtocol {
     Sixel,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PetImageSupport {
-    Supported(ImageProtocol),
-    Unsupported(PetImageUnsupportedReason),
-}
-
-impl PetImageSupport {
-    pub(crate) fn protocol(self) -> Option<ImageProtocol> {
-        match self {
-            Self::Supported(protocol) => Some(protocol),
-            Self::Unsupported(_) => None,
-        }
-    }
-
-    pub(crate) fn unsupported_message(self) -> Option<&'static str> {
-        match self {
-            Self::Supported(_) => None,
-            Self::Unsupported(reason) => Some(reason.message()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PetImageUnsupportedReason {
-    Tmux,
-    Zellij,
-    Iterm2TooOld,
-    Terminal,
-}
-
-impl PetImageUnsupportedReason {
-    fn message(self) -> &'static str {
-        match self {
-            Self::Tmux => {
-                crate::i18n::ui_text(
-                    "Pets are disabled in tmux. Terminal images don’t stay pane-local in tmux and can corrupt scrollback or move between panes. Run Codex outside tmux to use pets.",
-                    "tmux 中已禁用宠物。终端图片无法稳定限制在单个窗格内，可能破坏回滚内容或移动到其他窗格。请在 tmux 外运行 Codex 以使用宠物。",
-                )
-            }
-            Self::Zellij => {
-                crate::i18n::ui_text(
-                    "Pets are disabled in Zellij. Terminal images don’t stay reliably pane-local in Zellij. Run Codex outside Zellij to use pets.",
-                    "Zellij 中已禁用宠物。终端图片无法可靠地限制在单个窗格内。请在 Zellij 外运行 Codex 以使用宠物。",
-                )
-            }
-            Self::Iterm2TooOld => {
-                crate::i18n::ui_text(
-                    "Pets require iTerm2 3.6 or newer. Upgrade iTerm2 to use terminal pets.",
-                    "宠物需要 iTerm2 3.6 或更高版本。请升级 iTerm2 后使用终端宠物。",
-                )
-            }
-            Self::Terminal => {
-                crate::i18n::ui_text(
-                    "Pets aren’t available in this terminal. Terminal pets need image support, and this terminal environment doesn’t expose a supported image protocol. Try a terminal with Kitty graphics or Sixel support, or run Codex outside tmux.",
-                    "此终端不支持宠物。终端宠物需要图片支持，但当前终端没有提供受支持的图片协议。请尝试支持 Kitty graphics 或 Sixel 的终端，或在 tmux 外运行 Codex。",
-                )
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProtocolSelection {
-    Auto,
-    Kitty,
-    Sixel,
-}
-
-impl ProtocolSelection {
-    pub(crate) fn resolve(self) -> PetImageSupport {
-        match self {
-            Self::Kitty => PetImageSupport::Supported(ImageProtocol::Kitty),
-            Self::Sixel => PetImageSupport::Supported(ImageProtocol::Sixel),
-            Self::Auto => detect_pet_image_support(),
-        }
-    }
-}
-
-impl FromStr for ProtocolSelection {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self> {
-        match value {
-            "auto" => Ok(Self::Auto),
-            "kitty" => Ok(Self::Kitty),
-            "sixel" => Ok(Self::Sixel),
-            other => bail!("unknown protocol {other}; expected auto, kitty, or sixel"),
-        }
-    }
-}
-
-pub(crate) fn detect_pet_image_support() -> PetImageSupport {
+pub(crate) fn detect_image_protocol() -> Option<ImageProtocol> {
     if env::var_os("TMUX").is_some() || env::var_os("TMUX_PANE").is_some() {
-        return PetImageSupport::Unsupported(PetImageUnsupportedReason::Tmux);
+        return None;
     }
 
     if env::var_os("ZELLIJ").is_some()
         || env::var_os("ZELLIJ_SESSION_NAME").is_some()
         || env::var_os("ZELLIJ_VERSION").is_some()
     {
-        return PetImageSupport::Unsupported(PetImageUnsupportedReason::Zellij);
+        return None;
     }
 
     if env::var_os("KITTY_WINDOW_ID").is_some() {
-        return PetImageSupport::Supported(ImageProtocol::Kitty);
+        return Some(ImageProtocol::Kitty);
     }
 
     if env::var_os("WEZTERM_EXECUTABLE").is_some() || env::var_os("WEZTERM_VERSION").is_some() {
-        return PetImageSupport::Supported(ImageProtocol::Kitty);
+        return Some(ImageProtocol::Kitty);
     }
 
-    pet_image_support_for_terminal(&terminal_info())
+    image_protocol_for_terminal(&terminal_info())
 }
 
-fn pet_image_support_for_terminal(info: &TerminalInfo) -> PetImageSupport {
+fn image_protocol_for_terminal(info: &TerminalInfo) -> Option<ImageProtocol> {
     match info.multiplexer {
         Some(Multiplexer::Tmux { .. }) => {
-            return PetImageSupport::Unsupported(PetImageUnsupportedReason::Tmux);
+            return None;
         }
         Some(Multiplexer::Zellij { .. }) => {
-            return PetImageSupport::Unsupported(PetImageUnsupportedReason::Zellij);
+            return None;
         }
         None => {}
     }
 
     if supports_iterm2_kitty_graphics(info) {
-        return PetImageSupport::Supported(ImageProtocol::KittyLocalFile);
+        return Some(ImageProtocol::KittyLocalFile);
     }
 
     if is_iterm2_terminal(info) {
-        return PetImageSupport::Unsupported(PetImageUnsupportedReason::Iterm2TooOld);
+        return None;
     }
 
     if supports_kitty_graphics(info) {
-        return PetImageSupport::Supported(ImageProtocol::Kitty);
+        return Some(ImageProtocol::Kitty);
     }
 
     if supports_sixel(info) {
-        return PetImageSupport::Supported(ImageProtocol::Sixel);
+        return Some(ImageProtocol::Sixel);
     }
 
-    PetImageSupport::Unsupported(PetImageUnsupportedReason::Terminal)
+    None
 }
 
 fn supports_iterm2_kitty_graphics(info: &TerminalInfo) -> bool {
@@ -295,61 +197,6 @@ fn wrap_for_tmux_if_needed(command: &str) -> String {
     format!("{ESC}Ptmux;{escaped}{ST}")
 }
 
-pub fn sixel_frame(frame_path: &Path, cache_dir: &Path, height_px: u16) -> Result<PathBuf> {
-    fs::create_dir_all(cache_dir).with_context(|| format!("create {}", cache_dir.display()))?;
-
-    let stem = frame_path
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .context("frame path has no valid file stem")?;
-    let background = crate::terminal_palette::default_bg();
-    let cache_background = background.map_or_else(String::new, |(red, green, blue)| {
-        format!("_bg{red:02x}{green:02x}{blue:02x}")
-    });
-    let path = cache_dir.join(format!(
-        "{stem}_h{height_px}_{SIXEL_CACHE_VERSION}{cache_background}.six"
-    ));
-    if path.exists() {
-        return Ok(path);
-    }
-
-    let frame =
-        image::open(frame_path).with_context(|| format!("read {}", frame_path.display()))?;
-    let height = u32::from(height_px).max(1);
-    let width = ((u64::from(frame.width()) * u64::from(height)) / u64::from(frame.height()))
-        .try_into()
-        .unwrap_or(u32::MAX)
-        .max(1);
-    let mut rgba = frame.resize(width, height, FilterType::Lanczos3).to_rgba8();
-    if let Some(background) = background {
-        composite_on_background(&mut rgba, background);
-    }
-    let (width, height) = rgba.dimensions();
-    let sixel = sixel::encode_rgba(&rgba.into_raw(), width, height)?;
-
-    fs::write(&path, sixel).with_context(|| format!("write {}", path.display()))?;
-    Ok(path)
-}
-
-fn composite_on_background(rgba: &mut image::RgbaImage, background: (u8, u8, u8)) {
-    let (background_red, background_green, background_blue) = background;
-    for pixel in rgba.pixels_mut() {
-        let alpha = u32::from(pixel[3]);
-        if alpha == u32::from(u8::MAX) {
-            continue;
-        }
-        let inverse = u32::from(u8::MAX) - alpha;
-        pixel[0] = blend_on_background(pixel[0], background_red, alpha, inverse);
-        pixel[1] = blend_on_background(pixel[1], background_green, alpha, inverse);
-        pixel[2] = blend_on_background(pixel[2], background_blue, alpha, inverse);
-        pixel[3] = u8::MAX;
-    }
-}
-
-fn blend_on_background(channel: u8, background: u8, alpha: u32, inverse: u32) -> u8 {
-    ((u32::from(channel) * alpha + u32::from(background) * inverse + 127) / 255) as u8
-}
-
 #[cfg(test)]
 mod tests {
     use serial_test::serial;
@@ -410,71 +257,29 @@ mod tests {
     }
 
     #[test]
-    fn parses_protocol_selection() {
+    fn image_protocol_prefers_multiplexer_safety() {
         assert_eq!(
-            "auto".parse::<ProtocolSelection>().unwrap(),
-            ProtocolSelection::Auto
-        );
-        assert_eq!(
-            "kitty".parse::<ProtocolSelection>().unwrap(),
-            ProtocolSelection::Kitty
-        );
-        assert_eq!(
-            "sixel".parse::<ProtocolSelection>().unwrap(),
-            ProtocolSelection::Sixel
-        );
-    }
-
-    #[test]
-    #[serial]
-    fn auto_protocol_is_disabled_inside_tmux() {
-        let _guard = EnvVarGuard::new("TMUX", Some("session"));
-
-        assert_eq!(
-            ProtocolSelection::Auto.resolve(),
-            PetImageSupport::Unsupported(PetImageUnsupportedReason::Tmux)
-        );
-    }
-
-    #[test]
-    #[serial]
-    fn explicit_protocol_still_resolves_inside_tmux() {
-        let _guard = EnvVarGuard::new("TMUX", Some("session"));
-
-        assert_eq!(
-            ProtocolSelection::Kitty.resolve(),
-            PetImageSupport::Supported(ImageProtocol::Kitty)
-        );
-        assert_eq!(
-            ProtocolSelection::Sixel.resolve(),
-            PetImageSupport::Supported(ImageProtocol::Sixel)
-        );
-    }
-
-    #[test]
-    fn pet_image_support_prefers_multiplexer_safety() {
-        assert_eq!(
-            pet_image_support_for_terminal(&terminal_info_for_test(
+            image_protocol_for_terminal(&terminal_info_for_test(
                 TerminalName::Ghostty,
                 Some(Multiplexer::Tmux { version: None }),
                 Some("Ghostty"),
                 /*term*/ None,
             )),
-            PetImageSupport::Unsupported(PetImageUnsupportedReason::Tmux)
+            None
         );
         assert_eq!(
-            pet_image_support_for_terminal(&terminal_info_for_test(
+            image_protocol_for_terminal(&terminal_info_for_test(
                 TerminalName::Kitty,
                 Some(Multiplexer::Zellij { version: None }),
                 Some("kitty"),
                 /*term*/ None,
             )),
-            PetImageSupport::Unsupported(PetImageUnsupportedReason::Zellij)
+            None
         );
     }
 
     #[test]
-    fn pet_image_support_detects_iterm2_kitty_file_graphics() {
+    fn image_protocol_detects_iterm2_kitty_file_graphics() {
         for info in [
             terminal_info_with_version_for_test(
                 TerminalName::Iterm2,
@@ -492,14 +297,14 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                pet_image_support_for_terminal(&info),
-                PetImageSupport::Supported(ImageProtocol::KittyLocalFile)
+                image_protocol_for_terminal(&info),
+                Some(ImageProtocol::KittyLocalFile)
             );
         }
     }
 
     #[test]
-    fn pet_image_support_rejects_old_iterm2_versions() {
+    fn image_protocol_rejects_old_iterm2_versions() {
         for info in [
             terminal_info_with_version_for_test(
                 TerminalName::Iterm2,
@@ -524,25 +329,14 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                pet_image_support_for_terminal(&info),
-                PetImageSupport::Unsupported(PetImageUnsupportedReason::Iterm2TooOld)
+                image_protocol_for_terminal(&info),
+                None
             );
         }
     }
 
     #[test]
-    fn pet_image_support_old_iterm2_message_mentions_upgrade() {
-        let message = PetImageSupport::Unsupported(PetImageUnsupportedReason::Iterm2TooOld)
-            .unsupported_message();
-
-        assert_eq!(
-            message,
-            Some("Pets require iTerm2 3.6 or newer. Upgrade iTerm2 to use terminal pets.")
-        );
-    }
-
-    #[test]
-    fn pet_image_support_detects_kitty_graphics_terminals() {
+    fn image_protocol_detects_kitty_graphics_terminals() {
         for info in [
             terminal_info_for_test(
                 TerminalName::Ghostty,
@@ -582,14 +376,14 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                pet_image_support_for_terminal(&info),
-                PetImageSupport::Supported(ImageProtocol::Kitty)
+                image_protocol_for_terminal(&info),
+                Some(ImageProtocol::Kitty)
             );
         }
     }
 
     #[test]
-    fn pet_image_support_detects_sixel_terminals() {
+    fn image_protocol_detects_sixel_terminals() {
         for info in [
             terminal_info_for_test(
                 TerminalName::Unknown,
@@ -617,15 +411,15 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                pet_image_support_for_terminal(&info),
-                PetImageSupport::Supported(ImageProtocol::Sixel)
+                image_protocol_for_terminal(&info),
+                Some(ImageProtocol::Sixel)
             );
         }
     }
 
     #[test]
     #[serial]
-    fn wezterm_env_uses_kitty_graphics_for_ambient_pets() {
+    fn wezterm_env_uses_kitty_graphics() {
         let _tmux = EnvVarGuard::new("TMUX", /*value*/ None);
         let _tmux_pane = EnvVarGuard::new("TMUX_PANE", /*value*/ None);
         let _zellij = EnvVarGuard::new("ZELLIJ", /*value*/ None);
@@ -636,21 +430,21 @@ mod tests {
         let _wezterm_executable = EnvVarGuard::new("WEZTERM_EXECUTABLE", /*value*/ None);
 
         assert_eq!(
-            detect_pet_image_support(),
-            PetImageSupport::Supported(ImageProtocol::Kitty)
+            detect_image_protocol(),
+            Some(ImageProtocol::Kitty)
         );
     }
 
     #[test]
-    fn pet_image_support_rejects_unknown_terminals() {
+    fn image_protocol_rejects_unknown_terminals() {
         assert_eq!(
-            pet_image_support_for_terminal(&terminal_info_for_test(
+            image_protocol_for_terminal(&terminal_info_for_test(
                 TerminalName::Unknown,
                 /*multiplexer*/ None,
                 /*term_program*/ None,
                 Some("xterm-256color"),
             )),
-            PetImageSupport::Unsupported(PetImageUnsupportedReason::Terminal)
+            None
         );
     }
 
@@ -693,23 +487,6 @@ mod tests {
         assert_eq!(parse_dotted_version(Some("3.6.10.1")), None);
         assert_eq!(parse_dotted_version(Some("3.6beta")), None);
         assert_eq!(parse_dotted_version(/*version*/ None), None);
-    }
-
-    #[test]
-    fn sixel_frame_encodes_without_external_crate() {
-        let dir = tempfile::tempdir().unwrap();
-        let frame_path = dir.path().join("frame.png");
-        let rgba = image::RgbaImage::from_pixel(1, 1, image::Rgba([255, 0, 0, 255]));
-        rgba.save(&frame_path).unwrap();
-
-        let sixel_path =
-            sixel_frame(&frame_path, &dir.path().join("sixel"), /*height_px*/ 1).unwrap();
-        let sixel = fs::read_to_string(sixel_path).unwrap();
-
-        assert!(sixel.starts_with("\x1bP9;1;0q\"1;1;1;1"));
-        assert!(sixel.contains("#224;2;100;0;0"));
-        assert!(sixel.contains("#224@"));
-        assert!(sixel.ends_with("\x1b\\"));
     }
 
     #[test]

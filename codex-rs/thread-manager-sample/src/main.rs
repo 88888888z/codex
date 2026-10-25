@@ -56,7 +56,6 @@ use codex_core_api::ThreadStoreConfig;
 use codex_core_api::ToolSuggestConfig;
 use codex_core_api::TuiKeymap;
 use codex_core_api::TuiNotificationSettings;
-use codex_core_api::TuiPetAnchor;
 use codex_core_api::TurnInputRequest;
 use codex_core_api::UriBasedFileOpener;
 use codex_core_api::UserInput;
@@ -307,8 +306,6 @@ async fn new_config(
         tui_language: codex_config::types::TuiLanguage::Chinese,
         tui_provider_profile: None,
         tui_raw_output_mode: false,
-        tui_pet: None,
-        tui_pet_anchor: TuiPetAnchor::Composer,
         terminal_resize_reflow: TerminalResizeReflowConfig::default(),
         tui_keymap: TuiKeymap::default(),
         tui_quick_dials: BTreeMap::new(),

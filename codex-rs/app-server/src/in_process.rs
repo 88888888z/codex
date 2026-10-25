@@ -465,7 +465,6 @@ async fn start_uninitialized(mut args: InProcessStartArgs) -> IoResult<InProcess
         let log_write_warning = crate::log_write_warning::LogWriteWarningReporter::new(
             args.feedback.clone(),
             &outgoing_message_sender,
-            &args.config,
         );
         if let Some(log_db) = &args.log_db {
             log_db.set_failure_reporter(log_write_warning.clone());

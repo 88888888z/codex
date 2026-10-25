@@ -18,9 +18,9 @@ use image::ImageFormat;
 use image::RgbaImage;
 use ratatui::layout::Rect;
 
-use crate::pets::ImageProtocol;
+use crate::terminal_image::ImageProtocol;
 
-// Separate from the two image ids reserved for pets (0xC0DE and 0xC0DF).
+// Keep transcript image ids stable across redraws.
 pub(crate) const FIRST_IMAGE_ID: u32 = 0xC100;
 
 pub(crate) struct ImagePlacement {
@@ -145,16 +145,16 @@ impl TranscriptImage {
                     DynamicImage::ImageRgba8(cropped).write_to(&mut png, ImageFormat::Png)?;
                     png.flush()?;
                     let transmit = if self.protocol == ImageProtocol::KittyLocalFile {
-                        crate::pets::kitty_transmit_png_file_with_id
+                        crate::terminal_image::kitty_transmit_png_file_with_id
                     } else {
-                        crate::pets::kitty_transmit_png_with_id
+                        crate::terminal_image::kitty_transmit_png_with_id
                     };
                     let command = transmit(png.path(), self.columns, area.height, Some(id))?;
                     file = (self.protocol == ImageProtocol::KittyLocalFile).then_some(png);
                     command.into_bytes()
                 }
                 ImageProtocol::Sixel => {
-                    crate::pets::encode_rgba(cropped.as_raw(), cropped.width(), cropped.height())?
+                    crate::terminal_image::encode_rgba(cropped.as_raw(), cropped.width(), cropped.height())?
                 }
             })
         })();

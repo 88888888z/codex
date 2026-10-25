@@ -757,18 +757,6 @@ impl fmt::Display for NotificationCondition {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum TuiPetAnchor {
-    /// Anchor the pet to the top-right edge of the terminal screen.
-    #[default]
-    TopRight,
-    /// Anchor the pet to the bottom of the current TUI composer viewport.
-    Composer,
-    /// Anchor the pet to the physical bottom of the terminal screen.
-    ScreenBottom,
-}
-
 /// Right-click text paste when the fullscreen TUI has no selection.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, Default)]
 #[serde(rename_all = "lowercase")]
@@ -985,18 +973,6 @@ pub struct Tui {
     /// Use `/theme` in the TUI or see `$CODEX_HOME/themes` for custom themes.
     #[serde(default)]
     pub theme: Option<String>,
-
-    /// Pet id to preselect in the terminal pet picker.
-    ///
-    /// Custom pet ids resolve against CODEX_HOME/pets/<pet-id>/pet.json.
-    #[serde(default)]
-    pub pet: Option<String>,
-
-    /// Where the terminal pet should anchor vertically.
-    ///
-    /// Defaults to `composer`, which follows the current TUI composer viewport.
-    #[serde(default)]
-    pub pet_anchor: TuiPetAnchor,
 
     /// Preferred layout for resume/fork session picker results.
     #[serde(default)]

@@ -18,7 +18,7 @@ impl StateRuntime {
         builder.push_values(entries, |mut row, entry| {
             let feedback_log_body = entry.feedback_log_body.as_ref().or(entry.message.as_ref());
             // Keep about 10 MiB of reader-visible log content per partition.
-            // Both `query_logs` and `/feedback` read the persisted
+            // Both `query_logs` and diagnostics export read the persisted
             // `feedback_log_body`, while `LogEntry.message` is only a write-time
             // fallback for callers that still populate the old field.
             row.push_bind(entry.ts)
