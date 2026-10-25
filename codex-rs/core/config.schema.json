@@ -4932,6 +4932,44 @@
       ],
       "type": "string"
     },
+    "TuiModelPricing": {
+      "additionalProperties": false,
+      "description": "Per-model token prices in the configured currency per one million tokens.",
+      "properties": {
+        "cache_hit": {
+          "description": "Price for input tokens served from the prompt cache.",
+          "format": "double",
+          "type": "number"
+        },
+        "cache_miss": {
+          "description": "Price for input tokens that miss the prompt cache.",
+          "format": "double",
+          "type": "number"
+        },
+        "output": {
+          "description": "Price for generated output tokens.",
+          "format": "double",
+          "type": "number"
+        },
+        "peak_multiplier": {
+          "default": 1.0,
+          "description": "Multiplier applied during weekday peak hours in Beijing time.",
+          "format": "double",
+          "type": "number"
+        },
+        "currency": {
+          "default": "$",
+          "description": "Currency symbol displayed in the inspector.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cache_hit",
+        "cache_miss",
+        "output"
+      ],
+      "type": "object"
+    },
     "Tui": {
       "additionalProperties": false,
       "description": "Collection of settings that are specific to the TUI.",
@@ -5211,6 +5249,14 @@
             "string",
             "null"
           ]
+        },
+        "model_pricing": {
+          "additionalProperties": {
+            "$ref": "#/definitions/TuiModelPricing"
+          },
+          "default": {},
+          "description": "Optional per-model token prices used by the fullscreen inspector.\n\nKeys are model slugs. Values use each entry's configured currency per one million tokens.",
+          "type": "object"
         },
         "model_availability_nux": {
           "allOf": [

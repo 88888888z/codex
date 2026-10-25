@@ -284,6 +284,7 @@ mod voice_owner;
 #[cfg(test)]
 #[path = "app/warnings_tests.rs"]
 mod warnings_tests;
+mod workbench;
 mod working_directory;
 
 use self::agent_navigation::AgentNavigationDirection;
@@ -563,6 +564,7 @@ pub(crate) struct App {
     native_history: native_history::NativeHistory,
     turn_tips: turn_tips::TurnTips,
     pub(crate) transcript_view: crate::transcript_view::TranscriptView,
+    workbench_collapsed: bool,
     last_rendered_history_tail: Option<history_ui::RenderedHistoryTail>,
     last_thread_usage_status_cell: Option<history_ui::ThreadUsageStatusHistory>,
     pub(crate) pending_thread_usage_history_refresh: bool,

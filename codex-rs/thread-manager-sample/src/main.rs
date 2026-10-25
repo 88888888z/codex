@@ -305,6 +305,7 @@ async fn new_config(
         tui_theme: None,
         tui_language: codex_config::types::TuiLanguage::Chinese,
         tui_provider_profile: None,
+        tui_model_pricing: BTreeMap::new(),
         tui_raw_output_mode: false,
         terminal_resize_reflow: TerminalResizeReflowConfig::default(),
         tui_keymap: TuiKeymap::default(),

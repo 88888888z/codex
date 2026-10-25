@@ -128,8 +128,17 @@ impl App {
         } else {
             crate::i18n::ui_text("esc latest", "esc 最新")
         };
-        self.sync_owned_transcript(screen_size.width);
-        let transcript_width = self.chat_widget.history_wrap_width(screen_size.width);
+        let dashboard_visible = self
+            .chat_widget
+            .selected_index_for_present_view(AGENTS_OVERVIEW_VIEW_ID)
+            .is_some();
+        let workbench_columns = (!dashboard_visible && !self.chat_widget.has_active_modal())
+            .then(|| self.workbench_columns(screen_size.width, screen_size.height))
+            .flatten();
+        let workbench_snapshot = workbench_columns.map(|_| self.workbench_snapshot());
+        let main_width = workbench_columns.map_or(screen_size.width, |columns| columns.main_width);
+        self.sync_owned_transcript(main_width);
+        let transcript_width = self.chat_widget.history_wrap_width(main_width);
         let composer_hint = if self
             .chat_widget
             .rendered_selection
@@ -196,9 +205,6 @@ impl App {
                 working_tip,
                 ..Default::default()
             });
-        let dashboard_visible = chat_widget
-            .selected_index_for_present_view(AGENTS_OVERVIEW_VIEW_ID)
-            .is_some();
         let bottom_height = if dashboard_visible {
             screen_size.height
         } else {
@@ -220,6 +226,11 @@ impl App {
         let mut blossom_tick = None;
         let mut transcript_bottom = available.saturating_sub(u16::from(composer_gap.is_none()));
         tui.draw(screen_size.height, |frame| {
+            let main_x =
+                workbench_columns.map_or(
+                    /*x*/ 0,
+                    |columns| columns.areas(transcript_bottom).main.x,
+                );
             chat_widget.rendered_selection.borrow_mut().areas.clear();
             ratatui::widgets::Clear.render(
                 Rect::new(/*x*/ 0, /*y*/ 0, screen_size.width, available),
@@ -228,12 +239,12 @@ impl App {
             let header_height =
                 crate::chatwidget::SESSION_HEADER_HEIGHT.min(transcript_bottom);
             chat_widget.render_pinned_session_header(
-                Rect::new(/*x*/ 0, /*y*/ 0, screen_size.width, header_height),
+                Rect::new(main_x, /*y*/ 0, transcript_width, header_height),
                 frame.buffer,
             );
             let mut completion_tip_area = view.render_with_turn_tip_space(
                 Rect::new(
-                    /*x*/ 0,
+                    main_x,
                     header_height,
                     transcript_width,
                     transcript_bottom.saturating_sub(header_height),
@@ -295,12 +306,12 @@ impl App {
                 let header_height =
                     crate::chatwidget::SESSION_HEADER_HEIGHT.min(transcript_bottom);
                 chat_widget.render_pinned_session_header(
-                    Rect::new(/*x*/ 0, /*y*/ 0, screen_size.width, header_height),
+                    Rect::new(main_x, /*y*/ 0, transcript_width, header_height),
                     frame.buffer,
                 );
                 completion_tip_area = view.render_with_turn_tip_space(
                     Rect::new(
-                        /*x*/ 0,
+                        main_x,
                         header_height,
                         transcript_width,
                         transcript_bottom.saturating_sub(header_height),
@@ -316,13 +327,22 @@ impl App {
                 .borrow_mut()
                 .render_first_screen(
                     Rect {
-                        width: screen_size.width,
+                        width: transcript_width,
                         ..view.remaining_area()
                     },
                     frame.buffer,
                     composer,
                     MotionMode::from_animations_enabled(self.local_settings.tui.animations),
                 );
+            if let (Some(columns), Some(snapshot)) =
+                (workbench_columns, workbench_snapshot.as_ref())
+            {
+                super::workbench::render_workbench(
+                    columns.areas(transcript_bottom),
+                    snapshot,
+                    frame.buffer,
+                );
+            }
             bottom.render(bottom_area, frame.buffer);
             if let (Some(tip), Some(area)) = (completion_tip, completion_tip_area) {
                 tip.render(area, frame.buffer);
@@ -330,12 +350,13 @@ impl App {
             let follow_area = if let Some(gap) = composer_gap.as_ref() {
                 Some(Rect {
                     width: transcript_width,
+                    x: main_x,
                     ..gap.area.get()
                 })
             } else {
                 (available > 0).then(|| {
                     Rect::new(
-                        /*x*/ 0,
+                        main_x,
                         available - 1,
                         transcript_width,
                         /*height*/ 1,
@@ -468,9 +489,13 @@ impl App {
         }
         if let TuiEvent::Mouse(mouse) = event {
             let composer_ready = self.chat_widget.prepare_composer_mouse(*mouse);
+            let size = tui.prepare_draw_size()?;
             if mouse.kind != crossterm::event::MouseEventKind::Moved {
-                let size = tui.prepare_draw_size()?;
                 self.render_owned_transcript(tui, size)?;
+            }
+            if self.handle_workbench_mouse(*mouse, size) {
+                tui.frame_requester().schedule_frame();
+                return Ok(true);
             }
             if self.chat_widget.no_modal_or_popup_active()
                 && self
@@ -512,6 +537,14 @@ impl App {
             if !modal_transcript_event {
                 return Ok(false);
             }
+        }
+        if let TuiEvent::Key(key) = event
+            && !self.transcript_view.has_active_interaction()
+            && self.handle_workbench_key(*key)
+        {
+            self.chat_widget.end_composer_drag();
+            tui.frame_requester().schedule_frame();
+            return Ok(true);
         }
         // Raw pastes can arrive as thousands of Char/Enter/Tab events. Honor the composer's
         // paste batching instead of rendering the entire screen before each buffered key.

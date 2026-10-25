@@ -1748,6 +1748,16 @@ impl BottomPane {
         true
     }
 
+    pub(crate) fn dismiss_active_view(&mut self) -> bool {
+        if self.view_stack.pop().is_none() {
+            return false;
+        }
+        self.key_chord_reset_requested = true;
+        self.on_view_stack_depth_decreased();
+        self.request_redraw();
+        true
+    }
+
     /// Dismiss the newest matching view without disturbing views stacked above it.
     pub(crate) fn dismiss_view_by_id(&mut self, view_id: &'static str) -> bool {
         let Some(index) = self

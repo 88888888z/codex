@@ -27,19 +27,32 @@ impl Renderable for WarningsView {
         ])
         .areas(area);
         let entry = self.entries.get(self.current);
+        let chinese = crate::i18n::is_chinese(crate::i18n::current_language());
         let title = match entry {
+            Some(entry) if chinese => format!(
+                "警告 · 第 {} 个，共 {} 个 · {}",
+                self.current + 1,
+                self.entries.len(),
+                localized_warning_source(&entry.source, chinese)
+            ),
             Some(entry) => format!(
                 "Warnings · {} of {} · {}",
                 self.current + 1,
                 self.entries.len(),
-                entry.source
+                localized_warning_source(&entry.source, chinese)
             ),
-            None => "Warnings".to_string(),
+            None => crate::i18n::ui_text("Warnings", "警告").to_string(),
         };
         Line::from(title.bold()).render(header, buf);
-        let details = entry.map_or("No warnings", |entry| entry.details.as_str());
+        let details = entry
+            .map(|entry| localized_warning_details(&entry.details, chinese))
+            .unwrap_or_else(|| crate::i18n::ui_text("No warnings", "没有警告").to_string());
         let restart_hint = (self.daemon_restart_hint_at == Some(self.current)).then_some(
-            "\nThese warnings may reflect settings from when the background server started. If you’ve already fixed them, use /daemon to restart it.",
+            if chinese {
+                "\n这些警告可能来自后台服务启动时的设置。如果问题已经修复，请使用 /daemon 重启服务。"
+            } else {
+                "\nThese warnings may reflect settings from when the background server started. If you’ve already fixed them, use /daemon to restart it."
+            },
         );
         if body.width > 0
             && body.height > 0
@@ -95,25 +108,31 @@ impl Renderable for WarningsView {
             .join("/");
         let mut items = Vec::new();
         for (hint, label) in [
-            (Some("k".to_string()), "keep & next"),
+            (
+                Some("k".to_string()),
+                crate::i18n::ui_text("keep & next", "保留下一条"),
+            ),
             (
                 Some(
                     hint(KeymapContext::List, "cancel")
                         .unwrap_or_else(|| key_hint::ctrl(KeyCode::Char('c')).into())
                         .display_label(),
                 ),
-                "dismiss & close",
+                crate::i18n::ui_text("dismiss & close", "关闭并忽略"),
             ),
             (
                 hint(KeymapContext::Global, "copy")
                     .map(crate::key_hint::ShortcutHint::display_label),
-                "copy",
+                crate::i18n::ui_text("copy", "复制"),
             ),
-            ((!navigation.is_empty()).then_some(navigation), "warning"),
+            (
+                (!navigation.is_empty()).then_some(navigation),
+                crate::i18n::ui_text("warning", "切换警告"),
+            ),
             (
                 hint(KeymapContext::List, "move_down")
                     .map(crate::key_hint::ShortcutHint::display_label),
-                "scroll",
+                crate::i18n::ui_text("scroll", "滚动"),
             ),
         ] {
             if let Some(hint) = hint {
@@ -132,4 +151,61 @@ impl Renderable for WarningsView {
                 .render(footer, buf);
         }
     }
+}
+
+fn localized_warning_source(source: &str, chinese: bool) -> String {
+    if !chinese {
+        return source.to_string();
+    }
+    match source {
+        "Warning" => "警告".to_string(),
+        "Startup" => "启动检查".to_string(),
+        "Deprecation" => "弃用提醒".to_string(),
+        _ => source.strip_prefix("MCP · ").map_or_else(
+            || source.to_string(),
+            |server| format!("MCP 服务 · {server}"),
+        ),
+    }
+}
+
+fn localized_warning_details(details: &str, chinese: bool) -> String {
+    if !chinese {
+        return details.to_string();
+    }
+    details
+        .split('\n')
+        .map(|line| {
+            if let Some(message) = line.strip_prefix("Warning: ") {
+                return format!("警告：{message}");
+            }
+            if line == "Sign-in required." {
+                return "需要重新登录。".to_string();
+            }
+            if let Some(server) = line.strip_prefix("MCP startup incomplete: ") {
+                return format!("MCP 启动未完成：{server}");
+            }
+            if let Some(failed) = line
+                .strip_prefix("MCP startup incomplete (failed: ")
+                .and_then(|value| value.strip_suffix(')'))
+            {
+                return format!("MCP 启动未完成（失败：{failed}）");
+            }
+            if line == "MCP startup incomplete" {
+                return "MCP 启动未完成".to_string();
+            }
+            if let Some(remainder) = line.strip_prefix("MCP client for `")
+                && let Some((server, error)) = remainder.split_once("` failed to start: ")
+            {
+                return format!("MCP 客户端 `{server}` 启动失败：{error}");
+            }
+            if let Some(server) = line
+                .strip_prefix("MCP client for `")
+                .and_then(|value| value.strip_suffix("` failed to start"))
+            {
+                return format!("MCP 客户端 `{server}` 启动失败");
+            }
+            line.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }

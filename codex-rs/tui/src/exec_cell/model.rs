@@ -46,6 +46,13 @@ impl CommandOutput {
         }
     }
 
+    pub(crate) fn line_count(&self) -> usize {
+        self.live_output.as_ref().map_or_else(
+            || self.aggregated_output.lines().count(),
+            |output| output.total_lines(),
+        )
+    }
+
     /// Returns retained preview lines with reverse traversal for efficient tail rendering.
     pub(super) fn lines(&self) -> impl DoubleEndedIterator<Item = Cow<'_, str>> {
         match self.live_output.as_ref() {

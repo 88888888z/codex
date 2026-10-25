@@ -839,6 +839,32 @@ impl QuickDial {
     }
 }
 
+/// Per-model token prices in the configured currency per one million tokens.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct TuiModelPricing {
+    /// Price for input tokens served from the prompt cache.
+    pub cache_hit: f64,
+    /// Price for input tokens that miss the prompt cache.
+    pub cache_miss: f64,
+    /// Price for generated output tokens.
+    pub output: f64,
+    /// Multiplier applied during weekday peak hours in Beijing time.
+    #[serde(default = "default_peak_multiplier")]
+    pub peak_multiplier: f64,
+    /// Currency symbol displayed in the inspector.
+    #[serde(default = "default_currency_symbol")]
+    pub currency: String,
+}
+
+fn default_peak_multiplier() -> f64 {
+    1.0
+}
+
+fn default_currency_symbol() -> String {
+    "$".to_string()
+}
+
 /// Collection of settings that are specific to the TUI.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema)]
 #[schemars(deny_unknown_fields)]
@@ -856,6 +882,12 @@ pub struct Tui {
     /// Last selected third-party model provider profile.
     #[serde(default)]
     pub provider_profile: Option<String>,
+
+    /// Optional per-model token prices used by the fullscreen inspector.
+    ///
+    /// Keys are model slugs. Values use each entry's configured currency per one million tokens.
+    #[serde(default)]
+    pub model_pricing: BTreeMap<String, TuiModelPricing>,
 
     /// Enable animations (welcome screen, shimmer effects, spinners).
     /// Defaults to `true`.

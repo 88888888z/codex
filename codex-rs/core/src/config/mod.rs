@@ -56,6 +56,7 @@ use codex_config::types::ToolSuggestDisabledTool;
 use codex_config::types::ToolSuggestDiscoverable;
 use codex_config::types::TuiKeymap;
 use codex_config::types::TuiLanguage;
+use codex_config::types::TuiModelPricing;
 use codex_config::types::TuiNotificationSettings;
 use codex_config::types::UriBasedFileOpener;
 use codex_config::types::WindowsSandboxModeToml;
@@ -885,6 +886,9 @@ pub struct Config {
 
     /// Last selected third-party model provider profile.
     pub tui_provider_profile: Option<String>,
+
+    /// Per-model token prices used by the fullscreen TUI inspector.
+    pub tui_model_pricing: BTreeMap<String, TuiModelPricing>,
 
     /// Preferred layout for resume/fork session picker results.
     pub tui_session_picker_view: SessionPickerViewMode,
@@ -4801,6 +4805,11 @@ impl Config {
                 .tui
                 .as_ref()
                 .and_then(|tui| tui.provider_profile.clone()),
+            tui_model_pricing: cfg
+                .tui
+                .as_ref()
+                .map(|tui| tui.model_pricing.clone())
+                .unwrap_or_default(),
             tui_session_picker_view: cfg
                 .tui
                 .as_ref()
