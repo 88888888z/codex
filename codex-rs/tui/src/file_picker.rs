@@ -39,7 +39,6 @@ use crate::tui::TuiEvent;
 
 const MAX_PREVIEW_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_TREE_ROWS: usize = 2_000;
-const MAX_ATTACHMENT_BYTES: usize = 512 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum FilePickerFocus {
@@ -608,44 +607,20 @@ impl FilePickerOverlay {
             *end = (*end).min(last_line).max(*start);
         }
         normalize_ranges(&mut ranges);
-        let total_bytes = ranges
-            .iter()
-            .map(|(start, end)| {
-                preview.lines[*start..=*end]
-                    .iter()
-                    .map(String::len)
-                    .sum::<usize>()
-            })
-            .sum::<usize>();
-        if total_bytes > MAX_ATTACHMENT_BYTES {
-            self.status = Some(format!(
-                "{}：{}",
-                ui_text("Selected range is too large", "所选范围过大"),
-                ui_text("512 KiB maximum", "最多 512 KiB")
-            ));
-            return;
-        }
         let path = escape_xml_attribute(&preview.path.to_string_lossy());
         let instruction = ui_text(
-            "Use only the following selected file range for this request. Do not read the rest of this file unless I explicitly ask.",
-            "以下是我为本轮选择的文件内容，请只使用这些行；除非我明确要求，不要读取该文件的其他部分。",
+            "Use the file reading tool to read only the following selected file ranges. Do not read the rest of this file unless I explicitly ask.",
+            "请使用文件读取工具只读取以下文件范围；除非我明确要求，不要读取该文件的其他部分。",
         );
-        let mut payload = format!("\n{instruction}\n<codex_file_context path=\"{path}\">\n");
-        for (start, end) in &ranges {
-            let body = preview.lines[*start..=*end].join("\n");
-            payload.push_str(&format!(
-                "<range start=\"{}\" end=\"{}\">\n{body}\n</range>\n",
-                start + 1,
-                end + 1
-            ));
-        }
-        payload.push_str("</codex_file_context>\n");
         let display_path = display_path(&preview.path, &self.root);
         let range_label = ranges
             .iter()
             .map(|(start, end)| format!("{}-{}", start + 1, end + 1))
             .collect::<Vec<_>>()
             .join(",");
+        let payload = format!(
+            "\n{instruction}\n<codex_file_selection path=\"{path}\" ranges=\"{range_label}\" />\n"
+        );
         let placeholder = format!("[{} {display_path}:{range_label}]", ui_text("File", "文件"),);
         self.app_event_tx.send(AppEvent::AttachFileContext {
             placeholder,

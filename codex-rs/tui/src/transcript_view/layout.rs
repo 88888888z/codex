@@ -105,9 +105,18 @@ fn cell_content_layout(
             .as_any()
             .is::<crate::history_cell::UserHistoryCell>()
     {
-        layout = layout.with_rounded_prompt_frame(
+        layout = layout.with_rounded_frame(
             crate::style::history_prompt_style(),
             crate::style::history_prompt_border_style(),
+        );
+    } else if mode == HistoryRenderMode::Rich
+        && cell
+            .as_any()
+            .is::<crate::history_cell::AgentMarkdownCell>()
+    {
+        layout = layout.with_rounded_frame(
+            ratatui::style::Style::default(),
+            crate::style::agent_message_border_style(),
         );
     }
     if let Some(protocol) = presentation.image_protocol

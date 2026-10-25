@@ -28,9 +28,25 @@ pub(crate) const UI_ACCENT: (u8, u8, u8) = CHATGPT_BLUE_200;
 
 /// Deep lilac keeps the pinned session header distinct on light and dark terminals.
 const SESSION_HEADER_PURPLE: (u8, u8, u8) = (142, 92, 230);
+const AGENT_MESSAGE_TEAL: (u8, u8, u8) = (84, 194, 184);
+const AGENT_MESSAGE_TEAL_DARK: (u8, u8, u8) = (132, 220, 212);
 
 pub(crate) fn session_header_border_style() -> Style {
     Style::default().fg(best_color(SESSION_HEADER_PURPLE))
+}
+
+pub(crate) fn agent_message_border_style() -> Style {
+    let Some(background) = default_bg() else {
+        return Style::default().fg(Color::Cyan);
+    };
+    let preferred = if is_light(background) {
+        AGENT_MESSAGE_TEAL
+    } else {
+        AGENT_MESSAGE_TEAL_DARK
+    };
+    Style::default().fg(best_color(blend(
+        preferred, background, /*alpha*/ 0.62,
+    )))
 }
 
 /// Cool translucent-looking surfaces derived from the current terminal background.

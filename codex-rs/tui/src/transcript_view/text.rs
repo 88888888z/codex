@@ -151,7 +151,7 @@ impl TextLayout {
             layout = layout.without_leading_blank_row();
         }
         if let Some(frame) = &self.prompt_frame {
-            layout = layout.with_rounded_prompt_frame(frame.fill, frame.border);
+            layout = layout.with_rounded_frame(frame.fill, frame.border);
         }
         if self.separated {
             layout.with_leading_separator()
@@ -216,6 +216,7 @@ impl TextLayout {
     pub(super) fn with_leading_separator(mut self) -> Self {
         if !self.separated {
             self = self.with_leading_spacer();
+            self = self.with_leading_spacer();
             self.separated = !self.rows.is_empty();
         }
         self
@@ -241,7 +242,7 @@ impl TextLayout {
     ///
     /// The frame occupies the blank padding rows already present around user prompts, so it
     /// changes neither their copyable source nor their searchable text.
-    pub(super) fn with_rounded_prompt_frame(mut self, fill: Style, border: Style) -> Self {
+    pub(super) fn with_rounded_frame(mut self, fill: Style, border: Style) -> Self {
         let Some(first) = self
             .rows
             .iter()

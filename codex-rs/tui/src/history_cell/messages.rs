@@ -586,12 +586,14 @@ impl AgentMarkdownCell {
     ) -> Vec<HyperlinkLine> {
         let render = || {
             let Some(wrap_width) =
-                crate::width::usable_content_width_u16(width, /*reserved_cols*/ 2)
+                crate::width::usable_content_width_u16(width, /*reserved_cols*/ 6)
             else {
-                return prefix_hyperlink_lines(
-                    vec![HyperlinkLine::new(Line::default())],
-                    "• ".dim(),
-                    "  ".into(),
+                return with_agent_message_spacing(
+                    prefix_hyperlink_lines(
+                        vec![HyperlinkLine::new(Line::default())],
+                        "• ".dim(),
+                        "  ".into(),
+                    ),
                 );
             };
 
@@ -611,11 +613,13 @@ impl AgentMarkdownCell {
             } else {
                 lines
             };
-            normalize_whitespace_only_hyperlink_lines(prefix_hyperlink_lines(
-                lines,
-                "• ".dim(),
-                "  ".into(),
-            ))
+            with_agent_message_spacing(
+                normalize_whitespace_only_hyperlink_lines(prefix_hyperlink_lines(
+                    lines,
+                    "• ".dim(),
+                    "  ".into(),
+                )),
+            )
         };
 
         if let Some(rendered_lines) = &self.rendered_lines {
@@ -654,6 +658,12 @@ impl HistoryCell for AgentMarkdownCell {
     fn has_stable_transcript_height(&self) -> bool {
         self.rendered_lines.is_some()
     }
+}
+
+fn with_agent_message_spacing(mut lines: Vec<HyperlinkLine>) -> Vec<HyperlinkLine> {
+    lines.insert(/*index*/ 0, HyperlinkLine::new(Line::default()));
+    lines.push(HyperlinkLine::new(Line::default()));
+    lines
 }
 
 #[cfg(test)]
