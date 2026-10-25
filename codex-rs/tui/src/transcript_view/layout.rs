@@ -109,6 +109,7 @@ fn cell_content_layout(
             crate::style::history_prompt_style(),
             ratatui::style::Style::default().fg(ratatui::style::Color::White),
             /*horizontal_padding*/ 2,
+            crate::i18n::ui_text("INPUT", "输入"),
         );
     } else if mode == HistoryRenderMode::Rich
         && cell
@@ -119,6 +120,7 @@ fn cell_content_layout(
             ratatui::style::Style::default(),
             crate::style::agent_message_border_style(),
             /*horizontal_padding*/ 2,
+            crate::i18n::ui_text("OUTPUT", "输出"),
         );
     } else if mode == HistoryRenderMode::Rich
         && cell.as_any().is::<crate::exec_cell::ExecCell>()
@@ -127,6 +129,7 @@ fn cell_content_layout(
             ratatui::style::Style::default(),
             crate::style::hairline_style(),
             /*horizontal_padding*/ 2,
+            crate::i18n::ui_text("EXEC", "执行"),
         );
     }
     if let Some(protocol) = presentation.image_protocol

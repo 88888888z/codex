@@ -65,6 +65,7 @@ struct PromptFrame {
     fill: Style,
     border: Style,
     horizontal_padding: usize,
+    label: &'static str,
 }
 
 struct TextRow {
@@ -169,6 +170,7 @@ impl TextLayout {
                 frame.fill,
                 frame.border,
                 frame.horizontal_padding,
+                frame.label,
             );
         }
         if self.separated {
@@ -262,6 +264,7 @@ impl TextLayout {
         fill: Style,
         border: Style,
         horizontal_padding: usize,
+        label: &'static str,
     ) -> Self {
         let outer_width = self.width;
         let content_width = outer_width.saturating_sub(
@@ -273,7 +276,7 @@ impl TextLayout {
         self = self.rewrap(content_width);
         self.width = outer_width;
         self.ensure_frame_rows();
-        self.with_rounded_frame_inner(fill, border, horizontal_padding)
+        self.with_rounded_frame_inner(fill, border, horizontal_padding, label)
     }
 
     fn ensure_frame_rows(&mut self) {
@@ -310,6 +313,7 @@ impl TextLayout {
         fill: Style,
         border: Style,
         horizontal_padding: usize,
+        label: &'static str,
     ) -> Self {
         let Some(first) = self
             .rows
@@ -330,9 +334,17 @@ impl TextLayout {
         }
 
         let inner_width = usize::from(self.width - 2);
-        self.rows[first].line = HyperlinkLine::new(
-            Line::from(format!("╭{}╮", "─".repeat(inner_width))).style(border),
-        );
+        let mut top = vec![Span::styled("╭", border)];
+        let label_text = format!(" {label} ");
+        let label_width = display_width(&label_text);
+        if !label.is_empty() && label_width < inner_width {
+            top.push(Span::styled(label_text, border.bold()));
+            top.push(Span::styled("─".repeat(inner_width - label_width), border));
+        } else {
+            top.push(Span::styled("─".repeat(inner_width), border));
+        }
+        top.push(Span::styled("╮", border));
+        self.rows[first].line = HyperlinkLine::new(Line::from(top).style(border));
         self.rows[first].content_width = self.width;
         self.rows[last].line = HyperlinkLine::new(
             Line::from(format!("╰{}╯", "─".repeat(inner_width))).style(border),
@@ -363,6 +375,7 @@ impl TextLayout {
             fill,
             border,
             horizontal_padding,
+            label,
         });
         self
     }
