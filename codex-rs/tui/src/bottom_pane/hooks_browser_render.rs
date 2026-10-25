@@ -18,7 +18,16 @@ impl HooksBrowserView {
         let mut rows = header.split_off(header.len().saturating_sub(events.len()));
         if width < 72 {
             header.pop();
-            header.push("Event               Active/Installed".dim().into());
+            let event_column = crate::i18n::ui_text("Event", "事件");
+            header.push(
+                format!(
+                    "{}{}",
+                    pad_display(event_column, 20),
+                    crate::i18n::ui_text("Active/Installed", "已启用/已安装")
+                )
+                .dim()
+                .into(),
+            );
             rows = events
                 .iter()
                 .enumerate()
@@ -175,7 +184,7 @@ impl Renderable for HooksBrowserView {
 
 pub(super) fn detail_line(label: &str, value: &str) -> crate::terminal_hyperlinks::HyperlinkLine {
     crate::terminal_hyperlinks::annotate_web_urls_in_line(Line::from(vec![
-        format!("{label:<10}").into(),
+        pad_display(label, 10).into(),
         value.to_string().dim(),
     ]))
 }
@@ -199,7 +208,7 @@ pub(super) fn detail_wrapped_lines(
                 .map(|range| {
                     let prefix = if first {
                         first = false;
-                        format!("{label:<label_width$}")
+                        pad_display(label, label_width)
                     } else {
                         " ".repeat(label_width)
                     };

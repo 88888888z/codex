@@ -22,7 +22,13 @@ impl ChatWidget {
 
         match result {
             Ok(entry) => self.open_hooks_browser(entry),
-            Err(err) => self.add_error_message(format!("Failed to load hooks: {err}")),
+            Err(err) => self.add_error_message(
+                if crate::i18n::is_chinese(self.local_settings.tui.language) {
+                    format!("加载 Hooks 失败：{err}")
+                } else {
+                    format!("Failed to load hooks: {err}")
+                },
+            ),
         }
     }
 

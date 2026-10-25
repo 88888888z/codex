@@ -31,6 +31,9 @@ use crate::app_event::AppEvent;
 use crate::app_event_sender::AppEventSender;
 use crate::hooks_rpc::HookTrustUpdate;
 use crate::hooks_rpc::hook_needs_review;
+use crate::i18n::current_language;
+use crate::i18n::is_chinese;
+use crate::i18n::ui_text;
 use crate::key_hint;
 use crate::key_hint::KeyBindingListExt;
 use crate::keymap::ListAction;
@@ -262,7 +265,10 @@ impl HooksBrowserView {
     fn event_header_lines() -> Vec<Line<'static>> {
         vec![
             "Hooks".bold().into(),
-            "Lifecycle hooks from config and enabled plugins."
+            ui_text(
+                "Lifecycle hooks from config and enabled plugins.",
+                "来自配置和已启用插件的生命周期 Hooks。",
+            )
                 .dim()
                 .into(),
         ]
@@ -281,10 +287,17 @@ impl HooksBrowserView {
         event_name: HookEventName,
         review_needed_count: usize,
     ) -> Vec<Line<'static>> {
-        let mut lines = vec![format!("{} hooks", event_label(event_name)).bold().into()];
+        let mut lines = vec![
+            format!("{} {}", event_label(event_name), ui_text("hooks", "Hooks"))
+                .bold()
+                .into(),
+        ];
         match review_needed_message(review_needed_count) {
             None => lines.push(
-                "Turn hooks on or off. Your changes are saved automatically."
+                ui_text(
+                    "Turn hooks on or off. Your changes are saved automatically.",
+                    "开启或关闭 Hooks，更改会自动保存。",
+                )
                     .dim()
                     .into(),
             ),
@@ -305,14 +318,14 @@ impl HooksBrowserView {
         let show_review = rows.iter().any(|row| row.needs_review > 0);
         let mut lines = Vec::new();
         let mut header = vec![
-            format!("{:<EVENT_COLUMN_WIDTH$}", "Event").into(),
-            format!("{:<COUNT_COLUMN_WIDTH$}", "Installed").into(),
-            format!("{:<COUNT_COLUMN_WIDTH$}", "Active").into(),
+            pad_display(ui_text("Event", "事件"), EVENT_COLUMN_WIDTH).into(),
+            pad_display(ui_text("Installed", "已安装"), COUNT_COLUMN_WIDTH).into(),
+            pad_display(ui_text("Active", "已启用"), COUNT_COLUMN_WIDTH).into(),
         ];
         if show_review {
-            header.push(format!("{:<COUNT_COLUMN_WIDTH$}", "Review").into());
+            header.push(pad_display(ui_text("Review", "待审核"), COUNT_COLUMN_WIDTH).into());
         }
-        header.push("Description".into());
+        header.push(ui_text("Description", "说明").into());
         lines.push(Line::from(header));
         for (idx, row) in rows.into_iter().enumerate() {
             let selected = self.state.selected_idx == Some(idx);
@@ -364,7 +377,7 @@ impl HooksBrowserView {
             return lines;
         }
 
-        lines.push("Issues".bold().into());
+        lines.push(ui_text("Issues", "问题").bold().into());
         lines.extend(
             self.entry
                 .warnings
@@ -422,10 +435,10 @@ impl HooksBrowserView {
                     .as_deref()
                     .map(str::trim)
                     .filter(|title| !title.is_empty())
-                    .unwrap_or("Unnamed hook");
+                    .unwrap_or(ui_text("Unnamed hook", "未命名 Hook"));
                 let trust_suffix = match hook.trust_status {
-                    HookTrustStatus::Modified => " · modified",
-                    HookTrustStatus::Untrusted => " · new",
+                    HookTrustStatus::Modified => ui_text(" · modified", " · 已修改"),
+                    HookTrustStatus::Untrusted => ui_text(" · new", " · 新 Hook"),
                     HookTrustStatus::Managed | HookTrustStatus::Trusted => "",
                 };
                 let prefix = if self.state.selected_idx == Some(idx) {
@@ -468,14 +481,20 @@ impl HooksBrowserView {
             ]);
         };
 
-        let mut lines = vec![detail_line("Event", event_label(event_name))];
+        let mut lines = vec![detail_line(
+            ui_text("Event", "事件"),
+            event_label(event_name),
+        )];
         if let Some(matcher) = hook.matcher.as_deref() {
             lines.extend(detail_wrapped_lines(
-                "Matcher", matcher, width, /*max_lines*/ None,
+                ui_text("Matcher", "匹配器"),
+                matcher,
+                width,
+                /*max_lines*/ None,
             ));
         }
         lines.extend(detail_wrapped_lines(
-            "Source",
+            ui_text("Source", "来源"),
             &detail_source_value(hook),
             width,
             /*max_lines*/ None,
@@ -488,11 +507,18 @@ impl HooksBrowserView {
                     width,
                     Some(MAX_COMMAND_DETAIL_LINES),
                 ));
-                lines.push(detail_line("Mode", if *r#async { "Async" } else { "Sync" }));
+                lines.push(detail_line(
+                    ui_text("Mode", "模式"),
+                    if *r#async {
+                        ui_text("Async", "异步")
+                    } else {
+                        ui_text("Sync", "同步")
+                    },
+                ));
             }
             HookHandlerMetadata::McpTool { server, tool } => {
                 lines.extend(detail_wrapped_lines(
-                    "MCP Server",
+                    ui_text("MCP Server", "MCP 服务器"),
                     server,
                     width,
                     /*max_lines*/ None,
@@ -502,22 +528,37 @@ impl HooksBrowserView {
                 ));
             }
             HookHandlerMetadata::Prompt {} => {
-                lines.push(detail_line("Handler", "Prompt"));
+                lines.push(detail_line(
+                    ui_text("Handler", "处理器"),
+                    ui_text("Prompt", "提示词"),
+                ));
             }
             HookHandlerMetadata::Agent {} => {
-                lines.push(detail_line("Handler", "Agent"));
+                lines.push(detail_line(ui_text("Handler", "处理器"), "Agent"));
             }
         }
-        lines.push(detail_line("Timeout", &format!("{}s", hook.timeout_sec)));
+        lines.push(detail_line(
+            ui_text("Timeout", "超时"),
+            &if ui_is_chinese() {
+                format!("{} 秒", hook.timeout_sec)
+            } else {
+                format!("{}s", hook.timeout_sec)
+            },
+        ));
         if let Some(limit) = hook.additional_context_limit {
             let value = if limit == 0 {
-                "unlimited".to_string()
+                ui_text("unlimited", "不限制").to_string()
+            } else if ui_is_chinese() {
+                format!("约 {limit} tokens")
             } else {
                 format!("limit: {limit} approximate tokens")
             };
-            lines.push(detail_line("Context", &value));
+            lines.push(detail_line(ui_text("Context", "上下文"), &value));
         }
-        lines.push(detail_line("Trust", hook_trust_label(hook.trust_status)));
+        lines.push(detail_line(
+            ui_text("Trust", "信任状态"),
+            hook_trust_label(hook.trust_status),
+        ));
         lines
     }
 
@@ -538,25 +579,25 @@ impl HooksBrowserView {
             HooksBrowserPage::Events => {
                 if self.review_needed_total_count() > 0 {
                     spans.extend(key_hint::plain(KeyCode::Char('t')).spans());
-                    spans.push(" trust all · ".dim());
+                    spans.push(ui_text(" trust all · ", " 全部信任 · ").dim());
                     if let Some(accept) = accept {
                         spans.extend(accept.spans());
-                        spans.push(" review · ".dim());
+                        spans.push(ui_text(" review · ", " 审核 · ").dim());
                     }
                 } else if let Some(accept) = accept {
                     spans.extend(accept.spans());
-                    spans.push(" details · ".dim());
+                    spans.push(ui_text(" details · ", " 详情 · ").dim());
                 }
                 spans.extend(cancel.spans());
-                spans.push(" close".dim());
+                spans.push(ui_text(" close", " 关闭").dim());
             }
             HooksBrowserPage::Handlers(event_name) => {
                 if let Some(hook) = self.selected_hook(event_name) {
                     if hook.is_managed {
-                        spans.push("Managed (always on) · ".dim());
+                        spans.push(ui_text("Managed (always on) · ", "由管理员管理（始终开启） · ").dim());
                     } else if hook_needs_review(hook) {
                         spans.extend(key_hint::plain(KeyCode::Char('t')).spans());
-                        spans.push(" trust · ".dim());
+                        spans.push(ui_text(" trust · ", " 信任 · ").dim());
                     } else {
                         let mut toggle = key_hint::plain(KeyCode::Char(' ')).display_label();
                         if let Some(accept) = accept {
@@ -564,11 +605,11 @@ impl HooksBrowserView {
                             toggle.push_str(&accept.display_label());
                         }
                         spans.extend(key_hint::key_label_spans(&toggle));
-                        spans.push(" toggle · ".dim());
+                        spans.push(ui_text(" toggle · ", " 切换 · ").dim());
                     }
                 }
                 spans.extend(cancel.spans());
-                spans.push(" back".dim());
+                spans.push(ui_text(" back", " 返回").dim());
             }
         }
         let footer = Line::from(spans);
@@ -653,8 +694,18 @@ fn hook_is_active(hook: &HookMetadata) -> bool {
 fn review_needed_message(count: usize) -> Option<String> {
     match count {
         0 => None,
-        1 => Some("1 hook needs review before it can run.".to_string()),
-        count => Some(format!("{count} hooks need review before they can run.")),
+        1 => Some(
+            ui_text(
+                "1 hook needs review before it can run.",
+                "1 个 Hook 需要审核后才能运行。",
+            )
+            .to_string(),
+        ),
+        count => Some(if ui_is_chinese() {
+            format!("{count} 个 Hook 需要审核后才能运行。")
+        } else {
+            format!("{count} hooks need review before they can run.")
+        }),
     }
 }
 
@@ -667,10 +718,15 @@ struct EventRow {
 
 fn hook_trust_label(status: HookTrustStatus) -> &'static str {
     match status {
-        HookTrustStatus::Managed => "Managed",
-        HookTrustStatus::Trusted => "Trusted",
-        HookTrustStatus::Untrusted => "New hook - review required",
-        HookTrustStatus::Modified => "Modified since last trusted - review required",
+        HookTrustStatus::Managed => ui_text("Managed", "由管理员管理"),
+        HookTrustStatus::Trusted => ui_text("Trusted", "已信任"),
+        HookTrustStatus::Untrusted => {
+            ui_text("New hook - review required", "新 Hook，需要审核")
+        }
+        HookTrustStatus::Modified => ui_text(
+            "Modified since last trusted - review required",
+            "自上次信任后已修改，需要审核",
+        ),
     }
 }
 
@@ -695,33 +751,72 @@ fn event_label(event_name: HookEventName) -> &'static str {
 
 fn event_description(event_name: HookEventName) -> &'static str {
     match event_name {
-        HookEventName::PreToolUse => "Before a tool executes",
-        HookEventName::PermissionRequest => "When permission is requested",
-        HookEventName::PostToolUse => "After a tool executes",
-        HookEventName::PreCompact => "Before context compaction",
-        HookEventName::PostCompact => "After context compaction",
-        HookEventName::PreModelRequest => "Before a model request",
-        HookEventName::PostModelRequest => "After a model request, including failures",
-        HookEventName::SessionStart => "When a new session starts",
-        HookEventName::SessionEnd => "Right before a session ends",
-        HookEventName::UserPromptSubmit => "When the user submits a prompt",
-        HookEventName::SubagentStart => "When a subagent is created",
-        HookEventName::SubagentStop => "Right before a subagent ends its turn",
-        HookEventName::Stop => "Right before Codex ends its turn",
-        HookEventName::Interrupt => "Right before an interrupted turn is aborted",
+        HookEventName::PreToolUse => {
+            ui_text("Before a tool executes", "工具执行前")
+        }
+        HookEventName::PermissionRequest => {
+            ui_text("When permission is requested", "请求权限时")
+        }
+        HookEventName::PostToolUse => {
+            ui_text("After a tool executes", "工具执行后")
+        }
+        HookEventName::PreCompact => {
+            ui_text("Before context compaction", "上下文压缩前")
+        }
+        HookEventName::PostCompact => {
+            ui_text("After context compaction", "上下文压缩后")
+        }
+        HookEventName::PreModelRequest => {
+            ui_text("Before a model request", "模型请求前")
+        }
+        HookEventName::PostModelRequest => ui_text(
+            "After a model request, including failures",
+            "模型请求后，包括失败",
+        ),
+        HookEventName::SessionStart => {
+            ui_text("When a new session starts", "新会话开始时")
+        }
+        HookEventName::SessionEnd => {
+            ui_text("Right before a session ends", "会话结束前")
+        }
+        HookEventName::UserPromptSubmit => {
+            ui_text("When the user submits a prompt", "用户提交提示词时")
+        }
+        HookEventName::SubagentStart => {
+            ui_text("When a subagent is created", "创建子 Agent 时")
+        }
+        HookEventName::SubagentStop => {
+            ui_text("Right before a subagent ends its turn", "子 Agent 结束回合前")
+        }
+        HookEventName::Stop => {
+            ui_text("Right before Codex ends its turn", "Codex 结束回合前")
+        }
+        HookEventName::Interrupt => {
+            ui_text("Right before an interrupted turn is aborted", "中断回合终止前")
+        }
     }
 }
 
 fn hook_source_summary(hook: &HookMetadata) -> String {
     if let Some(id) = &hook.environment_id {
-        return format!("Environment - {id}");
+        return if ui_is_chinese() {
+            format!("环境 - {id}")
+        } else {
+            format!("Environment - {id}")
+        };
     }
     match hook.source {
         HookSource::Plugin => hook
             .plugin_id
             .as_deref()
-            .map(|plugin_id| format!("Plugin - {plugin_id}"))
-            .unwrap_or_else(|| "Plugin".to_string()),
+            .map(|plugin_id| {
+                if ui_is_chinese() {
+                    format!("插件 - {plugin_id}")
+                } else {
+                    format!("Plugin - {plugin_id}")
+                }
+            })
+            .unwrap_or_else(|| ui_text("Plugin", "插件").to_string()),
         _ => config_source_label(hook.source).to_string(),
     }
 }
@@ -748,18 +843,27 @@ fn detail_source_value(hook: &HookMetadata) -> String {
 
 fn config_source_label(source: HookSource) -> &'static str {
     match source {
-        HookSource::System => "Admin config",
-        HookSource::User => "User config",
-        HookSource::Project => "Project config",
-        HookSource::Mdm => "Admin config",
-        HookSource::SessionFlags => "Session flags",
+        HookSource::System => ui_text("Admin config", "管理员配置"),
+        HookSource::User => ui_text("User config", "用户配置"),
+        HookSource::Project => ui_text("Project config", "项目配置"),
+        HookSource::Mdm => ui_text("Admin config", "管理员配置"),
+        HookSource::SessionFlags => ui_text("Session flags", "会话参数"),
         HookSource::Plugin => unreachable!("plugin hooks are handled by summary_source"),
-        HookSource::CloudRequirements => "Admin config",
-        HookSource::CloudManagedConfig => "Cloud-managed config",
-        HookSource::LegacyManagedConfigFile => "Admin config",
-        HookSource::LegacyManagedConfigMdm => "Admin config",
-        HookSource::Unknown => "Unknown source",
+        HookSource::CloudRequirements => ui_text("Admin config", "管理员配置"),
+        HookSource::CloudManagedConfig => ui_text("Cloud-managed config", "云端管理配置"),
+        HookSource::LegacyManagedConfigFile => ui_text("Admin config", "管理员配置"),
+        HookSource::LegacyManagedConfigMdm => ui_text("Admin config", "管理员配置"),
+        HookSource::Unknown => ui_text("Unknown source", "未知来源"),
     }
+}
+
+fn ui_is_chinese() -> bool {
+    is_chinese(current_language())
+}
+
+fn pad_display(text: &str, width: usize) -> String {
+    let padding = width.saturating_sub(crate::width::display_width(text));
+    format!("{text}{}", " ".repeat(padding))
 }
 
 #[cfg(test)]
