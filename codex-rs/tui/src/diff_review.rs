@@ -13,6 +13,8 @@ use crate::key_hint::KeyBindingListExt;
 use crate::render::highlight::highlight_code_to_styled_spans;
 use crate::style::accent_color;
 use crate::style::hairline_style;
+use crate::style::status_style;
+use crate::style::StatusTone;
 use crate::terminal_palette::best_color;
 use crate::terminal_palette::default_bg;
 use crate::tui;
@@ -58,6 +60,14 @@ impl DiffFileStatus {
             Self::Added => ui_text("Added", "新增"),
             Self::Deleted => ui_text("Deleted", "删除"),
             Self::Modified => ui_text("Modified", "修改"),
+        }
+    }
+
+    fn tree_style(self) -> Style {
+        match self {
+            Self::Added => status_style(StatusTone::Success),
+            Self::Deleted => status_style(StatusTone::Failure),
+            Self::Modified => status_style(StatusTone::Attention),
         }
     }
 }
@@ -455,18 +465,29 @@ impl DiffReviewOverlay {
                 .unwrap_or_default();
             let marker = if index == self.selected { "›" } else { " " };
             let (added, removed) = file.added_removed();
+            let marker_style = if index == self.selected {
+                Style::default().fg(accent_color()).bold()
+            } else {
+                Style::default()
+            };
             let mut line = Line::from(vec![
-                format!(
-                    "{marker} {}{} {} ",
-                    "  ".repeat(components.len().saturating_sub(1)),
-                    file_name,
-                    file.status.marker()
-                )
-                .into(),
-                format!("+{added} -{removed}").dim(),
+                Span::styled(marker, marker_style),
+                Span::styled(
+                    format!(
+                        " {}{} {} ",
+                        "  ".repeat(components.len().saturating_sub(1)),
+                        file_name,
+                        file.status.marker()
+                    ),
+                    file.status.tree_style(),
+                ),
+                Span::styled(
+                    format!("+{added} -{removed}"),
+                    Style::default().dim(),
+                ),
             ]);
             if index == self.selected {
-                line = line.fg(accent_color()).bold();
+                line = line.bold();
                 selected_row = rows.len();
             }
             rows.push(line);
