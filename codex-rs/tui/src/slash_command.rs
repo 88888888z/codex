@@ -29,6 +29,7 @@ pub enum SlashCommand {
     AutoReview,
     Memories,
     Skills,
+    Tools,
     Import,
     Hooks,
     Review,
@@ -135,6 +136,7 @@ impl SlashCommand {
                 SlashCommand::Rewind => "查看并恢复工作区检查点",
                 SlashCommand::Mention => "提及文件",
                 SlashCommand::Skills => "使用 Skills 改善 Codex 的特定任务表现",
+                SlashCommand::Tools => "查看和管理本地自定义工具",
                 SlashCommand::Import => "从 Claude Code 导入设置、项目和最近对话",
                 SlashCommand::Hooks => "查看和管理生命周期钩子",
                 SlashCommand::Daemon => "管理本地后台服务",
@@ -208,6 +210,7 @@ impl SlashCommand {
             SlashCommand::Rewind => "review and restore workspace checkpoints",
             SlashCommand::Mention => "mention a file",
             SlashCommand::Skills => "use skills to improve how Codex performs specific tasks",
+            SlashCommand::Tools => "inspect and manage local custom tools",
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Daemon => "Manage the local background server",
@@ -295,6 +298,7 @@ impl SlashCommand {
                 | SlashCommand::Pin
                 | SlashCommand::Verify
                 | SlashCommand::Handoff
+                | SlashCommand::Tools
         )
     }
 
@@ -349,6 +353,7 @@ impl SlashCommand {
                 | SlashCommand::Budget
                 | SlashCommand::Pin
                 | SlashCommand::Verify
+                | SlashCommand::Tools
                 | SlashCommand::Files
                 | SlashCommand::Checkpoint
                 | SlashCommand::Rewind
@@ -396,6 +401,7 @@ impl SlashCommand {
             | SlashCommand::Rename
             | SlashCommand::Mention
             | SlashCommand::Skills
+            | SlashCommand::Tools
             | SlashCommand::Hooks
             | SlashCommand::Status
             | SlashCommand::Daemon

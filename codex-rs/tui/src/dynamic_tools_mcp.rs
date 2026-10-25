@@ -43,6 +43,7 @@ use serde_json::Value;
 use serde_json::json;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::PoisonError;
 use std::sync::RwLock;
@@ -101,15 +102,20 @@ impl ThreadToolTransport {
 pub(crate) struct ToolServices {
     pub(crate) task_tools: bool,
     pub(crate) worktrees: Option<crate::managed_worktree_tools::ManagedWorktreeTools>,
+    pub(crate) custom_tools: Option<Arc<crate::custom_tools::CustomToolRegistry>>,
 }
 
 impl ToolServices {
     pub(crate) fn namespace(&self) -> &'static str {
-        if self.task_tools {
+        if self.task_tools || self.custom_tools.is_some() {
             dynamic_tools::NAMESPACE
         } else {
             "codex_worktrees"
         }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        !self.task_tools && self.worktrees.is_none() && self.custom_tools.is_none()
     }
 }
 
@@ -149,16 +155,27 @@ impl DynamicToolMcpServer {
         let listener = TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         let authorization = Arc::new(format!("Bearer {}", Uuid::new_v4()));
+        let mut tool_configs = json!({
+            "create_thread": {"approval_mode": "prompt"},
+            "send_message_to_thread": {"approval_mode": "prompt"},
+            "fork_thread": {"approval_mode": "prompt"},
+            "create_worktree": {"approval_mode": "approve"}
+        });
+        if let Some(custom_tools) = &services.custom_tools
+            && let Some(config) = tool_configs.as_object_mut()
+        {
+            for (name, approval_mode) in custom_tools.approval_modes() {
+                config.insert(
+                    name.to_string(),
+                    json!({"approval_mode": approval_mode}),
+                );
+            }
+        }
         let server_config = json!({
             "url": format!("http://{address}/mcp"),
             "http_headers": {"Authorization": authorization.as_str()},
             "default_tools_approval_mode": "approve",
-            "tools": {
-                "create_thread": {"approval_mode": "prompt"},
-                "send_message_to_thread": {"approval_mode": "prompt"},
-                "fork_thread": {"approval_mode": "prompt"},
-                "create_worktree": {"approval_mode": "approve"}
-            }
+            "tools": tool_configs
         });
         if let Some(requirement) = managed_requirement {
             let raw_config = serde_json::from_value::<RawMcpServerConfig>(server_config.clone())
@@ -261,6 +278,9 @@ impl ServerHandler for DynamicToolMcpHandler {
         } else {
             Vec::new()
         };
+        if let Some(custom_tools) = &self.services.custom_tools {
+            specs.extend(custom_tools.specs());
+        }
         if self.services.worktrees.is_some() {
             specs.extend(crate::managed_worktree_tool_specs::specs());
         }
@@ -283,7 +303,7 @@ impl ServerHandler for DynamicToolMcpHandler {
                     Cow::Owned(function.description),
                     Arc::new(schema),
                 );
-                tool.annotations = Some(ToolAnnotations::new().read_only(matches!(
+                let read_only = matches!(
                     tool.name.as_ref(),
                     "list_threads"
                         | "list_archived_threads"
@@ -291,7 +311,12 @@ impl ServerHandler for DynamicToolMcpHandler {
                         | "wait_threads"
                         | "list_worktrees"
                         | "get_worktree_creation_status"
-                )));
+                ) || self
+                    .services
+                    .custom_tools
+                    .as_ref()
+                    .is_some_and(|tools| tools.is_read_only(tool.name.as_ref()));
+                tool.annotations = Some(ToolAnnotations::new().read_only(read_only));
                 tools.push(tool);
             }
         }
@@ -348,6 +373,25 @@ impl ServerHandler for DynamicToolMcpHandler {
             .ok_or_else(|| {
                 McpError::internal_error("TUI is reconnecting; tool was not sent", None)
             })?;
+        if let Some(custom_tools) = self.services.custom_tools.as_ref()
+            && custom_tools.contains(&params.tool)
+        {
+            let cwd = self
+                .thread_start_params
+                .cwd
+                .as_deref()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("."));
+            let response = crate::custom_tools::execute(
+                request_handle,
+                custom_tools,
+                &params.tool,
+                params.arguments,
+                &cwd,
+            )
+            .await;
+            return Ok(dynamic_response_to_mcp(response));
+        }
         let response = if matches!(
             params.tool.as_str(),
             "create_worktree" | "get_worktree_creation_status" | "list_worktrees"
@@ -380,24 +424,30 @@ impl ServerHandler for DynamicToolMcpHandler {
             )
             .await
         };
-        let content = response
-            .content_items
-            .into_iter()
-            .map(|item| match item {
-                DynamicToolCallOutputContentItem::InputText { text } => ContentBlock::text(text),
-                DynamicToolCallOutputContentItem::InputImage { image_url } => {
-                    ContentBlock::text(image_url)
-                }
-                DynamicToolCallOutputContentItem::InputAudio { audio_url } => {
-                    ContentBlock::text(audio_url)
-                }
-            })
-            .collect();
-        Ok(if response.success {
-            CallToolResult::success(content)
-        } else {
-            CallToolResult::error(content)
-        }
-        .into())
+        Ok(dynamic_response_to_mcp(response))
     }
+}
+
+fn dynamic_response_to_mcp(
+    response: codex_app_server_protocol::DynamicToolCallResponse,
+) -> rmcp::model::CallToolResponse {
+    let content = response
+        .content_items
+        .into_iter()
+        .map(|item| match item {
+            DynamicToolCallOutputContentItem::InputText { text } => ContentBlock::text(text),
+            DynamicToolCallOutputContentItem::InputImage { image_url } => {
+                ContentBlock::text(image_url)
+            }
+            DynamicToolCallOutputContentItem::InputAudio { audio_url } => {
+                ContentBlock::text(audio_url)
+            }
+        })
+        .collect();
+    if response.success {
+        CallToolResult::success(content)
+    } else {
+        CallToolResult::error(content)
+    }
+    .into()
 }

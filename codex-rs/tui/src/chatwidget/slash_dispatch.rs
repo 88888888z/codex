@@ -613,6 +613,9 @@ impl ChatWidget {
             SlashCommand::Skills => {
                 self.open_skills_menu();
             }
+            SlashCommand::Tools => {
+                self.show_custom_tools();
+            }
             SlashCommand::Import => {
                 self.app_event_tx
                     .send(AppEvent::OpenExternalAgentConfigMigration);
@@ -990,6 +993,12 @@ impl ChatWidget {
                     );
                 }
             }
+            SlashCommand::Tools if trimmed.eq_ignore_ascii_case("list") => {
+                self.show_custom_tools();
+            }
+            SlashCommand::Tools => self.add_error_message(
+                crate::i18n::ui_text("Usage: /tools [list]", "用法：/tools [list]").to_string(),
+            ),
             SlashCommand::Keymap => match trimmed.to_ascii_lowercase().as_str() {
                 "" => self.open_keymap_picker(),
                 "debug" => {
@@ -1501,6 +1510,7 @@ impl ChatWidget {
             | SlashCommand::Exit
             | SlashCommand::Mention
             | SlashCommand::Skills
+            | SlashCommand::Tools
             | SlashCommand::Import
             | SlashCommand::Hooks
             | SlashCommand::Title

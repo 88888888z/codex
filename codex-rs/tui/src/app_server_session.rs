@@ -514,11 +514,22 @@ impl AppServerSession {
         } else {
             None
         };
+        let custom_tools = match crate::custom_tools::CustomToolRegistry::load(
+            config.codex_home.join("tools.toml").to_path_buf(),
+        ) {
+            Ok(registry) if registry.is_empty() => None,
+            Ok(registry) => Some(Arc::new(registry)),
+            Err(error) => {
+                tracing::warn!(%error, "custom tools are unavailable");
+                None
+            }
+        };
         let services = crate::dynamic_tools_mcp::ToolServices {
             task_tools: !self.uses_embedded_app_server(),
             worktrees,
+            custom_tools,
         };
-        if !services.task_tools && services.worktrees.is_none() {
+        if services.is_empty() {
             return Ok(());
         }
         if config.mcp_servers.get().contains_key(services.namespace()) {

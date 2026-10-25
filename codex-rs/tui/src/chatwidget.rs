@@ -258,6 +258,7 @@ mod config_panel;
 mod connector_mentions;
 mod connectors;
 mod constructor;
+mod custom_tools;
 mod dynamic_activity;
 mod empty_state_policy;
 pub(crate) use self::connectors::ConnectorScopeGeneration;

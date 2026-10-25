@@ -191,6 +191,7 @@ async fn reconnect_restores_history_permissions_and_resumes_unsent_input() -> Re
                 crate::dynamic_tools_mcp::ToolServices {
                     task_tools: true,
                     worktrees: None,
+                    custom_tools: None,
                 },
             )
             .await?,

@@ -134,6 +134,7 @@ mod config_panel;
 mod config_update;
 mod copy_input_guard;
 pub(crate) mod custom_terminal;
+mod custom_tools;
 mod daybreak;
 mod experimental_features;
 mod markdown_copy;

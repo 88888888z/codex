@@ -1,0 +1,22 @@
+# Copy to $CODEX_HOME/tools.toml, edit the paths, then start a new Codex session.
+# The executable receives the JSON arguments object as its final command-line argument.
+
+[[tools]]
+name = "python_analyze"
+description = "Analyze a text file and return a summary."
+command = "python3"
+args = ["/absolute/path/to/analyze.py"]
+timeout_ms = 30000
+approval_mode = "prompt"
+read_only = true
+input_schema = { type = "object", properties = { path = { type = "string" } }, required = ["path"], additionalProperties = false }
+
+[[tools]]
+name = "native_report"
+description = "Run a compiled Rust or C/C++ helper."
+command = "/absolute/path/to/native-report"
+args = ["--json"]
+timeout_ms = 60000
+approval_mode = "writes"
+read_only = false
+input_schema = { type = "object", properties = { input = { type = "string" } }, required = ["input"], additionalProperties = false }

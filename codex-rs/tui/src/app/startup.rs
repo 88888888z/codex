@@ -513,7 +513,7 @@ impl App {
             )
             .await
         {
-            tracing::warn!(%error, "TUI task delegation is unavailable without its MCP server");
+            tracing::warn!(%error, "TUI local tools are unavailable without their MCP bridge");
         }
         let model_catalog = Arc::new(
             ModelCatalog::new(available_models.clone())
