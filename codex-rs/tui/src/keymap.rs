@@ -2514,8 +2514,6 @@ const MAIN_RESERVED_BINDINGS: &[(&str, KeyBinding)] = &[
         key_hint::ctrl(KeyCode::Char('c')),
     ),
     ("fixed.quit", key_hint::ctrl(KeyCode::Char('d'))),
-    ("fixed.paste_image", key_hint::ctrl(KeyCode::Char('v'))),
-    ("fixed.paste_image", key_hint::ctrl_alt(KeyCode::Char('v'))),
     (
         "fixed.cycle_collaboration_mode",
         key_hint::shift(KeyCode::Tab),
@@ -3852,14 +3850,6 @@ mod tests {
     }
 
     #[test]
-    fn rejects_main_bindings_that_collide_with_remaining_fixed_shortcuts() {
-        let mut keymap = TuiKeymap::default();
-        keymap.composer.submit = Some(one("ctrl-v"));
-
-        expect_conflict(&keymap, "composer.submit", "fixed.paste_image");
-    }
-
-    #[test]
     fn interrupt_turn_allows_backtrack_escape_and_can_be_remapped_or_unbound() {
         let mut keymap = TuiKeymap::default();
         let runtime = RuntimeKeymap::from_config(&keymap).expect("default keymap should parse");
@@ -3878,14 +3868,6 @@ mod tests {
         keymap.chat.interrupt_turn = Some(KeybindingsSpec::Many(vec![]));
         let runtime = RuntimeKeymap::from_config(&keymap).expect("unbound keymap should parse");
         assert!(runtime.chat.interrupt_turn.is_empty());
-    }
-
-    #[test]
-    fn interrupt_turn_rejects_other_fixed_shortcuts() {
-        let mut keymap = TuiKeymap::default();
-        keymap.chat.interrupt_turn = Some(one("ctrl-v"));
-
-        expect_conflict(&keymap, "chat.interrupt_turn", "fixed.paste_image");
     }
 
     #[test]

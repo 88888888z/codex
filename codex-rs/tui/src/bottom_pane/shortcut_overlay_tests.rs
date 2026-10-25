@@ -19,7 +19,6 @@ fn props() -> FooterProps {
         is_task_running: true,
         queue_submissions: false,
         collaboration_modes_enabled: true,
-        is_wsl: false,
         quit_shortcut_key: key_hint::ctrl(KeyCode::Char('c')),
         status_line_value: None,
         status_line_enabled: false,
@@ -68,10 +67,9 @@ fn snapshot(name: &str, width: u16, height: Option<u16>, props: &FooterProps) {
 }
 
 #[test]
-fn shortcut_overlay_uses_runtime_bindings_and_wsl_paste() {
+fn shortcut_overlay_uses_runtime_bindings() {
     let mut props = props();
     props.is_task_running = false;
-    props.is_wsl = true;
     props.esc_backtrack_hint = true;
     props.key_hints.external_editor = Some(ShortcutHint::Chord {
         prefix: key_hint::ctrl(KeyCode::Char('x')),

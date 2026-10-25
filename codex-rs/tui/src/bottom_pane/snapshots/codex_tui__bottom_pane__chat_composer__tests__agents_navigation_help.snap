@@ -9,7 +9,6 @@ expression: terminal.backend()
 "  @        Mention files        ⌥,       Less reasoning                         "
 "  !        Shell command        ⌥.       More reasoning                         "
 "  ⌃j       New line             ←        Agents (empty prompt)                  "
-"  ⌃v       Paste image          ⌥← / ⌥→  Subagents (empty prompt)               "
 "  ⌃g       External editor      f4       Inspect activity                       "
 "  ⌃r       Search history       ⌃c       Quit                                   "
 "  esc esc  Edit last message                                                    "

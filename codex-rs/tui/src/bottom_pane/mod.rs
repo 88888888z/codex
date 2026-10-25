@@ -2311,11 +2311,6 @@ impl BottomPane {
         flushed
     }
 
-    /// Commit accepted typing before snapshotting the target of an asynchronous paste.
-    pub(crate) fn prepare_composer_clipboard_paste(&mut self) {
-        self.composer.flush_pending_paste_burst();
-    }
-
     pub(crate) fn is_in_paste_burst(&self) -> bool {
         self.view_stack
             .last()

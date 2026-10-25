@@ -1,10 +1,8 @@
-//! Handle clipboard feedback and image paste after the app checks worker availability.
+//! Handle clipboard copy feedback after the app checks worker availability.
 //! Pending feedback belongs to this widget, so switching conversations discards it.
 
 use super::*;
 use crate::clipboard_copy::worker::CopyResult;
-
-pub(super) const IMAGE_PASTE_REPEAT_WINDOW: Duration = Duration::from_millis(/*millis*/ 250);
 
 pub(super) enum PendingCopy {
     Message(u64, String),
@@ -12,20 +10,6 @@ pub(super) enum PendingCopy {
 }
 
 impl ChatWidget {
-    pub(crate) fn paste_image(&mut self) -> Result<(), crate::clipboard_paste::PasteImageError> {
-        let result = paste_image_to_temp_png();
-        self.suppress_image_paste_until = Instant::now() + IMAGE_PASTE_REPEAT_WINDOW;
-        let (path, info) = result?;
-        tracing::debug!(
-            "pasted image size={}x{} format={}",
-            info.width,
-            info.height,
-            info.encoded_format.label()
-        );
-        self.attach_image(path);
-        Ok(())
-    }
-
     pub(super) fn show_clipboard_flash(&mut self, result: &CopyResult) {
         let line = match result {
             Ok(status) => Line::from(status.message("selection").dim()),

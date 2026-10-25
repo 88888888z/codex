@@ -33,7 +33,7 @@ async fn blocked_copy_allows_overlay_exit_rejects_backlog_and_wakes_completion()
         )
         .unwrap();
     let mut app = Box::new(crate::app::test_support::make_test_app().await);
-    let (mut chat, tx, mut events, _ops) =
+    let (mut chat, tx, _events, _ops) =
         crate::chatwidget::tests::make_chatwidget_manual_with_sender().await;
     chat.handle_server_notification(
         codex_app_server_protocol::ServerNotification::ItemCompleted(
@@ -65,9 +65,8 @@ async fn blocked_copy_allows_overlay_exit_rejects_backlog_and_wakes_completion()
     )
     .await
     .unwrap();
-    // Copy must start without draining AppEvent, before a subsequent paste key can arrive.
+    // Copy must start without draining AppEvent.
     assert!(tui.clipboard.is_busy());
-    while events.try_recv().is_ok() {}
     assert_eq!(
         start_rx
             .recv_timeout(Duration::from_secs(/*secs*/ 5))
@@ -95,24 +94,6 @@ async fn blocked_copy_allows_overlay_exit_rejects_backlog_and_wakes_completion()
     drop(overlay);
     assert!(tui.clipboard.is_busy());
 
-    app.handle_tui_event(
-        &mut tui,
-        &mut app_server,
-        TuiEvent::Key(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL)),
-    )
-    .await
-    .unwrap();
-    let mut feedback = Vec::new();
-    while let Ok(event) = events.try_recv() {
-        if let crate::app_event::AppEvent::InsertHistoryCell(cell) = event {
-            feedback.extend(
-                cell.display_lines(/*width*/ 80)
-                    .iter()
-                    .map(ToString::to_string),
-            );
-        }
-    }
-    insta::assert_snapshot!("image_paste_while_copy_is_busy", feedback.join("\n"));
     release.send(()).unwrap();
     tokio::time::timeout(Duration::from_secs(/*secs*/ 5), draw_rx.recv())
         .await

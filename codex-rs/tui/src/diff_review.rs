@@ -13,6 +13,7 @@ use crate::key_hint::KeyBindingListExt;
 use crate::render::highlight::highlight_code_to_styled_spans;
 use crate::style::accent_color;
 use crate::style::hairline_style;
+use crate::style::selection_style;
 use crate::style::status_style;
 use crate::style::StatusTone;
 use crate::terminal_palette::best_color;
@@ -441,6 +442,17 @@ impl DiffReviewOverlay {
             .min(rows.len().saturating_sub(height));
         Paragraph::new(rows.into_iter().skip(start).take(height).collect::<Vec<_>>())
             .render(inner, buf);
+        if !self.data.files.is_empty()
+            && selected_row >= start
+            && selected_row < start.saturating_add(height)
+            && let Some(background) = selection_style().bg
+        {
+            let row = inner.y + (selected_row - start) as u16;
+            buf.set_style(
+                Rect::new(inner.x, row, inner.width, 1),
+                Style::default().bg(background),
+            );
+        }
     }
 
     fn tree_rows(&self) -> (Vec<Line<'static>>, usize) {

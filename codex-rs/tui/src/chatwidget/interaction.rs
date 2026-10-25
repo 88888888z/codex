@@ -11,7 +11,6 @@ use crate::clipboard_copy::worker::CopyResult;
 pub(crate) enum KeyEventAction {
     None,
     CopyLastResponse(Arc<str>),
-    PasteImage { text_fallback: Option<KeyCode> },
 }
 
 impl ChatWidget {
@@ -204,37 +203,10 @@ impl ChatWidget {
                 self.quit_shortcut_expires_at = None;
                 self.quit_shortcut_key = None;
             }
-            key if key.kind == KeyEventKind::Press
-                && ((matches!(key.code, KeyCode::Char(c) if c.eq_ignore_ascii_case(&'v'))
-                    && key
-                        .modifiers
-                        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT))
-                    || (cfg!(windows) && key_hint::shift(KeyCode::Insert).is_press(key))) =>
-            {
-                if Instant::now() < self.suppress_image_paste_until {
-                    self.suppress_image_paste_until =
-                        Instant::now() + clipboard::IMAGE_PASTE_REPEAT_WINDOW;
-                    return KeyEventAction::None;
-                }
-                self.suppress_image_paste_until =
-                    Instant::now() + clipboard::IMAGE_PASTE_REPEAT_WINDOW;
-                let text_fallback = (cfg!(windows)
-                    && (key.modifiers == KeyModifiers::CONTROL
-                        || key_hint::shift(KeyCode::Insert).is_press(key)))
-                .then_some(key.code);
-                if text_fallback.is_some() {
-                    self.bottom_pane.prepare_composer_clipboard_paste();
-                }
-                return KeyEventAction::PasteImage { text_fallback };
-            }
             other if other.kind == KeyEventKind::Press => {
-                self.suppress_image_paste_until = Instant::now();
                 self.bottom_pane.clear_quit_shortcut_hint();
                 self.quit_shortcut_expires_at = None;
                 self.quit_shortcut_key = None;
-            }
-            other if other.kind == KeyEventKind::Release => {
-                self.suppress_image_paste_until = Instant::now();
             }
             _ => {}
         }

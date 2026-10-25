@@ -44,14 +44,6 @@ pub(super) fn lines(props: &FooterProps, width: u16) -> Vec<Line<'static>> {
         ],
     };
     compose.push(hints.insert_newline, ui_text("New line", "换行"));
-    compose.entries.push(Shortcut::new(
-        if props.is_wsl {
-            key_hint::ctrl_alt(KeyCode::Char('v'))
-        } else {
-            key_hint::ctrl(KeyCode::Char('v'))
-        },
-        ui_text("Paste image", "粘贴图片"),
-    ));
     compose.push(
         hints.external_editor,
         ui_text("External editor", "外部编辑器"),

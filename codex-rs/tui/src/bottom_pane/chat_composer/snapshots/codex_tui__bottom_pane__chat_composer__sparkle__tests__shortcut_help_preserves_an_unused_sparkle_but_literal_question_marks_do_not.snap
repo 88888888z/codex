@@ -10,7 +10,6 @@ shortcut help:
   @        Mention files        ⌥,       Less reasoning
   !        Shell command        ⌥.       More reasoning
   ⌃j       New line             ⌥← / ⌥→  Subagents (empty prompt)
-  ⌃v       Paste image          f4       Inspect activity
   ⌃g       External editor      ⌃c       Quit
   ⌃r       Search history
   esc esc  Edit last message    Transcript (open first)

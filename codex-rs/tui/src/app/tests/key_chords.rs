@@ -535,34 +535,6 @@ async fn legacy_terminal_preserves_active_alt_chords() -> Result<()> {
     Ok(())
 }
 
-#[cfg(unix)]
-#[tokio::test]
-async fn legacy_terminal_preserves_image_paste_without_reading_clipboard() -> Result<()> {
-    for mode in ['i', 'R'] {
-        let (mut app, mut tui, mut app_server) = chord_app().await?;
-        app.chat_widget.toggle_vim_mode_and_notify();
-        app.chat_widget.insert_str("abc");
-        press(
-            &mut app,
-            &mut tui,
-            &mut app_server,
-            KeyCode::Char(mode).into(),
-        )
-        .await?;
-        for key in [
-            KeyEvent::new(KeyCode::Char('v'), KeyModifiers::ALT),
-            KeyEvent::new(KeyCode::Char('V'), KeyModifiers::ALT | KeyModifiers::SHIFT),
-        ] {
-            assert!(!app.should_recover_vim_insert_escape(key));
-        }
-        assert!(app.should_recover_vim_insert_escape(KeyEvent::new(
-            KeyCode::Char('x'),
-            KeyModifiers::ALT,
-        )));
-    }
-    Ok(())
-}
-
 #[cfg(target_os = "macos")]
 #[tokio::test]
 async fn legacy_terminal_preserves_agent_shortcuts_without_editor_word_bindings() -> Result<()> {
