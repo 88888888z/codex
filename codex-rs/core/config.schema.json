@@ -7327,6 +7327,20 @@
       "description": "Compact prompt used for history compaction.",
       "type": "string"
     },
+    "compact_retain_token_budget": {
+      "description": "Soft token budget for recent turns retained verbatim during compaction. Defaults to 64,000 tokens.",
+      "format": "uint",
+      "maximum": 500000.0,
+      "minimum": 1000.0,
+      "type": "integer"
+    },
+    "compact_retain_turns": {
+      "description": "Number of recent complete user turns retained verbatim during compaction. Defaults to 3.",
+      "format": "uint32",
+      "maximum": 20.0,
+      "minimum": 0.0,
+      "type": "integer"
+    },
     "computer_use": {
       "$ref": "#/definitions/ComputerUseConfigToml"
     },

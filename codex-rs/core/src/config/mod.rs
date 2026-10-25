@@ -620,6 +620,9 @@ pub enum ThreadStoreConfig {
     InMemory { id: String },
 }
 
+pub const DEFAULT_COMPACT_RETAIN_TURNS: u32 = 3;
+pub const DEFAULT_COMPACT_RETAIN_TOKEN_BUDGET: usize = 64_000;
+
 /// Application configuration loaded from disk and merged with overrides.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Config {
@@ -774,6 +777,13 @@ pub struct Config {
 
     /// Compact prompt override.
     pub compact_prompt: Option<String>,
+
+    /// Number of recent complete user turns retained verbatim during compaction. Defaults to 3.
+    pub compact_retain_turns: u32,
+
+    /// Soft token budget for recent turns retained verbatim during compaction.
+    /// Defaults to 64,000 tokens.
+    pub compact_retain_token_budget: usize,
 
     /// Optional external notifier command. When set, Codex will spawn this
     /// program after each completed *turn* (i.e. when the agent finishes
@@ -4517,6 +4527,14 @@ impl Config {
             personality,
             developer_instructions,
             compact_prompt,
+            compact_retain_turns: cfg
+                .compact_retain_turns
+                .unwrap_or(DEFAULT_COMPACT_RETAIN_TURNS)
+                .min(/*max*/ 20),
+            compact_retain_token_budget: cfg
+                .compact_retain_token_budget
+                .unwrap_or(DEFAULT_COMPACT_RETAIN_TOKEN_BUDGET)
+                .clamp(/*min*/ 1_000, /*max*/ 500_000),
             include_permissions_instructions,
             include_apps_instructions,
             include_collaboration_mode_instructions,

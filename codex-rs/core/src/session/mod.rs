@@ -4951,10 +4951,15 @@ impl Session {
         let turn_context = step_context.turn.as_ref();
         let history = self.clone_history().await;
         let input_goal_ids = crate::context::UserGoalUpdate::message_ids(history.raw_items());
+        let split = crate::compact::split_recent_turns_for_compaction(
+            history.annotated_items(),
+            turn_context.config.compact_retain_turns as usize,
+            turn_context.config.compact_retain_token_budget,
+        );
         let retained_client_items =
             crate::compact_remote_v2::truncate_retained_messages_for_remote_compaction(
-                history
-                    .annotated_items()
+                split
+                    .older
                     .iter()
                     .filter(|item| {
                         (self.enabled(Feature::RetainClientToolOutputs)
@@ -4981,6 +4986,7 @@ impl Session {
                 .into_iter()
                 .map(ResponseItemEnvelope::new)
                 .chain(retained_client_items)
+                .chain(split.retained)
                 .collect();
         let turn_context_item = step_context.to_turn_context_item();
         self.replace_compacted_history(

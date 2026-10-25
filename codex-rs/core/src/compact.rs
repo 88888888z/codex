@@ -12,6 +12,7 @@ use crate::context::ContextualUserFragment;
 use crate::context::world_state::WorldState;
 use crate::context::world_state::WorldStateSnapshot;
 use crate::context::world_state::split_prefix_updates;
+use crate::context_manager::estimate_item_token_count;
 use crate::context_manager::updates::merge_world_state_updates;
 use crate::hook_runtime::PostCompactHookOutcome;
 use crate::hook_runtime::PreCompactHookOutcome;
@@ -61,6 +62,57 @@ use tracing::error;
 pub use codex_prompts::SUMMARIZATION_PROMPT;
 pub use codex_prompts::SUMMARY_PREFIX;
 const COMPACT_USER_MESSAGE_MAX_TOKENS: usize = 20_000;
+
+pub(crate) struct SplitRetainedTurns {
+    pub(crate) older: Vec<ResponseItemEnvelope>,
+    pub(crate) retained: Vec<ResponseItemEnvelope>,
+}
+
+pub(crate) fn split_recent_turns_for_compaction(
+    history: &[ResponseItemEnvelope],
+    retain_turns: usize,
+    retain_token_budget: usize,
+) -> SplitRetainedTurns {
+    let user_turns = history
+        .iter()
+        .enumerate()
+        .filter_map(|(index, envelope)| {
+            compacted_user_message(&envelope.item, envelope.metadata.as_ref())
+                .map(|_| index)
+        })
+        .collect::<Vec<_>>();
+    let retained_turns = retain_turns.min(user_turns.len());
+    if retained_turns == 0 {
+        return SplitRetainedTurns {
+            older: history.to_vec(),
+            retained: Vec::new(),
+        };
+    }
+
+    let mut start_turn = user_turns.len() - retained_turns;
+    let mut start = user_turns[start_turn];
+    let mut retained_tokens = history[start..]
+        .iter()
+        .map(|envelope| {
+            usize::try_from(estimate_item_token_count(&envelope.item)).unwrap_or(usize::MAX)
+        })
+        .fold(0usize, usize::saturating_add);
+    while retained_tokens > retain_token_budget && start_turn + 1 < user_turns.len() {
+        start_turn += 1;
+        start = user_turns[start_turn];
+        retained_tokens = history[start..]
+            .iter()
+            .map(|envelope| {
+                usize::try_from(estimate_item_token_count(&envelope.item)).unwrap_or(usize::MAX)
+            })
+            .fold(0usize, usize::saturating_add);
+    }
+
+    SplitRetainedTurns {
+        older: history[..start].to_vec(),
+        retained: history[start..].to_vec(),
+    }
+}
 
 /// Thread-local policy that preserves inherited context without changing model or skill budgets.
 /// Insert into `StartThreadOptions::thread_extension_init` to disable automatic compaction.
@@ -275,6 +327,14 @@ async fn run_compact_task_inner_impl(
 
     let mut history = sess.clone_history().await;
     let input_goal_ids = UserGoalUpdate::message_ids(history.raw_items());
+    let split = split_recent_turns_for_compaction(
+        history.annotated_items(),
+        turn_context.config.compact_retain_turns as usize,
+        turn_context.config.compact_retain_token_budget,
+    );
+    let older_history = split.older;
+    let retained_turns = split.retained;
+    history.replace_annotated(older_history.clone());
     history.record_items(
         &[initial_input_for_turn.into()],
         turn_context.model_info().truncation_policy.into(),
@@ -388,7 +448,6 @@ async fn run_compact_task_inner_impl(
     };
 
     let history_snapshot = sess.clone_history().await;
-    let history_items = history_snapshot.annotated_items();
     let summary_suffix = if matches!(compaction_metadata.phase(), CompactionPhase::PostTurn) {
         get_last_assistant_message_from_turn(compaction_response.output.iter())
             .filter(|summary| !summary.trim().is_empty())
@@ -401,9 +460,15 @@ async fn run_compact_task_inner_impl(
         get_last_assistant_message_from_turn(history_snapshot.raw_items()).unwrap_or_default()
     };
     let summary_text = format!("{SUMMARY_PREFIX}\n{summary_suffix}");
-    let user_messages = collect_annotated_user_messages(history_items);
+    let user_messages = collect_annotated_user_messages(&older_history);
 
-    let mut new_history = build_compacted_history(Vec::new(), &user_messages, &summary_text);
+    let mut new_history = build_compacted_history_with_retained_turns(
+        Vec::new(),
+        &user_messages,
+        &summary_text,
+        COMPACT_USER_MESSAGE_MAX_TOKENS,
+        retained_turns,
+    );
     if let Some(summary_item) = new_history.last_mut() {
         // This replacement history skips `record_conversation_items`; only the appended summary
         // belongs to this compaction turn.
@@ -708,10 +773,26 @@ pub(crate) fn build_compacted_history(
 }
 
 fn build_compacted_history_with_limit(
+    history: Vec<ResponseItemEnvelope>,
+    user_messages: &[CompactedUserMessage<'_>],
+    summary_text: &str,
+    max_tokens: usize,
+) -> Vec<ResponseItemEnvelope> {
+    build_compacted_history_with_retained_turns(
+        history,
+        user_messages,
+        summary_text,
+        max_tokens,
+        Vec::new(),
+    )
+}
+
+fn build_compacted_history_with_retained_turns(
     mut history: Vec<ResponseItemEnvelope>,
     user_messages: &[CompactedUserMessage<'_>],
     summary_text: &str,
     max_tokens: usize,
+    retained_turns: Vec<ResponseItemEnvelope>,
 ) -> Vec<ResponseItemEnvelope> {
     let mut selected_messages = Vec::new();
     if max_tokens > 0 {
@@ -799,6 +880,7 @@ fn build_compacted_history_with_limit(
         selected_messages.reverse();
     }
     history.extend(selected_messages);
+    history.extend(retained_turns);
 
     let summary_text = if summary_text.is_empty() {
         "(no summary available)".to_string()

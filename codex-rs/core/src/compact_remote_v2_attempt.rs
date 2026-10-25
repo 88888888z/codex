@@ -11,6 +11,7 @@ use super::run_remote_compaction_request_v2;
 use crate::Prompt;
 use crate::client::ModelClientSession;
 use crate::compact::CompactionAnalyticsDetails;
+use crate::compact::split_recent_turns_for_compaction;
 use crate::compact_remote_history::trim_function_call_history_to_fit_context_window;
 use crate::context::world_state::WorldState;
 use crate::context_manager::ContextManager;
@@ -23,6 +24,7 @@ use codex_analytics::CompactionPhase;
 use codex_analytics::CompactionReason;
 use codex_analytics::CompactionTrigger;
 use codex_history::CodexHarnessMetadata;
+use codex_history::ResponseItemEnvelope;
 use codex_protocol::error::Result as CodexResult;
 use codex_protocol::models::BaseInstructions;
 use codex_protocol::models::ResponseItem;
@@ -36,6 +38,7 @@ pub(super) struct RemoteCompactV2Attempt {
     pub(super) trace_input_history: Option<Vec<ResponseItem>>,
     pub(super) prompt_input: Vec<ResponseItem>,
     pub(super) prompt_input_metadata: Vec<Option<CodexHarnessMetadata>>,
+    pub(super) retained_turns: Vec<ResponseItemEnvelope>,
     pub(super) compaction_output: ResponseItem,
     pub(super) compaction_response_id: String,
     pub(super) token_usage: Option<TokenUsage>,
@@ -62,6 +65,7 @@ pub(crate) struct BackgroundCompactionInput {
     base_instructions: BaseInstructions,
     input: Vec<ResponseItem>,
     metadata: Vec<Option<CodexHarnessMetadata>>,
+    retained_turns: Vec<ResponseItemEnvelope>,
 }
 
 pub(super) async fn run_remote_compact_v2_attempt(
@@ -81,6 +85,7 @@ pub(super) async fn run_remote_compact_v2_attempt(
         base_instructions,
         mut input,
         prompt_input_metadata,
+        retained_turns,
         transport,
         captured_window,
     ) = match input {
@@ -100,6 +105,19 @@ pub(super) async fn run_remote_compact_v2_attempt(
             } else {
                 sess.get_prompt_base_instructions().await
             };
+            let trace_input_history = compaction_trace
+                .is_enabled()
+                .then(|| history.raw_items().cloned().collect());
+            let split = split_recent_turns_for_compaction(
+                history.annotated_items(),
+                turn_context.config.compact_retain_turns as usize,
+                turn_context.config.compact_retain_token_budget,
+            );
+            let mut retained_history = history.clone();
+            retained_history.replace_annotated(split.retained);
+            let retained_turns =
+                normalize_compaction_history(sess, retained_history, &model_info);
+            history.replace_annotated(split.older);
             let (rewritten_outputs, estimated_deleted_tokens) =
                 trim_function_call_history_to_fit_context_window(
                     &mut history,
@@ -125,17 +143,11 @@ pub(super) async fn run_remote_compact_v2_attempt(
                             .saturating_sub(estimated_deleted_tokens.min(max_local_deleted_tokens))
                     });
             }
-            let trace_input_history = compaction_trace
-                .is_enabled()
-                .then(|| history.raw_items().cloned().collect());
-            let (mut input, metadata): (Vec<_>, Vec<_>) = history
-                .for_prompt_annotated(&model_info.input_modalities)
+            let normalized = normalize_compaction_history(sess, history, &model_info);
+            let (input, metadata): (Vec<_>, Vec<_>) = normalized
                 .into_iter()
                 .map(|envelope| (envelope.item, envelope.metadata))
                 .unzip();
-            sess.services
-                .executed_tool_calls
-                .attach_to_compaction_prompt(&mut input);
             let client_session = client_session.unwrap_or_else(|| {
                 owned_client_session.insert(sess.services.model_client.new_session())
             });
@@ -146,6 +158,7 @@ pub(super) async fn run_remote_compact_v2_attempt(
                 base_instructions,
                 input,
                 metadata,
+                retained_turns,
                 CompactionRequestTransport::Foreground(client_session),
                 None,
             )
@@ -157,6 +170,7 @@ pub(super) async fn run_remote_compact_v2_attempt(
             input.base_instructions,
             input.input,
             input.metadata,
+            input.retained_turns,
             CompactionRequestTransport::Background(
                 input.turn_state,
                 input.prefix.auth_owner_generation,
@@ -164,6 +178,7 @@ pub(super) async fn run_remote_compact_v2_attempt(
             Some(input.window),
         ),
     };
+    debug_assert_eq!(input.len(), prompt_input_metadata.len());
     let tools_in_history = model_info.use_responses_lite
         && input
             .iter()
@@ -225,6 +240,7 @@ pub(super) async fn run_remote_compact_v2_attempt(
         trace_input_history,
         prompt_input,
         prompt_input_metadata,
+        retained_turns,
         compaction_output,
         compaction_response_id: response_id,
         token_usage,
@@ -253,25 +269,34 @@ pub(crate) fn capture_background_input(
     } else {
         base_instructions
     };
+    let history_len = snapshot.annotated_items().len();
     let prefix = CompactionPrefix {
         generation: snapshot.history_version(),
-        len: snapshot.annotated_items().len(),
+        len: history_len,
         auth_owner_generation,
     };
+    let split = split_recent_turns_for_compaction(
+        snapshot.annotated_items(),
+        step_context.turn.config.compact_retain_turns as usize,
+        step_context.turn.config.compact_retain_token_budget,
+    );
+    let mut retained_history = snapshot.clone();
+    retained_history.replace_annotated(split.retained);
+    let retained_turns =
+        normalize_compaction_history(sess, retained_history, &step_context.settings.model_info);
+    snapshot.replace_annotated(split.older);
     trim_function_call_history_to_fit_context_window(
         &mut snapshot,
         &step_context.turn,
         step_context.settings.model_info.usable_context_window(),
         &base_instructions,
     );
-    let (mut input, metadata): (Vec<_>, Vec<_>) = snapshot
-        .for_prompt_annotated(&step_context.settings.model_info.input_modalities)
+    let normalized =
+        normalize_compaction_history(sess, snapshot, &step_context.settings.model_info);
+    let (input, metadata): (Vec<_>, Vec<_>) = normalized
         .into_iter()
         .map(|envelope| (envelope.item, envelope.metadata))
         .unzip();
-    sess.services
-        .executed_tool_calls
-        .attach_to_compaction_prompt(&mut input);
     BackgroundCompactionInput {
         prefix,
         turn_state,
@@ -279,7 +304,28 @@ pub(crate) fn capture_background_input(
         base_instructions,
         input,
         metadata,
+        retained_turns,
     }
+}
+
+fn normalize_compaction_history(
+    sess: &Session,
+    history: ContextManager,
+    model_info: &ModelInfo,
+) -> Vec<ResponseItemEnvelope> {
+    let (mut input, metadata): (Vec<_>, Vec<_>) = history
+        .for_prompt_annotated(&model_info.input_modalities)
+        .into_iter()
+        .map(|envelope| (envelope.item, envelope.metadata))
+        .unzip();
+    sess.services
+        .executed_tool_calls
+        .attach_to_compaction_prompt(&mut input);
+    input
+        .into_iter()
+        .zip(metadata)
+        .map(|(item, metadata)| ResponseItemEnvelope { item, metadata })
+        .collect()
 }
 
 pub(crate) async fn run_background_compaction(

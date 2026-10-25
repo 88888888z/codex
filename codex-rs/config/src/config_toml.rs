@@ -182,6 +182,15 @@ pub struct ConfigToml {
     /// Token usage threshold triggering auto-compaction of conversation history.
     pub model_auto_compact_token_limit: Option<i64>,
 
+    /// Number of recent complete user turns retained verbatim during compaction. Defaults to 3.
+    #[schemars(range(min = 0, max = 20))]
+    pub compact_retain_turns: Option<u32>,
+
+    /// Soft token budget for recent turns retained verbatim during compaction.
+    /// Defaults to 64,000 tokens.
+    #[schemars(range(min = 1000, max = 500000))]
+    pub compact_retain_token_budget: Option<usize>,
+
     /// Controls whether the auto-compaction limit applies to the full context or
     /// only to tokens after the carried prefix in the current compaction window.
     pub model_auto_compact_token_limit_scope: Option<AutoCompactTokenLimitScope>,

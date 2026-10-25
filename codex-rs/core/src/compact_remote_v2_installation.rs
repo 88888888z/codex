@@ -178,6 +178,7 @@ async fn build_and_install_compaction(
         trace_input_history,
         prompt_input,
         prompt_input_metadata,
+        retained_turns,
         compaction_output,
         compaction_response_id,
         token_usage,
@@ -189,7 +190,7 @@ async fn build_and_install_compaction(
         sess.record_rollout_budget_usage(token_usage).await?;
         analytics_details.active_context_tokens_before = Some(token_usage.input_tokens);
     }
-    let (compacted_history, retained_images) = build_v2_compacted_history(
+    let (mut compacted_history, mut retained_images) = build_v2_compacted_history(
         prompt_input,
         prompt_input_metadata,
         compaction_output,
@@ -200,6 +201,17 @@ async fn build_and_install_compaction(
             RetainedImageBudget::Disabled
         },
     );
+    retained_images = retained_images.saturating_add(
+        retained_turns
+            .iter()
+            .map(|envelope| retained_input_image_count(&envelope.item))
+            .sum::<usize>(),
+    );
+    let compaction_output = compacted_history
+        .pop()
+        .expect("V2 compacted history always ends with its compaction output");
+    compacted_history.extend(retained_turns);
+    compacted_history.push(compaction_output);
     let reviewer_compaction_hash = reviewer_compaction_hash(sess, turn_context).await;
     let installed = if let Some((prefix, model_info, cutoff_world_state)) = prefix {
         let (initial_context, world_state_baseline) = sess
