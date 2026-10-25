@@ -687,7 +687,6 @@ pub(crate) enum AppEvent {
         thread_id: ThreadId,
     },
 
-
     /// Request to exit the application due to a fatal error.
     #[allow(dead_code)]
     FatalExitRequest(String),
@@ -939,11 +938,10 @@ pub(crate) enum AppEvent {
         report: VerificationReport,
     },
 
-    /// Restore one changed file selected in the structured diff review.
-    RollbackDiffFile {
+    /// Restore changed files selected in the structured diff review.
+    RollbackDiffFiles {
         cwd: PathBuf,
-        path: PathBuf,
-        status: crate::diff_review::DiffFileStatus,
+        files: Vec<(PathBuf, crate::diff_review::DiffFileStatus)>,
     },
 
     /// Open the app link view in the bottom pane.

@@ -8,14 +8,14 @@ use std::path::PathBuf;
 use crate::app_event::AppEvent;
 use crate::app_event_sender::AppEventSender;
 use crate::i18n::ui_text;
-use crate::keymap::PagerKeymap;
 use crate::key_hint::KeyBindingListExt;
+use crate::keymap::PagerKeymap;
 use crate::render::highlight::highlight_code_to_styled_spans;
+use crate::style::StatusTone;
 use crate::style::accent_color;
 use crate::style::hairline_style;
 use crate::style::selection_style;
 use crate::style::status_style;
-use crate::style::StatusTone;
 use crate::terminal_palette::best_color;
 use crate::terminal_palette::default_bg;
 use crate::tui;
@@ -107,7 +107,11 @@ impl DiffFile {
     }
 
     fn prepare_highlight(&mut self) {
-        let Some(language) = self.path.extension().and_then(|extension| extension.to_str()) else {
+        let Some(language) = self
+            .path
+            .extension()
+            .and_then(|extension| extension.to_str())
+        else {
             return;
         };
         let old_code = self
@@ -172,10 +176,7 @@ struct FileBuilder {
 
 impl FileBuilder {
     fn finish(self) -> Option<DiffFile> {
-        let path = self
-            .new_path
-            .or(self.old_path)
-            .or(self.fallback_path)?;
+        let path = self.new_path.or(self.old_path).or(self.fallback_path)?;
         let status = self.status.unwrap_or(DiffFileStatus::Modified);
         Some(DiffFile {
             path,
@@ -337,7 +338,10 @@ fn fallback_path_from_diff_header(value: &str) -> Option<PathBuf> {
 
 fn unquote_git_path(value: &str) -> String {
     let value = value.trim();
-    let Some(value) = value.strip_prefix('"').and_then(|value| value.strip_suffix('"')) else {
+    let Some(value) = value
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+    else {
         return value.to_string();
     };
     let mut out = String::new();
@@ -379,10 +383,17 @@ pub(crate) struct DiffReviewOverlay {
     selected: usize,
     scroll: usize,
     focus: DiffFocus,
-    confirm_rollback: bool,
+    confirm: Option<RollbackConfirm>,
+    status: Option<(String, bool)>,
     done: bool,
     app_event_tx: AppEventSender,
     keymap: PagerKeymap,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RollbackConfirm {
+    File,
+    All,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -404,7 +415,8 @@ impl DiffReviewOverlay {
             selected: 0,
             scroll: 0,
             focus: DiffFocus::Tree,
-            confirm_rollback: false,
+            confirm: None,
+            status: None,
             done: false,
             app_event_tx,
             keymap,
@@ -437,7 +449,11 @@ impl DiffReviewOverlay {
         ])
         .render(header_area, buf);
 
-        let tree_width = body_area.width.saturating_mul(/*percent*/ 30).max(24).min(40);
+        let tree_width = body_area
+            .width
+            .saturating_mul(/*percent*/ 30)
+            .max(24)
+            .min(40);
         let [tree_area, content_area] = Layout::horizontal([
             Constraint::Length(tree_width.min(body_area.width)),
             Constraint::Min(1),
@@ -470,36 +486,61 @@ impl DiffReviewOverlay {
     }
 
     fn render_footer(&self, area: Rect, buf: &mut Buffer) {
-        if self.confirm_rollback {
-            let file = self
-                .data
-                .files
-                .get(self.selected)
-                .map(|file| self.display_path(file))
-                .unwrap_or_default();
-            let prompt = if crate::i18n::is_chinese(crate::i18n::current_language()) {
-                format!("回滚 {file}？y 确认 · n/Esc 取消")
-            } else {
-                format!("Rollback {file}? y confirm · n/Esc cancel")
+        let chinese = crate::i18n::is_chinese(crate::i18n::current_language());
+        if let Some(confirm) = self.confirm {
+            let prompt = match confirm {
+                RollbackConfirm::File => {
+                    let file = self
+                        .data
+                        .files
+                        .get(self.selected)
+                        .map(|file| self.display_path(file))
+                        .unwrap_or_default();
+                    if chinese {
+                        format!("回滚 {file}？y 确认 · n/Esc 取消")
+                    } else {
+                        format!("Rollback {file}? y confirm · n/Esc cancel")
+                    }
+                }
+                RollbackConfirm::All => {
+                    if chinese {
+                        format!(
+                            "回滚全部 {} 个文件？y 确认 · n/Esc 取消",
+                            self.data.files.len()
+                        )
+                    } else {
+                        format!(
+                            "Rollback all {} files? y confirm · n/Esc cancel",
+                            self.data.files.len()
+                        )
+                    }
+                }
             };
             Line::from(prompt)
                 .fg(Color::Yellow)
                 .render(Rect::new(area.x, area.y, area.width, 1), buf);
+            return;
+        }
+        let focus = match self.focus {
+            DiffFocus::Tree => ui_text("Tree", "目录树"),
+            DiffFocus::View => ui_text("View", "代码视图"),
+        };
+        let hints = if chinese {
+            format!(
+                "区域：{focus} · Tab 切换 · ↑/↓ 操作 · PgUp/PgDn 滚动 · r 回滚 · R 全部回滚 · Esc 关闭"
+            )
         } else {
-            let focus = match self.focus {
-                DiffFocus::Tree => ui_text("Tree", "目录树"),
-                DiffFocus::View => ui_text("View", "代码视图"),
-            };
-            let hints = if crate::i18n::is_chinese(crate::i18n::current_language()) {
-                format!("区域：{focus} · Tab 切换 · ↑/↓ 操作 · PgUp/PgDn 滚动 · r 回滚 · Esc 关闭")
-            } else {
-                format!(
-                    "Focus: {focus} · Tab switch · ↑/↓ act · PgUp/PgDn scroll · r rollback · Esc close"
-                )
-            };
-            Line::from(hints)
-                .dim()
-                .render(Rect::new(area.x, area.y, area.width, 1), buf);
+            format!(
+                "Focus: {focus} · Tab switch · ↑/↓ act · PgUp/PgDn scroll · r rollback · R rollback all · Esc close"
+            )
+        };
+        Line::from(hints)
+            .dim()
+            .render(Rect::new(area.x, area.y, area.width, 1), buf);
+        if let Some((status, success)) = &self.status {
+            Line::from(status.clone())
+                .fg(if *success { Color::Green } else { Color::Red })
+                .render(Rect::new(area.x, area.y + 1, area.width, 1), buf);
         }
     }
 
@@ -518,10 +559,16 @@ impl DiffReviewOverlay {
     }
 
     fn handle_key(&mut self, tui: &mut tui::Tui, key: KeyEvent) -> Result<()> {
-        if self.confirm_rollback {
+        if let Some(confirm) = self.confirm {
             match key.code {
-                KeyCode::Char('y') => self.rollback_selected(),
-                KeyCode::Char('n') | KeyCode::Esc => self.confirm_rollback = false,
+                KeyCode::Char('y') => {
+                    self.confirm = None;
+                    match confirm {
+                        RollbackConfirm::File => self.rollback_selected(),
+                        RollbackConfirm::All => self.rollback_all(),
+                    }
+                }
+                KeyCode::Char('n') | KeyCode::Esc => self.confirm = None,
                 _ => {}
             }
             tui.frame_requester().schedule_frame();
@@ -549,14 +596,20 @@ impl DiffReviewOverlay {
         } else if self.keymap.page_down.is_pressed(key) {
             self.scroll = self.scroll.saturating_add(10);
         } else if key.code == KeyCode::Char('r') && key.modifiers.is_empty() {
-            self.confirm_rollback = self.data.files.get(self.selected).is_some();
+            self.confirm = self
+                .data
+                .files
+                .get(self.selected)
+                .map(|_| RollbackConfirm::File);
+        } else if key.code == KeyCode::Char('R') && !self.data.files.is_empty() {
+            self.confirm = Some(RollbackConfirm::All);
         }
         tui.frame_requester().schedule_frame();
         Ok(())
     }
 
     fn handle_mouse(&mut self, tui: &mut tui::Tui, kind: MouseEventKind) -> Result<()> {
-        if self.confirm_rollback {
+        if self.confirm.is_some() {
             return Ok(());
         }
         match kind {
@@ -585,15 +638,72 @@ impl DiffReviewOverlay {
 
     fn rollback_selected(&mut self) {
         let Some(file) = self.data.files.get(self.selected) else {
-            self.confirm_rollback = false;
             return;
         };
-        self.app_event_tx.send(AppEvent::RollbackDiffFile {
+        self.status = Some((ui_text("Rolling back…", "正在回滚…").to_string(), true));
+        self.app_event_tx.send(AppEvent::RollbackDiffFiles {
             cwd: self.data.cwd.clone(),
-            path: file.path.clone(),
-            status: file.status,
+            files: vec![(file.path.clone(), file.status)],
         });
-        self.done = true;
+    }
+
+    fn rollback_all(&mut self) {
+        if self.data.files.is_empty() {
+            return;
+        }
+        self.status = Some((ui_text("Rolling back…", "正在回滚…").to_string(), true));
+        self.app_event_tx.send(AppEvent::RollbackDiffFiles {
+            cwd: self.data.cwd.clone(),
+            files: self
+                .data
+                .files
+                .iter()
+                .map(|file| (file.path.clone(), file.status))
+                .collect(),
+        });
+    }
+
+    pub(crate) fn on_rollback_finished(
+        &mut self,
+        succeeded: &[PathBuf],
+        failures: &[(PathBuf, String)],
+    ) {
+        self.data
+            .files
+            .retain(|file| !succeeded.iter().any(|path| path == &file.path));
+        self.selected = self.selected.min(self.data.files.len().saturating_sub(1));
+        self.scroll = 0;
+        let chinese = crate::i18n::is_chinese(crate::i18n::current_language());
+        let status = if failures.is_empty() {
+            if chinese {
+                format!("已回滚 {} 个文件。", succeeded.len())
+            } else {
+                format!("Rolled back {} files.", succeeded.len())
+            }
+        } else {
+            let (path, error) = &failures[0];
+            let path = display_path(path, &self.data.cwd);
+            if succeeded.is_empty() {
+                if chinese {
+                    format!("回滚失败：{path}：{error}")
+                } else {
+                    format!("Rollback failed: {path}: {error}")
+                }
+            } else if chinese {
+                format!(
+                    "已回滚 {} 个，失败 {} 个：{path}：{error}",
+                    succeeded.len(),
+                    failures.len()
+                )
+            } else {
+                format!(
+                    "Rolled back {}, failed {}: {path}: {error}",
+                    succeeded.len(),
+                    failures.len()
+                )
+            }
+        };
+        self.status = Some((status, failures.is_empty()));
     }
 
     fn display_path(&self, file: &DiffFile) -> String {

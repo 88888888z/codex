@@ -54,7 +54,7 @@ impl App {
                 &event,
                 AppEvent::OpenDaemonMenu
                     | AppEvent::DiffReviewResult(_, _)
-                    | AppEvent::RollbackDiffFile { .. }
+                    | AppEvent::RollbackDiffFiles { .. }
                     | AppEvent::OpenRewind { .. }
                     | AppEvent::CreateRewindCheckpoint { .. }
                     | AppEvent::LoadRewindPreview { .. }
@@ -1439,27 +1439,49 @@ impl App {
                 self.compact_from_budget();
                 tui.frame_requester().schedule_frame();
             }
-            AppEvent::RollbackDiffFile { cwd, path, status } => {
-                let Some(runner) = self.workspace_command_runner.clone() else {
-                    self.chat_widget
-                        .add_error_message("无法回滚：工作区命令执行器不可用。".to_string());
-                    return Ok(AppRunControl::Continue);
-                };
-                match crate::get_git_diff::rollback_diff_file(
-                    runner.as_ref(),
-                    &cwd,
-                    &path,
-                    status,
-                )
-                .await
-                {
-                    Ok(()) => self.chat_widget.add_info_message(
-                        format!("已回滚 `{}`。", path.display()),
+            AppEvent::RollbackDiffFiles { cwd, files } => {
+                let mut succeeded = Vec::new();
+                let mut failures = Vec::new();
+                if let Some(runner) = self.workspace_command_runner.clone() {
+                    for (path, status) in files {
+                        match crate::get_git_diff::rollback_diff_file(
+                            runner.as_ref(),
+                            &cwd,
+                            &path,
+                            status,
+                        )
+                        .await
+                        {
+                            Ok(()) => succeeded.push(path),
+                            Err(error) => failures.push((path, error)),
+                        }
+                    }
+                } else {
+                    failures.extend(
+                        files
+                            .into_iter()
+                            .map(|(path, _)| (path, "工作区命令执行器不可用。".to_string())),
+                    );
+                }
+                if let Some(Overlay::Diff(overlay)) = self.overlay.as_mut() {
+                    overlay.on_rollback_finished(&succeeded, &failures);
+                }
+                if !succeeded.is_empty() {
+                    self.chat_widget.add_info_message(
+                        format!("已回滚 {} 个文件。", succeeded.len()),
                         /*hint*/ None,
-                    ),
-                    Err(error) => self
-                        .chat_widget
-                        .add_error_message(format!("回滚失败：{error}")),
+                    );
+                }
+                if let Some((path, error)) = failures.first() {
+                    let suffix = if failures.len() > 1 {
+                        format!("（共 {} 个失败）", failures.len())
+                    } else {
+                        String::new()
+                    };
+                    self.chat_widget.add_error_message(format!(
+                        "回滚 `{}` 失败：{error}{suffix}",
+                        path.display()
+                    ));
                 }
                 tui.frame_requester().schedule_frame();
             }
