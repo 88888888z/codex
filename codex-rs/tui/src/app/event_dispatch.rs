@@ -61,6 +61,8 @@ impl App {
                     | AppEvent::RewindPreviewLoaded { .. }
                     | AppEvent::RestoreRewindCheckpoint { .. }
                     | AppEvent::RewindFilesRestored { .. }
+                    | AppEvent::OpenFilePicker { .. }
+                    | AppEvent::AttachFileContext { .. }
                     | AppEvent::OpenWarnings
                     | AppEvent::StatusLineSetup { .. }
                     | AppEvent::StatusLineSetupCancelled
@@ -1375,6 +1377,40 @@ impl App {
                 result,
             } => {
                 self.finish_rewind_file_restore(tui, checkpoint, target, result);
+            }
+            AppEvent::OpenFilePicker { cwd, path } => {
+                if self.app_server_target.uses_remote_workspace() {
+                    self.chat_widget.add_error_message(
+                        "文件选择目前仅支持本地工作区；远程工作区尚未实现。".to_string(),
+                    );
+                    tui.frame_requester().schedule_frame();
+                    return Ok(AppRunControl::Continue);
+                }
+                match crate::file_picker::FilePickerOverlay::new(
+                    &cwd,
+                    path.as_deref(),
+                    self.app_event_tx.clone(),
+                    self.keymap.pager.clone(),
+                ) {
+                    Ok(overlay) => {
+                        tui.enter_alt_screen()?;
+                        self.overlay = Some(Overlay::new_file_picker(overlay));
+                        tui.frame_requester().schedule_frame();
+                    }
+                    Err(error) => {
+                        self.chat_widget
+                            .add_error_message(format!("无法打开文件选择器：{error}"));
+                        tui.frame_requester().schedule_frame();
+                    }
+                }
+            }
+            AppEvent::AttachFileContext {
+                placeholder,
+                payload,
+            } => {
+                self.chat_widget
+                    .insert_file_context(placeholder, payload);
+                tui.frame_requester().schedule_frame();
             }
             AppEvent::RollbackDiffFile { cwd, path, status } => {
                 let Some(runner) = self.workspace_command_runner.clone() else {

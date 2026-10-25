@@ -561,6 +561,15 @@ impl ChatWidget {
                 self.emit_raw_output_mode_changed(enabled);
             }
             SlashCommand::Tui => self.show_tui_mode_picker(),
+            SlashCommand::Files => {
+                self.app_event_tx.send(AppEvent::OpenFilePicker {
+                    cwd: self
+                        .current_cwd
+                        .clone()
+                        .unwrap_or_else(|| self.config.cwd.to_path_buf()),
+                    path: None,
+                });
+            }
             SlashCommand::Checkpoint => {
                 self.app_event_tx.send(AppEvent::CreateRewindCheckpoint {
                     cwd: self
@@ -1015,6 +1024,15 @@ impl ChatWidget {
                 self.handle_provider_command_args(trimmed);
                 self.app_event_tx.send(AppEvent::SettingsSelectionClosed);
             }
+            SlashCommand::Files => {
+                self.app_event_tx.send(AppEvent::OpenFilePicker {
+                    cwd: self
+                        .current_cwd
+                        .clone()
+                        .unwrap_or_else(|| self.config.cwd.to_path_buf()),
+                    path: Some(trimmed.to_string()),
+                });
+            }
             SlashCommand::Checkpoint => {
                 self.app_event_tx.send(AppEvent::CreateRewindCheckpoint {
                     cwd: self
@@ -1047,11 +1065,8 @@ impl ChatWidget {
                     .counter("codex.thread.rename", /*inc*/ 1, &[]);
                 let Some(name) = normalize_thread_name(&args) else {
                     self.add_error_message(
-                        crate::i18n::ui_text(
-                            "Thread name cannot be empty.",
-                            "会话名称不能为空。",
-                        )
-                        .to_string(),
+                        crate::i18n::ui_text("Thread name cannot be empty.", "会话名称不能为空。")
+                            .to_string(),
                     );
                     return;
                 };
@@ -1429,6 +1444,7 @@ impl ChatWidget {
             | SlashCommand::Vim
             | SlashCommand::Daybreak
             | SlashCommand::Diff
+            | SlashCommand::Files
             | SlashCommand::Checkpoint
             | SlashCommand::Rewind
             | SlashCommand::App

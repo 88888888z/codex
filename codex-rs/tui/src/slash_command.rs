@@ -55,6 +55,7 @@ pub enum SlashCommand {
     Raw,
     Tui,
     Diff,
+    Files,
     Checkpoint,
     Rewind,
     Mention,
@@ -121,6 +122,7 @@ impl SlashCommand {
                 SlashCommand::Raw => "切换原始回滚模式，便于复制终端文本",
                 SlashCommand::Tui => "选择下次启动时的 TUI 模式",
                 SlashCommand::Diff => "显示 Git 差异（包括未跟踪文件）",
+                SlashCommand::Files => "浏览文件并选择附加给 AI 的行范围",
                 SlashCommand::Checkpoint => "保存当前工作区检查点",
                 SlashCommand::Rewind => "查看并恢复工作区检查点",
                 SlashCommand::Mention => "提及文件",
@@ -187,6 +189,7 @@ impl SlashCommand {
             SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
             SlashCommand::Tui => "choose the TUI mode for the next launch",
             SlashCommand::Diff => "show git diff (including untracked files)",
+            SlashCommand::Files => "browse files and attach selected line ranges",
             SlashCommand::Checkpoint => "save the current workspace checkpoint",
             SlashCommand::Rewind => "review and restore workspace checkpoints",
             SlashCommand::Mention => "mention a file",
@@ -273,6 +276,7 @@ impl SlashCommand {
                 | SlashCommand::Side
                 | SlashCommand::Btw
                 | SlashCommand::Resume
+                | SlashCommand::Files
                 | SlashCommand::Checkpoint
         )
     }
@@ -286,6 +290,7 @@ impl SlashCommand {
                 | SlashCommand::Export
                 | SlashCommand::Raw
                 | SlashCommand::Diff
+                | SlashCommand::Files
                 | SlashCommand::Mention
                 | SlashCommand::Status
                 | SlashCommand::Daemon
@@ -324,6 +329,7 @@ impl SlashCommand {
                 | SlashCommand::Raw
                 | SlashCommand::Language
                 | SlashCommand::Provider
+                | SlashCommand::Files
                 | SlashCommand::Checkpoint
                 | SlashCommand::Rewind
         )
@@ -351,6 +357,7 @@ impl SlashCommand {
             | SlashCommand::Plan
             | SlashCommand::Cd
             | SlashCommand::Clear
+            | SlashCommand::Files
             | SlashCommand::Checkpoint
             | SlashCommand::Rewind
             | SlashCommand::MemoryDrop

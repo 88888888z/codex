@@ -48,6 +48,7 @@ pub(crate) enum Overlay {
     Analytics(Box<crate::analytics::AnalyticsView>),
     Diff(Box<DiffReviewOverlay>),
     Rewind(Box<crate::rewind::RewindOverlay>),
+    FilePicker(Box<crate::file_picker::FilePickerOverlay>),
 }
 
 impl Overlay {
@@ -95,12 +96,18 @@ impl Overlay {
         Self::Rewind(Box::new(overlay))
     }
 
+    pub(crate) fn new_file_picker(overlay: crate::file_picker::FilePickerOverlay) -> Self {
+        Self::FilePicker(Box::new(overlay))
+    }
+
     pub(crate) fn handle_event(&mut self, tui: &mut tui::Tui, event: TuiEvent) -> Result<()> {
         let input = match self {
             Overlay::Transcript(_) => tui::OverlayInput::Transcript,
             Overlay::Static(_) => tui::OverlayInput::StaticPager,
             Overlay::Analytics(_) => tui::OverlayInput::Usage,
-            Overlay::Diff(_) | Overlay::Rewind(_) => tui::OverlayInput::StaticPager,
+            Overlay::Diff(_) | Overlay::Rewind(_) | Overlay::FilePicker(_) => {
+                tui::OverlayInput::StaticPager
+            }
         };
         tui.set_overlay_input(input)?;
         let result = match self {
@@ -109,6 +116,7 @@ impl Overlay {
             Overlay::Analytics(o) => o.handle_event(tui, event),
             Overlay::Diff(o) => o.handle_event(tui, event),
             Overlay::Rewind(o) => o.handle_event(tui, event),
+            Overlay::FilePicker(o) => o.handle_event(tui, event),
         };
         if result.is_err() || self.is_done() {
             let restore = tui.set_overlay_input(tui::OverlayInput::Default);
@@ -124,6 +132,7 @@ impl Overlay {
             Overlay::Analytics(o) => o.is_done,
             Overlay::Diff(o) => o.is_done(),
             Overlay::Rewind(o) => o.is_done(),
+            Overlay::FilePicker(o) => o.is_done(),
         }
     }
 }

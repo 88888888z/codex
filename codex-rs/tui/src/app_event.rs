@@ -899,6 +899,18 @@ pub(crate) enum AppEvent {
         result: Result<crate::rewind::RewindRestoreOutcome, String>,
     },
 
+    /// Open the file browser at the workspace or an explicit path.
+    OpenFilePicker {
+        cwd: PathBuf,
+        path: Option<String>,
+    },
+
+    /// Insert a user-selected file range into the composer as bounded context.
+    AttachFileContext {
+        placeholder: String,
+        payload: String,
+    },
+
     /// Restore one changed file selected in the structured diff review.
     RollbackDiffFile {
         cwd: PathBuf,

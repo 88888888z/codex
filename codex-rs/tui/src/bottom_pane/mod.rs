@@ -1102,6 +1102,14 @@ impl BottomPane {
         self.request_redraw();
     }
 
+    pub(crate) fn insert_file_context(&mut self, placeholder: String, payload: String) {
+        self.interrupt_config_editor_transition();
+        self.composer
+            .insert_context_placeholder(placeholder, payload);
+        self.record_composer_activity_at(Instant::now());
+        self.request_redraw();
+    }
+
     pub(crate) fn pre_draw_tick(&mut self) {
         self.pre_draw_tick_at(Instant::now());
     }

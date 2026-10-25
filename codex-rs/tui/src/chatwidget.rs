@@ -1779,6 +1779,11 @@ impl ChatWidget {
         self.bottom_pane.insert_str(text);
     }
 
+    pub(crate) fn insert_file_context(&mut self, placeholder: String, payload: String) {
+        self.bottom_pane.insert_file_context(placeholder, payload);
+        self.request_redraw();
+    }
+
     pub(crate) fn set_remote_image_urls(&mut self, remote_image_urls: Vec<String>) {
         self.bottom_pane.set_remote_image_urls(remote_image_urls);
     }

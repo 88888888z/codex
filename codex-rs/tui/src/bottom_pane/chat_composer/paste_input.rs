@@ -16,6 +16,49 @@ impl ChatComposer {
         self.insert_str_at_target(self.draft.textarea.edit_target(), text);
     }
 
+    pub(crate) fn insert_context_placeholder(&mut self, placeholder: String, payload: String) {
+        self.draft.textarea_state.get_mut().follow_cursor();
+        let started_vim_edit = self.begin_direct_vim_edit();
+        let elements_before = self.draft.textarea.element_payloads();
+        let target = self.draft.textarea.edit_target();
+        let text = self.draft.textarea.text();
+        let before = &text[..target.start()];
+        let leading_space = before
+            .chars()
+            .last()
+            .is_some_and(|character| !character.is_whitespace())
+            .then_some(" ")
+            .unwrap_or_default();
+        let trailing_space = " ";
+        let mut suffix = 1;
+        let (element, payload) = loop {
+            let label = if suffix == 1 {
+                placeholder.clone()
+            } else {
+                format!("{placeholder} #{suffix}")
+            };
+            let element = format!("{leading_space}{label}{trailing_space}");
+            if !self
+                .draft
+                .pending_pastes
+                .iter()
+                .any(|(existing, _)| existing == &element)
+            {
+                break (element, payload);
+            }
+            suffix += 1;
+        };
+        self.draft
+            .textarea
+            .insert_element_at_target(target, &element);
+        self.draft.pending_pastes.push((element, payload));
+        self.reconcile_deleted_elements(elements_before);
+        self.sync_popups();
+        if started_vim_edit {
+            self.finish_vim_edit();
+        }
+    }
+
     fn insert_str_at_target(&mut self, target: EditTarget, text: &str) {
         if !text.is_empty() && self.sparkle.draft.get() == sparkle::SparkleDraft::Untouched {
             self.dismiss_sparkle();
