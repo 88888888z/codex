@@ -55,7 +55,10 @@ impl AnalyticsView {
         if history.data.is_empty() {
             return plot::Chart {
                 lines: vec![
-                    "No data reported for this range."
+                    crate::i18n::ui_text(
+                        "No data reported for this range.",
+                        "此时间范围没有数据。",
+                    )
                         .set_style(secondary_style())
                         .into(),
                 ],
@@ -90,12 +93,16 @@ impl AnalyticsView {
             }
         }
         let unit = match section {
-            Section::Usage if history.unit == AccountAnalyticsUnit::Tokens => "tokens",
-            Section::Summary => "tokens",
-            Section::Activity => "messages",
-            Section::Plugins => "calls",
-            Section::Skills => "uses",
-            Section::Usage | Section::Credits | Section::Chats | Section::Plan => "credits",
+            Section::Usage if history.unit == AccountAnalyticsUnit::Tokens => {
+                crate::i18n::ui_text("tokens", "Token")
+            }
+            Section::Summary => crate::i18n::ui_text("tokens", "Token"),
+            Section::Activity => crate::i18n::ui_text("messages", "条消息"),
+            Section::Plugins => crate::i18n::ui_text("calls", "次调用"),
+            Section::Skills => crate::i18n::ui_text("uses", "次使用"),
+            Section::Usage | Section::Credits | Section::Chats | Section::Plan => {
+                crate::i18n::ui_text("credits", "额度")
+            }
         };
         let empty_breakdown = matches!(
             section,
@@ -116,31 +123,46 @@ impl AnalyticsView {
             format_amount(total)
         };
         let mut lines = vec![if relative {
-            "Total usage · relative units"
+            crate::i18n::ui_text("Total usage · relative units", "总用量 · 相对单位")
                 .set_style(secondary_style())
                 .into()
         } else {
-            number(format!(
-                "{} {}{unit}",
-                formatted_total,
-                if section == Section::Activity {
-                    "reported "
+            if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                number(if section == Section::Activity {
+                    format!("已上报 {formatted_total} {unit}")
                 } else {
-                    ""
-                }
-            ))
-            .into()
+                    format!("{formatted_total} {unit}")
+                })
+                .into()
+            } else {
+                number(format!(
+                    "{} {}{unit}",
+                    formatted_total,
+                    if section == Section::Activity {
+                        "reported "
+                    } else {
+                        ""
+                    }
+                ))
+                .into()
+            }
         }];
         if section == Section::Usage && !self.business() && self.zoomed {
             lines.push(
-                "Approximate · may be delayed up to 6 hours"
+                crate::i18n::ui_text(
+                    "Approximate · may be delayed up to 6 hours",
+                    "近似数据 · 可能延迟最多 6 小时",
+                )
                     .set_style(secondary_style())
                     .into(),
             );
         }
         if self.sections[section].group == 3 {
             lines.push(
-                "All usage by how each turn started"
+                crate::i18n::ui_text(
+                    "All usage by how each turn started",
+                    "按每轮启动方式统计全部用量",
+                )
                     .set_style(secondary_style())
                     .into(),
             );
@@ -162,11 +184,18 @@ impl AnalyticsView {
                     section,
                     Section::Plugins | Section::Activity | Section::Skills
                 ) {
-                    format!("No {unit} reported in this range.")
+                    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        format!("此范围没有 {unit} 数据。")
+                    } else {
+                        format!("No {unit} reported in this range.")
+                    }
                         .set_style(secondary_style())
                         .into()
                 } else {
-                    "No activity reported in this range."
+                    crate::i18n::ui_text(
+                        "No activity reported in this range.",
+                        "此时间范围没有活动数据。",
+                    )
                         .set_style(secondary_style())
                         .into()
                 },
@@ -185,11 +214,19 @@ impl AnalyticsView {
         }
         let table_start = lines.len();
         let summary = match day {
-            None => " · Not reported".set_style(secondary_style()),
+            None => crate::i18n::ui_text(" · Not reported", " · 未上报")
+                .set_style(secondary_style()),
             Some(day) if day.total == 0.0 && day.values.iter().all(|value| value.value == 0.0) => {
-                " · No activity (0)".set_style(secondary_style())
+                crate::i18n::ui_text(" · No activity (0)", " · 无活动 (0)")
+                    .set_style(secondary_style())
             }
-            Some(day) if relative => number(format!(" · {} usage units", data::amount(day.total))),
+            Some(day) if relative => number(if crate::i18n::is_chinese(
+                crate::i18n::current_language(),
+            ) {
+                format!(" · {} 个用量单位", data::amount(day.total))
+            } else {
+                format!(" · {} usage units", data::amount(day.total))
+            }),
             Some(day) => number(format!(
                 " · {} {unit}",
                 if expanded {
@@ -206,9 +243,9 @@ impl AnalyticsView {
         if self.zoomed {
             lines.push(columns(
                 match section {
-                    Section::Plugins => "Plugin",
-                    Section::Skills => "Skill",
-                    Section::Chats => "Chat",
+                    Section::Plugins => crate::i18n::ui_text("Plugin", "插件"),
+                    Section::Skills => crate::i18n::ui_text("Skill", "Skill"),
+                    Section::Chats => crate::i18n::ui_text("Chat", "会话"),
                     Section::Summary
                     | Section::Usage
                     | Section::Credits
@@ -218,17 +255,17 @@ impl AnalyticsView {
                 .bold()
                 .into(),
                 if history.unit == AccountAnalyticsUnit::Tokens {
-                    "Tokens"
+                    crate::i18n::ui_text("Tokens", "Token")
                 } else if section == Section::Usage {
-                    "Share"
+                    crate::i18n::ui_text("Share", "占比")
                 } else if section == Section::Activity {
-                    "Messages"
+                    crate::i18n::ui_text("Messages", "消息")
                 } else if section == Section::Plugins {
-                    "Calls"
+                    crate::i18n::ui_text("Calls", "调用")
                 } else if section == Section::Skills {
-                    "Uses"
+                    crate::i18n::ui_text("Uses", "使用")
                 } else {
-                    "Credits"
+                    crate::i18n::ui_text("Credits", "额度")
                 }
                 .bold()
                 .into(),
@@ -261,7 +298,11 @@ impl AnalyticsView {
         let remainder = if !expanded && values.len() > row_budget {
             let remaining = values.split_off(row_budget - 1);
             Some((
-                format!("{} more", remaining.len()),
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("还有 {} 项", remaining.len())
+                } else {
+                    format!("{} more", remaining.len())
+                },
                 remaining.iter().map(|(_, value)| value.value).sum::<f64>(),
             ))
         } else {
@@ -320,9 +361,17 @@ impl AnalyticsView {
             lines.truncate(table_start);
             lines.push(truncate_line_with_ellipsis_if_overflow(
                 if day.is_none() {
-                    format!("Data not reported for {selected_date}.")
+                    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        format!("{selected_date} 没有上报数据。")
+                    } else {
+                        format!("Data not reported for {selected_date}.")
+                    }
                 } else {
-                    format!("No {unit} reported for {selected_date}.")
+                    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        format!("{selected_date} 没有 {unit} 数据。")
+                    } else {
+                        format!("No {unit} reported for {selected_date}.")
+                    }
                 }
                 .set_style(secondary_style())
                 .into(),
@@ -336,10 +385,17 @@ impl AnalyticsView {
                 .and_then(|value| chrono::DateTime::from_timestamp(value, /*nsecs*/ 0))
         {
             lines.push(
-                format!(
-                    "Updated {} UTC",
-                    updated.format(self.clock_format.date_time_format())
-                )
+                (if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!(
+                        "更新于 {} UTC",
+                        updated.format(self.clock_format.date_time_format())
+                    )
+                } else {
+                    format!(
+                        "Updated {} UTC",
+                        updated.format(self.clock_format.date_time_format())
+                    )
+                })
                 .set_style(secondary_style())
                 .into(),
             );

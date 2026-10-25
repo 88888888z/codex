@@ -860,6 +860,16 @@ pub(crate) enum AppEvent {
     /// Result of computing a `/diff` command.
     DiffResult(PathBuf, String),
 
+    /// Plain unified diff used by the structured diff review surface.
+    DiffReviewResult(PathBuf, String),
+
+    /// Restore one changed file selected in the structured diff review.
+    RollbackDiffFile {
+        cwd: PathBuf,
+        path: PathBuf,
+        status: crate::diff_review::DiffFileStatus,
+    },
+
     /// Open the app link view in the bottom pane.
     OpenAppLink {
         app_id: String,
@@ -1697,6 +1707,12 @@ pub(crate) enum AppEvent {
 
     /// Select a saved provider profile and start a new session with it.
     ActivateProviderProfile(crate::provider_profiles::ProfileSummary),
+
+    /// Open the saved provider profile list for deletion.
+    OpenProviderDeletePicker,
+
+    /// Confirm deletion of a saved provider profile.
+    ConfirmProviderProfileDelete(crate::provider_profiles::ProfileSummary),
 
     /// Remove a saved provider profile and its encrypted credential.
     DeleteProviderProfile(crate::provider_profiles::ProfileSummary),

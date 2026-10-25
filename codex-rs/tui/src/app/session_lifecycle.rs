@@ -13,6 +13,7 @@ use crate::app_server_session::is_server_shutting_down_error;
 use crate::app_server_session::source_agent_path;
 use crate::app_server_session::thread_blocks_direct_input;
 use crate::chatwidget::ThreadInputStateRestoreMode;
+use crate::i18n::ui_text;
 use std::collections::HashSet;
 
 #[derive(Clone, Copy)]
@@ -147,8 +148,10 @@ impl App {
         }
 
         if self.agent_navigation.is_empty() {
-            self.chat_widget
-                .add_info_message("No agents available yet.".to_string(), /*hint*/ None);
+            self.chat_widget.add_info_message(
+                ui_text("No agents available yet.", "还没有可用的 Agent。").to_string(),
+                /*hint*/ None,
+            );
             return;
         }
 
@@ -215,7 +218,7 @@ impl App {
 
         SelectionViewParams {
             view_id: Some(AGENT_PICKER_VIEW_ID),
-            title: Some("Subagents".to_string()),
+            title: Some(ui_text("Subagents", "子 Agent").to_string()),
             subtitle: Some(AgentNavigationState::picker_subtitle()),
             footer_hint: Some(standard_popup_hint_line()),
             items,
@@ -565,7 +568,11 @@ impl App {
         }
         if self.windows_sandbox_blocks_thread_switch() {
             self.chat_widget.add_info_message(
-                "Finish Windows sandbox setup before switching threads.".to_string(),
+                ui_text(
+                    "Finish Windows sandbox setup before switching threads.",
+                    "请先完成 Windows 沙箱设置，再切换线程。",
+                )
+                .to_string(),
                 /*hint*/ None,
             );
             return Ok(());
@@ -583,9 +590,13 @@ impl App {
                 .refresh_agent_picker_thread_liveness(app_server, thread_id)
                 .await)
         {
-            self.add_agents_overview_error(format!(
-                "Agent thread {thread_id} is no longer available."
-            ));
+            self.add_agents_overview_error(
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("Agent 线程 {thread_id} 已不可用。")
+                } else {
+                    format!("Agent thread {thread_id} is no longer available.")
+                },
+            );
             return Ok(());
         }
         let mut is_replay_only = self
@@ -607,9 +618,13 @@ impl App {
                     attached_replay_only = true;
                 }
                 Err(err) => {
-                    self.add_agents_overview_error(format!(
-                        "Failed to attach to agent thread {thread_id}: {err}"
-                    ));
+                    self.add_agents_overview_error(
+                        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("无法连接到 Agent 线程 {thread_id}：{err}")
+                        } else {
+                            format!("Failed to attach to agent thread {thread_id}: {err}")
+                        },
+                    );
                     return Ok(());
                 }
             }
@@ -629,7 +644,13 @@ impl App {
         self.active_thread_id = None;
         let Some((receiver, mut snapshot)) = self.activate_thread_for_replay(thread_id).await
         else {
-            self.add_agents_overview_error(format!("Agent thread {thread_id} is already active."));
+            self.add_agents_overview_error(
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("Agent 线程 {thread_id} 已在运行。")
+                } else {
+                    format!("Agent thread {thread_id} is already active.")
+                },
+            );
             if let Some(previous_thread_id) = previous_thread_id {
                 self.activate_thread_channel(previous_thread_id).await;
             }
@@ -663,9 +684,13 @@ impl App {
         // Refreshing can merge restored turns into the store, so recap progress must be read only
         // after the refresh while the activated thread channel is still retained.
         let Some(channel) = self.thread_event_channels.get(&thread_id) else {
-            self.add_agents_overview_error(format!(
-                "Agent thread {thread_id} is no longer available."
-            ));
+            self.add_agents_overview_error(
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("Agent 线程 {thread_id} 已不可用。")
+                } else {
+                    format!("Agent thread {thread_id} is no longer available.")
+                },
+            );
             return Ok(());
         };
         let recap_progress = {
@@ -708,7 +733,15 @@ impl App {
                 .is_none_or(|channel| channel.attachment() != ThreadEventAttachment::ExternalWriter)
         {
             self.chat_widget.pause_unavailable_thread();
-            let message = if attached_replay_only {
+            let message = if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                if attached_replay_only {
+                    format!(
+                        "Agent 线程 {thread_id} 无法实时恢复，正在重放已保存的对话。"
+                    )
+                } else {
+                    format!("Agent 线程 {thread_id} 已关闭，正在重放已保存的对话。")
+                }
+            } else if attached_replay_only {
                 format!(
                     "Agent thread {thread_id} could not be resumed live. Replaying saved transcript."
                 )

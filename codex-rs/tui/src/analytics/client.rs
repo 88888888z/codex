@@ -261,10 +261,19 @@ fn route(report: Report, grouping: Grouping, plan: Option<PlanType>) -> Option<A
 
 pub(super) fn request_error(error: RequestError) -> String {
     match error.status().map(|status| status.as_u16()) {
-        Some(401) => "Sign in again to load this report.",
-        Some(403) => "Access denied for this report.",
-        Some(404) => "This report endpoint is unavailable. Press R to retry.",
-        _ => "Report request failed. Press R to retry.",
+        Some(401) => crate::i18n::ui_text(
+            "Sign in again to load this report.",
+            "请重新登录后加载此报告。",
+        ),
+        Some(403) => crate::i18n::ui_text("Access denied for this report.", "无权访问此报告。"),
+        Some(404) => crate::i18n::ui_text(
+            "This report endpoint is unavailable. Press R to retry.",
+            "此报告接口不可用。按 R 重试。",
+        ),
+        _ => crate::i18n::ui_text(
+            "Report request failed. Press R to retry.",
+            "报告请求失败。按 R 重试。",
+        ),
     }
     .into()
 }

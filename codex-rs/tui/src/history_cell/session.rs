@@ -2,7 +2,6 @@
 
 use super::*;
 use crate::line_truncation::line_width;
-use crate::line_truncation::truncate_line_with_ellipsis_if_overflow;
 use crate::style::accent_color;
 use crate::width::display_width;
 
@@ -356,31 +355,8 @@ impl SessionHeaderHistoryCell {
 }
 
 impl HistoryCell for SessionHeaderHistoryCell {
-    fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
-        let width = usize::from(width);
-        let mut title = vec!["  ".into()];
-        title.extend(codex_title(self.version));
-        let mut lines = vec![
-            Line::default(),
-            Line::from(title),
-            Line::from(vec![
-                "     ".into(),
-                self.format_directory(Some(width.saturating_sub(/*rhs*/ 5)))
-                    .dim(),
-            ]),
-        ];
-        if self.yolo_mode {
-            lines.push(Line::from(vec![
-                crate::i18n::ui_text("  permissions: ", "  权限：").dim(),
-                crate::i18n::ui_text("YOLO mode", "YOLO 模式")
-                    .magenta()
-                    .bold(),
-            ]));
-        }
-        lines
-            .into_iter()
-            .map(|line| truncate_line_with_ellipsis_if_overflow(line, width))
-            .collect()
+    fn display_lines(&self, _width: u16) -> Vec<Line<'static>> {
+        Vec::new()
     }
 
     fn raw_lines(&self) -> Vec<Line<'static>> {

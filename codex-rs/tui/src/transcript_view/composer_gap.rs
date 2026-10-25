@@ -117,31 +117,52 @@ impl TranscriptView {
 impl CopyFeedback {
     fn line(&self, width: u16) -> Line<'static> {
         let characters = self.characters;
+        let chinese = crate::i18n::is_chinese(crate::i18n::current_language());
         let labels = match self.result {
             Ok(CopyStatus::Confirmed) => [
-                format!("Copied {characters} chars to host clipboard"),
-                format!("Copied {characters} chars"),
-                "Copied".into(),
+                if chinese {
+                    format!("已将 {characters} 个字符复制到主机剪贴板")
+                } else {
+                    format!("Copied {characters} chars to host clipboard")
+                },
+                if chinese {
+                    format!("已复制 {characters} 个字符")
+                } else {
+                    format!("Copied {characters} chars")
+                },
+                crate::i18n::ui_text("Copied", "已复制").into(),
             ],
             Ok(CopyStatus::Pending(_)) => [
-                format!("Copying {characters} chars…"),
-                "Copying…".into(),
-                "Copying…".into(),
+                if chinese {
+                    format!("正在复制 {characters} 个字符…")
+                } else {
+                    format!("Copying {characters} chars…")
+                },
+                crate::i18n::ui_text("Copying…", "正在复制…").into(),
+                crate::i18n::ui_text("Copying…", "正在复制…").into(),
             ],
             Ok(CopyStatus::Busy) => [
-                "Copy already in progress".into(),
-                "Copy in progress".into(),
-                "Copy busy".into(),
+                crate::i18n::ui_text("Copy already in progress", "复制仍在进行").into(),
+                crate::i18n::ui_text("Copy in progress", "正在复制").into(),
+                crate::i18n::ui_text("Copy busy", "剪贴板忙").into(),
             ],
             Ok(CopyStatus::Unconfirmed) => [
-                "Copy sent to terminal · paste to verify".into(),
-                "Copy sent · verify paste".into(),
-                "Copy unconfirmed".into(),
+                crate::i18n::ui_text(
+                    "Copy sent to terminal · paste to verify",
+                    "复制请求已发送到终端 · 请粘贴验证",
+                )
+                .into(),
+                crate::i18n::ui_text(
+                    "Copy sent · verify paste",
+                    "已发送复制 · 请粘贴验证",
+                )
+                .into(),
+                crate::i18n::ui_text("Copy unconfirmed", "复制未确认").into(),
             ],
             Err(()) => [
-                "Copy failed · try again".into(),
-                "Copy failed".into(),
-                "Copy failed".into(),
+                crate::i18n::ui_text("Copy failed · try again", "复制失败 · 请重试").into(),
+                crate::i18n::ui_text("Copy failed", "复制失败").into(),
+                crate::i18n::ui_text("Copy failed", "复制失败").into(),
             ],
         };
         let line = first_fitting_line(labels.map(Line::from), width);

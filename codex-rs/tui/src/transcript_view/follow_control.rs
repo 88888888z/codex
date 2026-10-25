@@ -7,6 +7,7 @@ use crossterm::event::MouseButton;
 use crossterm::event::MouseEvent;
 use crossterm::event::MouseEventKind;
 use ratatui::layout::Position as ScreenPosition;
+use ratatui::style::Modifier;
 use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
@@ -42,7 +43,7 @@ impl TranscriptView {
         let style =
             crate::style::user_message_style().fg(crate::style::user_message_accent_color());
         let style = if hovered {
-            style.reversed().bold()
+            style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
         } else {
             style
         };
@@ -60,19 +61,28 @@ impl TranscriptView {
         }
         let labels = if self.unseen_activity {
             [
-                " New activity · ↓ Back to bottom · esc ",
-                " New activity · ↓ Bottom ",
-                " New · ↓ Bottom ",
-                " ↓ Bottom ",
-                " ↓ ",
+                crate::i18n::ui_text(
+                    " New activity · ↓ Back to bottom · esc ",
+                    " 新活动 · ↓ 返回底部 · Esc ",
+                ),
+                crate::i18n::ui_text(
+                    " New activity · ↓ Bottom ",
+                    " 新活动 · ↓ 返回底部 ",
+                ),
+                crate::i18n::ui_text(" New · ↓ Bottom ", " ↓ 返回底部 "),
+                crate::i18n::ui_text(" ↓ Bottom ", " ↓ 返回底部 "),
+                crate::i18n::ui_text(" ↓ ", " ↓ "),
             ]
         } else {
             [
-                " ↓ Back to bottom · esc ",
-                " ↓ Back to bottom ",
-                " ↓ Bottom · esc ",
-                " ↓ Bottom ",
-                " ↓ ",
+                crate::i18n::ui_text(
+                    " ↓ Back to bottom · esc ",
+                    " ↓ 返回底部 · Esc ",
+                ),
+                crate::i18n::ui_text(" ↓ Back to bottom ", " ↓ 返回底部 "),
+                crate::i18n::ui_text(" ↓ Bottom · esc ", " ↓ 返回底部 · Esc "),
+                crate::i18n::ui_text(" ↓ Bottom ", " ↓ 返回底部 "),
+                crate::i18n::ui_text(" ↓ ", " ↓ "),
             ]
         };
         labels

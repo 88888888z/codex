@@ -13,6 +13,7 @@ use crate::bottom_pane::CancellationEvent;
 use crate::bottom_pane::menu_surface_padding_height;
 use crate::bottom_pane::popup_content_width;
 use crate::bottom_pane::render_menu_surface;
+use crate::i18n::ui_text;
 use crate::render::renderable::Renderable;
 use crate::style::accent_color;
 use crate::wrapping::word_wrap_lines;
@@ -72,31 +73,45 @@ impl KeymapCaptureView {
     fn lines(&self, width: u16) -> Vec<Line<'static>> {
         let wrap_width = usize::from(width.max(1));
         let header = vec![
-            Line::from("Remap Shortcut".bold()),
+            Line::from(ui_text("Remap Shortcut", "重映射快捷键").bold()),
             Line::from(vec![
-                "Action: ".dim(),
+                ui_text("Action: ", "操作：").dim(),
                 self.label.clone().into(),
                 "  ".into(),
                 format!("{}.{}", self.context, self.action).dim(),
             ]),
             Line::from(vec![
-                "Current: ".dim(),
+                ui_text("Current: ", "当前：").dim(),
                 self.current_binding.clone().fg(accent_color()),
             ]),
         ];
         let mut lines = word_wrap_lines(&header, wrap_width);
 
         let instructions = match (self.capture_mode, self.first_stroke.as_deref()) {
-            (KeymapCaptureMode::SingleKey, _) => "Press the new key now. Esc cancels.".to_string(),
-            (KeymapCaptureMode::Chord, None) => {
-                "Press the first key, then the second. Esc cancels.".to_string()
+            (KeymapCaptureMode::SingleKey, _) => {
+                ui_text(
+                    "Press the new key now. Esc cancels.",
+                    "现在按下新按键，Esc 取消。",
+                )
+                .to_string()
             }
+            (KeymapCaptureMode::Chord, None) => ui_text(
+                "Press the first key, then the second. Esc cancels.",
+                "先按第一个键，再按第二个键，Esc 取消。",
+            )
+            .to_string(),
             (KeymapCaptureMode::Chord, Some(first)) => {
-                format!("First key: {first}. Press the second key. Esc cancels.")
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("第一个键：{first}。请按第二个键，Esc 取消。")
+                } else {
+                    format!("First key: {first}. Press the second key. Esc cancels.")
+                }
             }
-            (KeymapCaptureMode::LeaderChord, _) => {
-                "Press the key that follows the configured leader. Esc cancels.".to_string()
-            }
+            (KeymapCaptureMode::LeaderChord, _) => ui_text(
+                "Press the key that follows the configured leader. Esc cancels.",
+                "按下配置的 Leader 之后的按键，Esc 取消。",
+            )
+            .to_string(),
         };
         lines.extend(
             textwrap::wrap(&instructions, wrap_width)
@@ -107,8 +122,8 @@ impl KeymapCaptureView {
         if let Some(error) = &self.error_message {
             lines.push(Line::from(""));
             let options = textwrap::Options::new(wrap_width)
-                .initial_indent("Error: ")
-                .subsequent_indent("       ");
+                .initial_indent(ui_text("Error: ", "错误："))
+                .subsequent_indent(ui_text("       ", "      "));
             lines.extend(
                 textwrap::wrap(error, options)
                     .into_iter()

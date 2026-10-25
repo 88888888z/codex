@@ -18,15 +18,17 @@ pub(super) const GROUPINGS: [Grouping; 7] = [
     Grouping::TokenType,
 ];
 
-pub(super) const GROUP_LABELS: [&str; 7] = [
-    "Surface",
-    "Feature",
-    "Model",
-    "Turn start",
-    "Speed",
-    "Reasoning",
-    "Token type",
-];
+pub(super) fn group_label(index: usize) -> &'static str {
+    match GROUPINGS[index] {
+        Grouping::Surface => crate::i18n::ui_text("Surface", "入口"),
+        Grouping::Feature => crate::i18n::ui_text("Feature", "功能"),
+        Grouping::Model => crate::i18n::ui_text("Model", "模型"),
+        Grouping::TaskStart => crate::i18n::ui_text("Turn start", "轮次开始方式"),
+        Grouping::Speed => crate::i18n::ui_text("Speed", "速度"),
+        Grouping::Reasoning => crate::i18n::ui_text("Reasoning", "思考强度"),
+        Grouping::TokenType => crate::i18n::ui_text("Token type", "Token 类型"),
+    }
+}
 
 pub(super) struct Pending<T> {
     receiver: oneshot::Receiver<Result<Option<T>, String>>,
@@ -67,8 +69,16 @@ impl<T: Send + 'static> Load<T> {
                         .await
                     {
                         Ok(Ok(result)) => result,
-                        Ok(Err(_)) => Err("Request interrupted. Press R to retry.".into()),
-                        Err(_) => Err("Request timed out. Press R to retry.".into()),
+                        Ok(Err(_)) => Err(crate::i18n::ui_text(
+                            "Request interrupted. Press R to retry.",
+                            "请求已中断。按 R 重试。",
+                        )
+                        .into()),
+                        Err(_) => Err(crate::i18n::ui_text(
+                            "Request timed out. Press R to retry.",
+                            "请求超时。按 R 重试。",
+                        )
+                        .into()),
                     };
                 let _ = sender.send(result);
                 frame.schedule_frame();
@@ -83,7 +93,13 @@ impl<T: Send + 'static> Load<T> {
                 Ok(Ok(None)) => Self::Unavailable,
                 Ok(Err(message)) => Self::Error(message),
                 Err(oneshot::error::TryRecvError::Closed) => {
-                    Self::Error("Request interrupted. Press R to retry.".into())
+                    Self::Error(
+                        crate::i18n::ui_text(
+                            "Request interrupted. Press R to retry.",
+                            "请求已中断。按 R 重试。",
+                        )
+                        .into(),
+                    )
                 }
                 Err(oneshot::error::TryRecvError::Empty) => return,
             };
@@ -101,8 +117,11 @@ impl<T: Send + 'static> Load<T> {
     pub(super) fn message(&self) -> Option<&str> {
         match self {
             Self::Ready(_) => None,
-            Self::Loading(_) => Some("Loading…"),
-            Self::Unavailable => Some("No history has been reported."),
+            Self::Loading(_) => Some(crate::i18n::ui_text("Loading…", "正在加载…")),
+            Self::Unavailable => Some(crate::i18n::ui_text(
+                "No history has been reported.",
+                "没有历史记录。",
+            )),
             Self::Error(message) => Some(message),
         }
     }
@@ -110,7 +129,11 @@ impl<T: Send + 'static> Load<T> {
 
 /// Keep untyped server and transport diagnostics out of account reports.
 pub(super) fn error(_error: codex_app_server_client::TypedRequestError) -> String {
-    "Couldn't load analytics. Press R to retry.".into()
+    crate::i18n::ui_text(
+        "Couldn't load analytics. Press R to retry.",
+        "无法加载分析数据。按 R 重试。",
+    )
+    .into()
 }
 
 /// Keep tiny refunds visible while avoiding noise on ordinary credit amounts.

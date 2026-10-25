@@ -1,6 +1,7 @@
 //! A compact footer advertises primary actions; help lists the configured task shortcuts.
 
 use super::*;
+use crate::i18n::ui_text;
 use crate::key_hint;
 use crate::shortcut_help::Group;
 use crate::shortcut_help::Shortcut;
@@ -57,40 +58,45 @@ impl AgentsOverviewView {
 
     pub(super) fn center_help_lines(&self, width: u16) -> Vec<Line<'static>> {
         let mut navigate = Group {
-            title: "Navigate",
+            title: ui_text("Navigate", "导航"),
             entries: Vec::new(),
         };
         for (action, label) in [
-            (ListAction::MoveUp, "Up"),
-            (ListAction::MoveDown, "Down"),
-            (ListAction::Accept, "Open"),
-            (ListAction::PageUp, "Page up"),
-            (ListAction::PageDown, "Page down"),
+            (ListAction::MoveUp, ui_text("Up", "上移")),
+            (ListAction::MoveDown, ui_text("Down", "下移")),
+            (ListAction::Accept, ui_text("Open", "打开")),
+            (ListAction::PageUp, ui_text("Page up", "上一页")),
+            (ListAction::PageDown, ui_text("Page down", "下一页")),
         ] {
             navigate.push(self.center_list_hint(action), label);
         }
-        navigate
-            .entries
-            .push(Shortcut::new(key_hint::ctrl(KeyCode::Char('c')), "Quit"));
+        navigate.entries.push(Shortcut::new(
+            key_hint::ctrl(KeyCode::Char('c')),
+            ui_text("Quit", "退出"),
+        ));
         let mut tasks = Group {
-            title: "Tasks",
+            title: ui_text("Tasks", "任务"),
             entries: Vec::new(),
         };
         for (action, bindings, label) in [
-            ("new_task", &self.agents_keymap.new_task, "New"),
+            ("new_task", &self.agents_keymap.new_task, ui_text("New", "新建")),
             (
                 "new_worktree",
                 &self.agents_keymap.new_worktree,
-                "New worktree",
+                ui_text("New worktree", "新建工作树"),
             ),
-            ("resume", &self.agents_keymap.resume, "Resume"),
-            ("fork", &self.agents_keymap.fork, "Fork"),
-            ("rename", &self.agents_keymap.rename, "Rename"),
-            ("stop", &self.agents_keymap.stop, "Stop"),
-            ("archive", &self.agents_keymap.archive, "Archive"),
-            ("hide", &self.agents_keymap.hide, "Hide"),
-            ("delete", &self.agents_keymap.delete, "Delete"),
-            ("toggle_pin", &self.agents_keymap.toggle_pin, "Pin/unpin"),
+            ("resume", &self.agents_keymap.resume, ui_text("Resume", "继续")),
+            ("fork", &self.agents_keymap.fork, ui_text("Fork", "分叉")),
+            ("rename", &self.agents_keymap.rename, ui_text("Rename", "重命名")),
+            ("stop", &self.agents_keymap.stop, ui_text("Stop", "停止")),
+            ("archive", &self.agents_keymap.archive, ui_text("Archive", "归档")),
+            ("hide", &self.agents_keymap.hide, ui_text("Hide", "隐藏")),
+            ("delete", &self.agents_keymap.delete, ui_text("Delete", "删除")),
+            (
+                "toggle_pin",
+                &self.agents_keymap.toggle_pin,
+                ui_text("Pin/unpin", "固定/取消固定"),
+            ),
         ] {
             if (action != "new_worktree" || self.worktrees_enabled)
                 && (action != "toggle_pin" || self.can_toggle_selected_pin())
@@ -99,27 +105,30 @@ impl AgentsOverviewView {
             }
         }
         let mut view = Group {
-            title: "View",
+            title: ui_text("View", "视图"),
             entries: Vec::new(),
         };
         let filter = self.center_filter_hint();
         if !filter.is_empty() {
             view.entries.push(Shortcut {
                 key: filter,
-                action: "Filter",
+                action: ui_text("Filter", "筛选"),
             });
         }
         for (action, bindings, label) in [
-            ("search", &self.agents_keymap.search, "Search"),
+            ("search", &self.agents_keymap.search, ui_text("Search", "搜索")),
             (
                 "toggle_grouping",
                 &self.agents_keymap.toggle_grouping,
-                "Group",
+                ui_text("Group", "分组"),
             ),
         ] {
             view.push(self.agents_keymap.primary_hint(action, bindings), label);
         }
-        let mut lines = vec!["Task shortcuts".bold().into(), Line::default()];
+        let mut lines = vec![
+            ui_text("Task shortcuts", "任务快捷键").bold().into(),
+            Line::default(),
+        ];
         lines.extend(crate::shortcut_help::group_lines(
             [navigate, tasks, view],
             width,
@@ -142,7 +151,7 @@ impl AgentsOverviewView {
                         .is_pressed(KeyEvent::new(KeyCode::Char('?'), modifiers))
                 })
         {
-            hints.push(("?".into(), "help".into()));
+            hints.push(("?".into(), ui_text("help", "帮助").into()));
         }
         let cancel = if state.help {
             self.keymap.primary_hint(ListAction::Cancel)
@@ -150,7 +159,7 @@ impl AgentsOverviewView {
             self.center_list_hint(ListAction::Cancel)
         };
         if let Some(hint) = cancel {
-            hints.push((hint.display_label(), "back".into()));
+            hints.push((hint.display_label(), ui_text("back", "返回").into()));
         }
         if state.help {
             return hints;
@@ -163,17 +172,17 @@ impl AgentsOverviewView {
                 .collect::<Vec<_>>()
                 .join("/");
             if !navigation.is_empty() {
-                hints.push((navigation, "move".into()));
+                hints.push((navigation, ui_text("move", "移动").into()));
             }
         }
         if let Some(hint) = self.center_list_hint(ListAction::Accept) {
             hints.push((
                 hint.display_label(),
-                if state.rename_target.is_some() {
-                    "rename"
+                (if state.rename_target.is_some() {
+                    ui_text("rename", "重命名")
                 } else {
-                    "open"
-                }
+                    ui_text("open", "打开")
+                })
                 .into(),
             ));
         }
@@ -182,7 +191,7 @@ impl AgentsOverviewView {
                 .agents_keymap
                 .primary_hint("new_task", &self.agents_keymap.new_task)
         {
-            hints.push((hint.display_label(), "new".into()));
+            hints.push((hint.display_label(), ui_text("new", "新建").into()));
         }
         hints
     }

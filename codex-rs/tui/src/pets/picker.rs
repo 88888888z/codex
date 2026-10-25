@@ -129,7 +129,9 @@ pub(crate) fn build_pet_picker_params(
         footer_hint: Some(standard_popup_hint_line()),
         items,
         is_searchable: true,
-        search_placeholder: Some("Type to filter pets...".to_string()),
+        search_placeholder: Some(
+            crate::i18n::ui_text("Type to filter pets...", "输入以筛选宠物…").to_string(),
+        ),
         initial_selected_idx,
         side_content: Box::new(preview_state.renderable()),
         side_content_width: SideContentWidth::Fixed(PET_PICKER_PREVIEW_WIDTH),
@@ -148,17 +150,37 @@ fn available_pet_entries(codex_home: &Path) -> Vec<PetPickerEntry> {
             selector: pet.id.to_string(),
             legacy_selector: None,
             display_name: pet.display_name.to_string(),
-            description: Some(pet.description.to_string()),
+            description: Some(
+                localized_builtin_description(pet.id, pet.description).to_string(),
+            ),
         })
         .collect::<Vec<_>>();
     entries.push(PetPickerEntry {
         selector: DISABLED_PET_ID.to_string(),
         legacy_selector: None,
-        display_name: "Disable terminal pets".to_string(),
+        display_name: crate::i18n::ui_text("Disable terminal pets", "禁用终端宠物")
+            .to_string(),
         description: None,
     });
     entries.extend(custom_pet_entries(codex_home));
     entries
+}
+
+fn localized_builtin_description<'a>(id: &str, fallback: &'a str) -> &'a str {
+    if !crate::i18n::is_chinese(crate::i18n::current_language()) {
+        return fallback;
+    }
+    match id {
+        "codex" => "最初的 Codex 伙伴",
+        "dewey" => "适合安静工作日的整洁小鸭",
+        "fireball" => "快速迭代时充满热路径能量",
+        "rocky" => "面对巨大 diff 也稳如岩石",
+        "seedy" => "为新想法冒出的嫩芽",
+        "stacky" => "适合深度工作的平衡堆栈",
+        "bsod" => "一只小小的蓝屏精灵",
+        "null-signal" => "来自虚空的安静信号",
+        _ => fallback,
+    }
 }
 
 fn custom_pet_entries(codex_home: &Path) -> Vec<PetPickerEntry> {

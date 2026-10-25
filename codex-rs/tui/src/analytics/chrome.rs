@@ -10,15 +10,15 @@ use ratatui::text::Line;
 impl AnalyticsView {
     pub(super) fn tab_label(&self, section: Section) -> &'static str {
         match section {
-            Section::Summary => "Overview",
-            Section::Usage if self.business() => "Tokens",
-            Section::Usage => "Usage",
-            Section::Credits => "Credits",
-            Section::Activity => "Messages",
-            Section::Plugins => "Plugins",
-            Section::Skills => "Skills",
-            Section::Chats => "Chats",
-            Section::Plan => "Plan",
+            Section::Summary => crate::i18n::ui_text("Overview", "概览"),
+            Section::Usage if self.business() => crate::i18n::ui_text("Tokens", "Token"),
+            Section::Usage => crate::i18n::ui_text("Usage", "用量"),
+            Section::Credits => crate::i18n::ui_text("Credits", "额度"),
+            Section::Activity => crate::i18n::ui_text("Messages", "消息"),
+            Section::Plugins => crate::i18n::ui_text("Plugins", "插件"),
+            Section::Skills => crate::i18n::ui_text("Skills", "Skills"),
+            Section::Chats => crate::i18n::ui_text("Chats", "会话"),
+            Section::Plan => crate::i18n::ui_text("Plan", "套餐"),
         }
     }
 
@@ -98,63 +98,80 @@ impl AnalyticsView {
     pub(super) fn help_lines(&self, width: usize) -> Vec<Line<'static>> {
         let mut controls = vec![
             format!(
-                "Tab / {} · next / previous report",
+                "Tab / {} · {}",
                 crate::key_hint::shift(crossterm::event::KeyCode::Tab).display_label()
+                ,
+                crate::i18n::ui_text("next / previous report", "下一个 / 上一个报告")
             ),
             format!(
-                "1–{} · open a report directly",
-                self.visible_sections().len()
+                "1–{} · {}",
+                self.visible_sections().len(),
+                crate::i18n::ui_text("open a report directly", "直接打开报告")
             ),
             format!(
-                "{} / {} · select chart day or plan window",
+                "{} / {} · {}",
                 self.hint(ListAction::MoveLeft),
-                self.hint(ListAction::MoveRight)
+                self.hint(ListAction::MoveRight),
+                crate::i18n::ui_text("select chart day or plan window", "选择图表日期或套餐周期")
             ),
             format!(
-                "{} / {} · select chat or plan period; scroll Overview",
+                "{} / {} · {}",
                 self.hint(ListAction::MoveUp),
-                self.hint(ListAction::MoveDown)
+                self.hint(ListAction::MoveDown),
+                crate::i18n::ui_text(
+                    "select chat or plan period; scroll Overview",
+                    "选择会话或套餐周期；滚动概览"
+                )
             ),
             format!(
-                "{} · expand or collapse details",
-                self.hint(ListAction::Accept)
+                "{} · {}",
+                self.hint(ListAction::Accept),
+                crate::i18n::ui_text("expand or collapse details", "展开或收起详情")
             ),
             format!(
-                "{} / {} · scroll report",
+                "{} / {} · {}",
                 self.hint(ListAction::PageUp),
-                self.hint(ListAction::PageDown)
+                self.hint(ListAction::PageDown),
+                crate::i18n::ui_text("scroll report", "滚动报告")
             ),
-            "In alternate screen: mouse wheel · scroll; click tabs or report controls".into(),
+            crate::i18n::ui_text(
+                "In alternate screen: mouse wheel · scroll; click tabs or report controls",
+                "备用屏幕中：滚轮滚动；点击标签页或报告控件"
+            ).into(),
         ];
         if self.control_available(Control::Range) {
-            controls.push("r · switch between 7 and 30 days".into());
+            controls.push(crate::i18n::ui_text("r · switch between 7 and 30 days", "r · 在 7 天和 30 天间切换").into());
         }
         if self.control_available(Control::Group) {
-            controls.push("g · change grouping / Overview aggregation".into());
+            controls.push(crate::i18n::ui_text("g · change grouping / Overview aggregation", "g · 更改分组 / 概览聚合").into());
         }
         if self.control_available(Control::Model) {
-            controls.push("m · cycle model filter".into());
+            controls.push(crate::i18n::ui_text("m · cycle model filter", "m · 循环切换模型筛选").into());
         }
         if self.control_available(Control::TaskMetric) {
-            controls.push("s · change chat sort metric".into());
+            controls.push(crate::i18n::ui_text("s · change chat sort metric", "s · 更改会话排序指标").into());
         }
         if self.control_available(Control::ZeroCreditGroups) {
-            controls.push("a · show zero-credit groups in expanded details".into());
+            controls.push(crate::i18n::ui_text("a · show zero-credit groups in expanded details", "a · 在展开详情中显示零额度分组").into());
         }
         controls.extend([
-            "R · refresh all reports".into(),
+            crate::i18n::ui_text("R · refresh all reports", "R · 刷新所有报告").into(),
             format!(
-                "z · dashboard / focused report; {} · focus dashboard card",
-                self.hint(ListAction::Accept)
+                "z · {}; {} · {}",
+                crate::i18n::ui_text("dashboard / focused report", "仪表盘 / 专注报告"),
+                self.hint(ListAction::Accept),
+                crate::i18n::ui_text("focus dashboard card", "聚焦仪表盘卡片")
             ),
             format!(
-                "{} · back; q / {} · close usage",
+                "{} · {}; q / {} · {}",
                 self.hint(ListAction::Cancel),
-                crate::key_hint::ctrl(crossterm::event::KeyCode::Char('c')).display_label()
+                crate::i18n::ui_text("back", "返回"),
+                crate::key_hint::ctrl(crossterm::event::KeyCode::Char('c')).display_label(),
+                crate::i18n::ui_text("close usage", "关闭用量")
             ),
         ]);
         if self.help_shortcut_available() {
-            controls.insert(controls.len() - 1, "? · toggle this help".into());
+            controls.insert(controls.len() - 1, crate::i18n::ui_text("? · toggle this help", "? · 切换帮助").into());
         }
         if let Some(updated) = self.sections[self.section]
             .history
@@ -162,10 +179,12 @@ impl AnalyticsView {
             .and_then(|report| report.updated_at)
             .and_then(|timestamp| chrono::DateTime::from_timestamp(timestamp, /*nsecs*/ 0))
         {
-            controls.push(format!(
-                "Report updated {} UTC",
-                updated.format(self.clock_format.date_time_format())
-            ));
+            let timestamp = updated.format(self.clock_format.date_time_format());
+            controls.push(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("报告更新于 {timestamp} UTC")
+            } else {
+                format!("Report updated {timestamp} UTC")
+            });
         }
         controls
             .into_iter()

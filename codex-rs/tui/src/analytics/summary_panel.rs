@@ -23,7 +23,10 @@ impl AnalyticsView {
             lines.push(
                 self.profile
                     .message()
-                    .unwrap_or("Profile statistics unavailable.")
+                    .unwrap_or(crate::i18n::ui_text(
+                        "Profile statistics unavailable.",
+                        "账户统计不可用。",
+                    ))
                     .to_owned()
                     .into(),
             );
@@ -70,32 +73,28 @@ impl AnalyticsView {
         let tokens = &profile.stats.tokens;
         let fields = [
             (
-                "Lifetime tokens",
+                crate::i18n::ui_text("Lifetime tokens", "累计 Token"),
                 tokens
                     .lifetime_tokens
                     .map(|value| super::data::compact_amount(value as f64)),
             ),
             (
-                "Peak tokens",
+                crate::i18n::ui_text("Peak tokens", "最高 Token"),
                 tokens
                     .peak_daily_tokens
                     .map(|value| super::data::compact_amount(value as f64)),
             ),
             (
-                "Longest chat",
+                crate::i18n::ui_text("Longest chat", "最长会话"),
                 tokens.longest_running_turn_sec.map(duration),
             ),
             (
-                "Current streak",
-                tokens
-                    .current_streak_days
-                    .map(|days| format!("{days} days")),
+                crate::i18n::ui_text("Current streak", "当前连续"),
+                tokens.current_streak_days.map(days),
             ),
             (
-                "Longest streak",
-                tokens
-                    .longest_streak_days
-                    .map(|days| format!("{days} days")),
+                crate::i18n::ui_text("Longest streak", "最长连续"),
+                tokens.longest_streak_days.map(days),
             ),
         ];
         if !self.zoomed {
@@ -140,8 +139,12 @@ impl AnalyticsView {
             lines.extend([values, labels, Line::default()]);
         }
         let selected = self.sections[Section::Summary].group;
-        lines.push("Token activity".bold().into());
-        lines.push("Last 12 months".set_style(secondary_style()).into());
+        lines.push(crate::i18n::ui_text("Token activity", "Token 活动").bold().into());
+        lines.push(
+            crate::i18n::ui_text("Last 12 months", "最近 12 个月")
+                .set_style(secondary_style())
+                .into(),
+        );
         lines.push(Line::default());
         if let Some(buckets) = &tokens.daily_usage_buckets {
             lines.extend(activity_chart::chart_lines(
@@ -152,7 +155,10 @@ impl AnalyticsView {
             ));
         } else {
             lines.push(
-                "Token activity history unavailable"
+                crate::i18n::ui_text(
+                    "Token activity history unavailable",
+                    "Token 活动历史不可用",
+                )
                     .set_style(secondary_style())
                     .into(),
             );
@@ -169,13 +175,22 @@ impl AnalyticsView {
             .unwrap_or_else(|| "—".into());
         let metrics = [
             (
-                "Fast Mode",
+                crate::i18n::ui_text("Fast Mode", "Fast 模式"),
                 percent(stats.fast_mode_usage_percentage.as_ref()),
             ),
-            ("Most used reasoning", reasoning),
-            ("Skills explored", count_value(stats.unique_skills_used)),
-            ("Total skills used", count_value(stats.total_skills_used)),
-            ("Total chats", count_value(stats.total_threads)),
+            (crate::i18n::ui_text("Most used reasoning", "最常用思考强度"), reasoning),
+            (
+                crate::i18n::ui_text("Skills explored", "使用过的 Skills"),
+                count_value(stats.unique_skills_used),
+            ),
+            (
+                crate::i18n::ui_text("Total skills used", "Skills 总使用次数"),
+                count_value(stats.total_skills_used),
+            ),
+            (
+                crate::i18n::ui_text("Total chats", "会话总数"),
+                count_value(stats.total_threads),
+            ),
         ];
         let two_columns = inner_width >= 76;
         let column_width = if two_columns {
@@ -183,7 +198,10 @@ impl AnalyticsView {
         } else {
             inner_width
         };
-        let mut insights = vec!["Activity insights".bold().into(), Line::default()];
+        let mut insights = vec![
+            crate::i18n::ui_text("Activity insights", "活动洞察").bold().into(),
+            Line::default(),
+        ];
         for (label, value) in metrics {
             insights.extend(word_wrap_lines(
                 [columns(
@@ -195,7 +213,9 @@ impl AnalyticsView {
             ));
         }
         let mut plugins = vec![
-            "Most used plugins and skills".bold().into(),
+            crate::i18n::ui_text("Most used plugins and skills", "最常用的插件和 Skills")
+                .bold()
+                .into(),
             Line::default(),
         ];
         if let Some(invocations) = &stats.top_invocations {
@@ -215,7 +235,13 @@ impl AnalyticsView {
                         format!(
                             "{} {}",
                             count_value(Some(count)),
-                            if count == 1 { "run" } else { "runs" }
+                            if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                                "次"
+                            } else if count == 1 {
+                                "run"
+                            } else {
+                                "runs"
+                            }
                         )
                     })
                     .unwrap_or_else(|| "—".into());
@@ -237,14 +263,20 @@ impl AnalyticsView {
             }
             if displayed == 0 {
                 plugins.push(
-                    "No reported plugins or skills."
+                    crate::i18n::ui_text(
+                        "No reported plugins or skills.",
+                        "没有插件或 Skills 使用记录。",
+                    )
                         .set_style(secondary_style())
                         .into(),
                 );
             }
         } else {
             plugins.push(
-                "Plugin and skill usage unavailable."
+                crate::i18n::ui_text(
+                    "Plugin and skill usage unavailable.",
+                    "插件和 Skills 使用情况不可用。",
+                )
                     .set_style(secondary_style())
                     .into(),
             );
@@ -264,7 +296,11 @@ impl AnalyticsView {
                 .and_then(|date| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
             {
                 lines.push(
-                    format!("Statistics as of {}", date.format("%b %-d, %Y"))
+                    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        format!("统计截至 {}", date.format("%Y-%m-%d"))
+                    } else {
+                        format!("Statistics as of {}", date.format("%b %-d, %Y"))
+                    }
                         .set_style(secondary_style())
                         .into(),
                 );
@@ -275,7 +311,10 @@ impl AnalyticsView {
                 .is_some_and(|error| !error.trim().is_empty())
             {
                 lines.push(
-                    "Some profile statistics are unavailable."
+                    crate::i18n::ui_text(
+                        "Some profile statistics are unavailable.",
+                        "部分账户统计不可用。",
+                    )
                         .set_style(secondary_style())
                         .into(),
                 );
@@ -325,9 +364,25 @@ fn count_value(value: Option<u64>) -> String {
         })
 }
 
+fn days(days: i64) -> String {
+    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+        format!("{days} 天")
+    } else {
+        format!("{days} days")
+    }
+}
+
 fn duration(seconds: i64) -> String {
     let seconds = seconds.max(/*other*/ 0);
     let (hours, minutes) = (seconds / 3600, seconds % 3600 / 60);
+    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+        return match (hours, minutes) {
+            (0, 0) => format!("{seconds} 秒"),
+            (0, minutes) => format!("{minutes} 分钟"),
+            (hours, 0) => format!("{hours} 小时"),
+            (hours, minutes) => format!("{hours} 小时 {minutes} 分"),
+        };
+    }
     match (hours, minutes) {
         (0, 0) => format!("{seconds}s"),
         (0, minutes) => format!("{minutes}m"),

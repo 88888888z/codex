@@ -38,6 +38,7 @@ use crate::config_update::format_config_error;
 use crate::config_update::replace_config_value;
 use crate::config_update::write_trusted_project;
 use crate::empty_state_animation::Presentation;
+use crate::i18n::ui_text;
 use crate::key_hint::KeyBindingListExt;
 use crate::legacy_core::config::Config;
 use crate::onboarding::auth::AuthModeWidget;
@@ -654,12 +655,26 @@ async fn run_onboarding_screen_inner(
                                 let message = match result {
                                     Ok(CopyStatus::Pending(id)) => {
                                         pending_copy = Some((id, login_id));
-                                        "Copying link…".to_string()
+                                        ui_text("Copying link…", "正在复制链接…").to_string()
                                     }
-                                    Ok(CopyStatus::Busy) => "Clipboard busy; try again".to_string(),
-                                    Ok(CopyStatus::Confirmed) => "Copied link to clipboard".to_string(),
-                                    Ok(CopyStatus::Unconfirmed) => "Copy requested; check your clipboard".to_string(),
-                                    Err(error) => format!("Could not copy link: {error}"),
+                                    Ok(CopyStatus::Busy) => {
+                                        ui_text("Clipboard busy; try again", "剪贴板忙，请重试").to_string()
+                                    }
+                                    Ok(CopyStatus::Confirmed) => {
+                                        ui_text("Copied link to clipboard", "链接已复制到剪贴板").to_string()
+                                    }
+                                    Ok(CopyStatus::Unconfirmed) => ui_text(
+                                        "Copy requested; check your clipboard",
+                                        "已请求复制，请检查剪贴板",
+                                    )
+                                    .to_string(),
+                                    Err(error) => {
+                                        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                                            format!("无法复制链接：{error}")
+                                        } else {
+                                            format!("Could not copy link: {error}")
+                                        }
+                                    }
                                 };
                                 if let Some(Step::Auth(widget)) = onboarding_screen.current_steps_mut().into_iter().last() {
                                     *widget.error.write().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(message);
@@ -694,10 +709,24 @@ async fn run_onboarding_screen_inner(
                                     })
                                 {
                                     let message = match result {
-                                        Ok(CopyStatus::Confirmed) => "Copied link to clipboard".to_string(),
-                                        Ok(CopyStatus::Unconfirmed) => "Copy requested; check your clipboard".to_string(),
-                                        Ok(CopyStatus::Busy | CopyStatus::Pending(_)) => "Clipboard busy; try again".to_string(),
-                                        Err(error) => format!("Could not copy link: {error}"),
+                                        Ok(CopyStatus::Confirmed) => {
+                                            ui_text("Copied link to clipboard", "链接已复制到剪贴板").to_string()
+                                        }
+                                        Ok(CopyStatus::Unconfirmed) => ui_text(
+                                            "Copy requested; check your clipboard",
+                                            "已请求复制，请检查剪贴板",
+                                        )
+                                        .to_string(),
+                                        Ok(CopyStatus::Busy | CopyStatus::Pending(_)) => {
+                                            ui_text("Clipboard busy; try again", "剪贴板忙，请重试").to_string()
+                                        }
+                                        Err(error) => {
+                                            if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                                                format!("无法复制链接：{error}")
+                                            } else {
+                                                format!("Could not copy link: {error}")
+                                            }
+                                        }
                                     };
                                     *widget.error.write().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(message);
                                 }
@@ -869,10 +898,13 @@ async fn persist_selected_trust(
             );
             if let Step::TrustDirectory(widget) = &mut onboarding_screen.steps[trust_step_index] {
                 widget.selection = None;
-                widget.error = Some(format!(
-                    "Failed to set trust for {}: {error}",
-                    trust_target.display()
-                ));
+                widget.error = Some(
+                    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        format!("无法为 {} 设置信任：{error}", trust_target.display())
+                    } else {
+                        format!("Failed to set trust for {}: {error}", trust_target.display())
+                    },
+                );
             }
             false
         }

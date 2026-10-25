@@ -76,7 +76,13 @@ impl AnalyticsView {
         };
         let mut tables = Vec::new();
         let mut selections = Vec::new();
-        for (window, title) in ["5-hour limits", "Weekly limits"].into_iter().enumerate() {
+        for (window, title) in [
+            crate::i18n::ui_text("5-hour limits", "5 小时额度"),
+            crate::i18n::ui_text("Weekly limits", "每周额度"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let heading = format!(
                 "{} {title}",
                 if self.plan.window == window {
@@ -91,9 +97,15 @@ impl AnalyticsView {
                 if report.periods[window].is_empty() {
                     lines.push(
                         if report.coverage_complete {
-                            "No limit periods in this date range"
+                            crate::i18n::ui_text(
+                                "No limit periods in this date range",
+                                "此时间范围没有额度周期",
+                            )
                         } else {
-                            "Limit history isn't available yet"
+                            crate::i18n::ui_text(
+                                "Limit history isn't available yet",
+                                "额度历史尚不可用",
+                            )
                         }
                         .set_style(secondary_style())
                         .into(),
@@ -120,7 +132,9 @@ impl AnalyticsView {
                     let amount = period
                         .used
                         .map(|value| format!("{}%", data::amount(value / 100.0)))
-                        .unwrap_or_else(|| "Not available".into());
+                        .unwrap_or_else(|| {
+                            crate::i18n::ui_text("Not available", "不可用").into()
+                        });
                     let mut row = columns(label.into(), amount.into(), table_width);
                     if selected && self.plan.window == window {
                         super::styles::select_row(&mut row, table_width);
@@ -165,10 +179,16 @@ impl AnalyticsView {
             } else {
                 lines.push(
                     match &self.plan.report {
-                        data::Load::Unavailable => "Limit history isn't available yet",
+                        data::Load::Unavailable => crate::i18n::ui_text(
+                            "Limit history isn't available yet",
+                            "额度历史尚不可用",
+                        ),
                         state => state
                             .message()
-                            .unwrap_or("Limit history isn't available yet"),
+                            .unwrap_or(crate::i18n::ui_text(
+                                "Limit history isn't available yet",
+                                "额度历史尚不可用",
+                            )),
                     }
                     .to_string()
                     .set_style(secondary_style())
@@ -208,7 +228,10 @@ impl AnalyticsView {
         };
         if group == 3 {
             lines.push(
-                "By turn start includes Tasks only; percentages use the full period limit"
+                crate::i18n::ui_text(
+                    "By turn start includes Tasks only; percentages use the full period limit",
+                    "按轮次开始时间仅统计任务；百分比使用完整周期额度",
+                )
                     .dim()
                     .into(),
             );
@@ -222,29 +245,43 @@ impl AnalyticsView {
         }) = self.plan.report.ready()
         {
             if !*coverage_complete {
-                lines.push("Some periods aren't available yet".dim().into());
+                lines.push(
+                    crate::i18n::ui_text(
+                        "Some periods aren't available yet",
+                        "部分周期尚不可用",
+                    )
+                    .dim()
+                    .into(),
+                );
             }
+            let timestamp = as_of.format(self.clock_format.date_time_format());
             lines.push(
-                format!(
-                    "Usage as of {} UTC · * current at last update",
-                    as_of.format(self.clock_format.date_time_format())
-                )
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("用量截至 {timestamp} UTC · * 表示上次更新时进行中")
+                } else {
+                    format!("Usage as of {timestamp} UTC · * current at last update")
+                }
                 .dim()
                 .into(),
             );
             if let Some(start) = coverage_start {
+                let start = start.format(self.clock_format.date_time_format());
                 lines.push(
-                    format!(
-                        "Available since {} UTC",
-                        start.format(self.clock_format.date_time_format())
-                    )
+                    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        format!("自 {start} UTC 起可用")
+                    } else {
+                        format!("Available since {start} UTC")
+                    }
                     .dim()
                     .into(),
                 );
             }
             if *approximate {
                 lines.push(
-                    "Amounts and period boundaries are approximate; recent activity may be delayed"
+                    crate::i18n::ui_text(
+                        "Amounts and period boundaries are approximate; recent activity may be delayed",
+                        "金额和周期边界为近似值；最近活动可能延迟",
+                    )
                         .dim()
                         .into(),
                 );

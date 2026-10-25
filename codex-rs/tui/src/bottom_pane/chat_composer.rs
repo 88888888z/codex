@@ -378,7 +378,6 @@ use crate::render::Insets;
 use crate::render::RectExt;
 use crate::render::renderable::Renderable;
 use crate::slash_command::SlashCommand;
-use crate::style::user_message_style;
 use codex_protocol::ThreadId;
 use codex_protocol::user_input::ByteRange;
 use codex_protocol::user_input::MAX_USER_INPUT_TEXT_CHARS;
@@ -523,7 +522,6 @@ fn parent_owned_command_is_allowed(command: SlashCommand, args: &str) -> bool {
                 | SlashCommand::Memories
                 | SlashCommand::Quit
                 | SlashCommand::Exit
-                | SlashCommand::Logout
                 | SlashCommand::Copy
                 | SlashCommand::Raw
                 | SlashCommand::Diff
@@ -538,7 +536,6 @@ fn parent_owned_command_is_allowed(command: SlashCommand, args: &str) -> bool {
                 | SlashCommand::Ide
                 | SlashCommand::DebugConfig
                 | SlashCommand::Theme
-                | SlashCommand::Pets
                 | SlashCommand::Ps
                 | SlashCommand::Stop
                 | SlashCommand::MemoryDrop

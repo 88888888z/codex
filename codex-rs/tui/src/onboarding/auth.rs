@@ -48,6 +48,7 @@ use uuid::Uuid;
 use crate::LoginStatus;
 use crate::bottom_pane::provider_setup::ProviderSetupAction;
 use crate::bottom_pane::provider_setup::ProviderSetupForm;
+use crate::i18n::ui_text;
 use crate::key_hint::KeyBinding;
 use crate::key_hint::KeyBindingListExt;
 use crate::motion::MotionMode;
@@ -525,7 +526,9 @@ impl AuthModeWidget {
 
     fn disallow_api_login(&mut self) {
         self.highlighted_mode = SignInOption::ChatGpt;
-        self.set_error(Some(API_KEY_DISABLED_MESSAGE.to_string()));
+        self.set_error(Some(
+            ui_text(API_KEY_DISABLED_MESSAGE, "API 密钥登录已禁用。").to_string(),
+        ));
         *self.sign_in_state.write().unwrap() = SignInState::PickMode;
         self.request_frame.schedule_frame();
     }
@@ -591,11 +594,17 @@ impl AuthModeWidget {
         };
 
         let chatgpt_description = if !self.is_chatgpt_login_allowed() {
-            "ChatGPT login is disabled"
+            ui_text("ChatGPT login is disabled", "ChatGPT 登录已禁用")
         } else {
-            "Usage included with Plus, Pro, Business, and Enterprise plans"
+            ui_text(
+                "Usage included with Plus, Pro, Business, and Enterprise plans",
+                "Plus、Pro、Business 和 Enterprise 套餐包含用量",
+            )
         };
-        let device_code_description = "Sign in from another device with a one-time code";
+        let device_code_description = ui_text(
+            "Sign in from another device with a one-time code",
+            "在另一台设备上使用一次性代码登录",
+        );
 
         for (idx, option) in self.displayed_sign_in_options().into_iter().enumerate() {
             match option {
@@ -603,7 +612,7 @@ impl AuthModeWidget {
                     lines.extend(create_mode_item(
                         idx,
                         option,
-                        "Sign in with ChatGPT",
+                        ui_text("Sign in with ChatGPT", "使用 ChatGPT 登录"),
                         chatgpt_description,
                     ));
                 }
@@ -611,7 +620,7 @@ impl AuthModeWidget {
                     lines.extend(create_mode_item(
                         idx,
                         option,
-                        "Sign in with Device Code",
+                        ui_text("Sign in with Device Code", "使用设备代码登录"),
                         device_code_description,
                     ));
                 }
@@ -620,19 +629,22 @@ impl AuthModeWidget {
                         idx,
                         option,
                         if self.bedrock_setup_enabled {
-                            "Use an OpenAI API key"
+                            ui_text("Use an OpenAI API key", "使用 OpenAI API 密钥")
                         } else {
-                            "Provide your own API key"
+                            ui_text("Provide your own API key", "使用自己的 API 密钥")
                         },
-                        "Pay for what you use",
+                        ui_text("Pay for what you use", "按实际用量付费"),
                     ));
                 }
                 SignInOption::Bedrock => {
                     lines.extend(create_mode_item(
                         idx,
                         option,
-                        "Use Amazon Bedrock",
-                        "Connect using your AWS credentials",
+                        ui_text("Use Amazon Bedrock", "使用 Amazon Bedrock"),
+                        ui_text(
+                            "Connect using your AWS credentials",
+                            "使用 AWS 凭据连接",
+                        ),
                     ));
                 }
                 SignInOption::Provider => {
@@ -649,16 +661,19 @@ impl AuthModeWidget {
 
         if !self.is_api_login_allowed() {
             lines.push(
-                "  API key login is disabled by this workspace. Sign in with ChatGPT to continue."
-                    .dim()
-                    .into(),
+                ui_text(
+                    "  API key login is disabled by this workspace. Sign in with ChatGPT to continue.",
+                    "  当前工作区已禁用 API 密钥登录。请使用 ChatGPT 登录后继续。",
+                )
+                .dim()
+                .into(),
             );
             lines.push("".into());
         }
         lines.push(Line::from(vec![
-            "  Press ".dim(),
+            ui_text("  Press ", "  按 ").dim(),
             self.confirm_binding().into(),
-            " to continue".dim(),
+            ui_text(" to continue", " 继续").dim(),
         ]));
         if let Some(err) = self.error_message() {
             lines.push("".into());
@@ -682,19 +697,26 @@ impl AuthModeWidget {
             self.request_frame
                 .schedule_frame_in(std::time::Duration::from_millis(100));
             spans.extend(shimmer_text(
-                "Finish signing in via your browser",
+                ui_text(
+                    "Finish signing in via your browser",
+                    "请在浏览器中完成登录",
+                ),
                 MotionMode::Animated,
             ));
         } else {
-            spans.push("Finish signing in via your browser".into());
+            spans.push(ui_text("Finish signing in via your browser", "请在浏览器中完成登录").into());
         }
         let mut lines = vec![spans.into(), "".into()];
 
         let auth_url = if !state.auth_url.is_empty() {
             lines.push(Line::from(vec![
-                "  If the link doesn't open automatically, press ".into(),
+                ui_text(
+                    "  If the link doesn't open automatically, press ",
+                    "  如果链接没有自动打开，请按 ",
+                )
+                .into(),
                 keys::COPY_LINK[0].into(),
-                " to copy it:".into(),
+                ui_text(" to copy it:", " 复制：").into(),
             ]));
             if let Some(message) = self.error_message() {
                 lines.push(format!("  {message}").dim().into());
@@ -706,11 +728,15 @@ impl AuthModeWidget {
             ]));
             lines.push("".into());
             lines.push(Line::from(vec![
-                "  On a remote or headless machine? Press ".into(),
+                ui_text(
+                    "  On a remote or headless machine? Press ",
+                    "  在远程或无界面设备上？按 ",
+                )
+                .into(),
                 self.cancel_binding().into(),
-                " and choose ".into(),
-                "Sign in with Device Code".cyan(),
-                ".".into(),
+                ui_text(" and choose ", " 并选择 ").into(),
+                ui_text("Sign in with Device Code", "使用设备代码登录").cyan(),
+                ui_text(".", "。").into(),
             ]));
             lines.push("".into());
             Some(state.auth_url.clone())
@@ -719,9 +745,9 @@ impl AuthModeWidget {
         };
 
         lines.push(Line::from(vec![
-            "  Press ".dim(),
+            ui_text("  Press ", "  按 ").dim(),
             self.cancel_binding().into(),
-            " to cancel".dim(),
+            ui_text(" to cancel", " 取消").dim(),
         ]));
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
@@ -736,43 +762,68 @@ impl AuthModeWidget {
 
     fn render_chatgpt_success_message(&self, area: Rect, buf: &mut Buffer) {
         let mut docs_line =
-            HyperlinkLine::new(Line::from("  Learn about permissions and approvals in the ").dim());
+            HyperlinkLine::new(Line::from(
+                ui_text(
+                    "  Learn about permissions and approvals in the ",
+                    "  了解权限与审批：",
+                )
+                .dim(),
+            ));
         docs_line.push_span(
-            "Codex docs".underlined(),
+            ui_text("Codex docs", "Codex 文档").underlined(),
             Some("https://developers.openai.com/codex/security"),
         );
         let mut preferences_line =
-            HyperlinkLine::new(Line::from("  Your plan's rate limits and ").dim());
+            HyperlinkLine::new(Line::from(
+                ui_text(
+                    "  Your plan's rate limits and ",
+                    "  套餐速率限制与",
+                )
+                .dim(),
+            ));
         preferences_line.push_span(
-            "training data preferences".underlined(),
+            ui_text("training data preferences", "训练数据偏好").underlined(),
             Some("https://chatgpt.com/#settings"),
         );
-        preferences_line.push_span(" apply".into(), /*destination*/ None);
+        preferences_line.push_span(
+            ui_text(" apply", "设置").into(),
+            /*destination*/ None,
+        );
 
         let lines = vec![
             HyperlinkLine::new(
-                "✓ Signed in with your ChatGPT account"
+                ui_text(
+                    "✓ Signed in with your ChatGPT account",
+                    "✓ 已使用 ChatGPT 账户登录",
+                )
                     .fg(Color::Green)
                     .into(),
             ),
             "".into(),
-            "  You're in control".into(),
+            ui_text("  You're in control", "  由你掌控").into(),
             docs_line,
             "".into(),
-            "  Codex can make mistakes".into(),
+            ui_text("  Codex can make mistakes", "  Codex 可能会出错").into(),
             HyperlinkLine::new(
-                "  Review the code it writes and commands it runs"
+                ui_text(
+                    "  Review the code it writes and commands it runs",
+                    "  请检查它编写的代码和运行的命令",
+                )
                     .dim()
                     .into(),
             ),
             "".into(),
-            "  Included with your ChatGPT plan".into(),
+            ui_text(
+                "  Included with your ChatGPT plan",
+                "  已包含在 ChatGPT 套餐中",
+            )
+            .into(),
             preferences_line,
             "".into(),
             HyperlinkLine::new(Line::from(vec![
-                "  Press ".fg(Color::Cyan),
+                ui_text("  Press ", "  按 ").fg(Color::Cyan),
                 self.confirm_binding().into(),
-                " to continue".fg(Color::Cyan),
+                ui_text(" to continue", " 继续").fg(Color::Cyan),
             ])),
         ];
 
@@ -784,7 +835,10 @@ impl AuthModeWidget {
 
     fn render_chatgpt_success(&self, area: Rect, buf: &mut Buffer) {
         let lines = vec![
-            "✓ Signed in with your ChatGPT account"
+            ui_text(
+                "✓ Signed in with your ChatGPT account",
+                "✓ 已使用 ChatGPT 账户登录",
+            )
                 .fg(Color::Green)
                 .into(),
         ];
@@ -796,9 +850,15 @@ impl AuthModeWidget {
 
     fn render_api_key_configured(&self, area: Rect, buf: &mut Buffer) {
         let lines = vec![
-            "✓ API key configured".fg(Color::Green).into(),
+            ui_text("✓ API key configured", "✓ API 密钥已配置")
+                .fg(Color::Green)
+                .into(),
             "".into(),
-            "  Codex will use usage-based billing with your API key.".into(),
+            ui_text(
+                "  Codex will use usage-based billing with your API key.",
+                "  Codex 将使用此 API 密钥按实际用量计费。",
+            )
+            .into(),
         ];
 
         Paragraph::new(lines)
@@ -817,16 +877,29 @@ impl AuthModeWidget {
         let mut intro_lines: Vec<Line> = vec![
             Line::from(vec![
                 "> ".into(),
-                "Use your own OpenAI API key for usage-based billing".bold(),
+                ui_text(
+                    "Use your own OpenAI API key for usage-based billing",
+                    "使用自己的 OpenAI API 密钥按实际用量计费",
+                )
+                .bold(),
             ]),
             "".into(),
-            "  Paste or type your API key below.".into(),
+            ui_text("  Paste or type your API key below.", "  在下方粘贴或输入 API 密钥。").into(),
             "".into(),
         ];
         if state.prepopulated_from_env {
-            intro_lines.push("  Detected OPENAI_API_KEY environment variable.".into());
             intro_lines.push(
-                "  Paste a different key if you prefer to use another account."
+                ui_text(
+                    "  Detected OPENAI_API_KEY environment variable.",
+                    "  检测到 OPENAI_API_KEY 环境变量。",
+                )
+                .into(),
+            );
+            intro_lines.push(
+                ui_text(
+                    "  Paste a different key if you prefer to use another account.",
+                    "  如需使用其他账户，请粘贴其他密钥。",
+                )
                     .dim()
                     .into(),
             );
@@ -837,7 +910,7 @@ impl AuthModeWidget {
             .render(intro_area, buf);
 
         let content_line: Line = if state.value.is_empty() {
-            vec!["Paste or type your API key".dim()].into()
+            vec![ui_text("Paste or type your API key", "粘贴或输入 API 密钥").dim()].into()
         } else {
             Line::from(state.value.clone())
         };
@@ -845,7 +918,7 @@ impl AuthModeWidget {
             .wrap(Wrap { trim: false })
             .block(
                 Block::default()
-                    .title("API key")
+                    .title(ui_text("API key", "API 密钥"))
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
                     .border_style(Style::default().fg(Color::Cyan)),
@@ -854,14 +927,14 @@ impl AuthModeWidget {
 
         let mut footer_lines: Vec<Line> = vec![
             Line::from(vec![
-                "  Press ".dim(),
+                ui_text("  Press ", "  按 ").dim(),
                 self.confirm_binding().into(),
-                " to save".dim(),
+                ui_text(" to save", " 保存").dim(),
             ]),
             Line::from(vec![
-                "  Press ".dim(),
+                ui_text("  Press ", "  按 ").dim(),
                 self.cancel_binding().into(),
-                " to go back".dim(),
+                ui_text(" to go back", " 返回").dim(),
             ]),
         ];
         if let Some(error) = self.error_message() {
@@ -887,7 +960,9 @@ impl AuthModeWidget {
                 } else if keys::CONFIRM.is_pressed(*key_event) {
                     let trimmed = state.value.trim().to_string();
                     if trimmed.is_empty() {
-                        self.set_error(Some("API key cannot be empty".to_string()));
+                        self.set_error(Some(
+                            ui_text("API key cannot be empty", "API 密钥不能为空").to_string(),
+                        ));
                         should_request_frame = true;
                     } else {
                         should_save = Some(trimmed);
@@ -1014,16 +1089,26 @@ impl AuthModeWidget {
                     *sign_in_state.write().unwrap() = SignInState::ApiKeyConfigured;
                 }
                 Ok(other) => {
-                    *error.write().unwrap() = Some(format!(
-                        "Unexpected account/login/start response: {other:?}"
-                    ));
+                    *error.write().unwrap() = Some(
+                        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("收到意外的账户登录响应：{other:?}")
+                        } else {
+                            format!("Unexpected account/login/start response: {other:?}")
+                        },
+                    );
                     *sign_in_state.write().unwrap() = SignInState::ApiKeyEntry(ApiKeyInputState {
                         value: api_key,
                         prepopulated_from_env: false,
                     });
                 }
                 Err(err) => {
-                    *error.write().unwrap() = Some(format!("Failed to save API key: {err}"));
+                    *error.write().unwrap() = Some(
+                        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("保存 API 密钥失败：{err}")
+                        } else {
+                            format!("Failed to save API key: {err}")
+                        },
+                    );
                     *sign_in_state.write().unwrap() = SignInState::ApiKeyEntry(ApiKeyInputState {
                         value: api_key,
                         prepopulated_from_env: false,
@@ -1086,9 +1171,13 @@ impl AuthModeWidget {
                 }
                 Ok(other) => {
                     *sign_in_state.write().unwrap() = SignInState::PickMode;
-                    *error.write().unwrap() = Some(format!(
-                        "Unexpected account/login/start response: {other:?}"
-                    ));
+                    *error.write().unwrap() = Some(
+                        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("收到意外的账户登录响应：{other:?}")
+                        } else {
+                            format!("Unexpected account/login/start response: {other:?}")
+                        },
+                    );
                 }
                 Err(err) => {
                     *sign_in_state.write().unwrap() = SignInState::PickMode;
@@ -1206,7 +1295,7 @@ impl WidgetRef for AuthModeWidget {
                 state.render(area, buf, self.error_message());
             }
             SignInState::BedrockConfigured => {
-                Paragraph::new("✓ Amazon Bedrock configured".green())
+                Paragraph::new(ui_text("✓ Amazon Bedrock configured", "✓ Amazon Bedrock 已配置").green())
                     .wrap(Wrap { trim: false })
                     .render(area, buf);
             }

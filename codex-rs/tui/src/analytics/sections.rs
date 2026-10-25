@@ -139,7 +139,7 @@ impl AnalyticsView {
         {
             "Product"
         } else {
-            super::data::GROUP_LABELS[group]
+            super::data::group_label(group)
         }
     }
 

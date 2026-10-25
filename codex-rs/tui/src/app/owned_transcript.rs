@@ -124,9 +124,9 @@ impl App {
         );
         let composer = self.first_screen_composer();
         let latest_navigation = if self.enter_returns_to_latest() {
-            "enter/esc latest"
+            crate::i18n::ui_text("enter/esc latest", "enter/esc 最新")
         } else {
-            "esc latest"
+            crate::i18n::ui_text("esc latest", "esc 最新")
         };
         self.sync_owned_transcript(screen_size.width);
         let transcript_width = self.chat_widget.history_wrap_width(screen_size.width);
@@ -138,7 +138,10 @@ impl App {
             .has_active_interaction()
         {
             Some(
-                ratatui::text::Line::from("Selecting text · esc cancel")
+                ratatui::text::Line::from(crate::i18n::ui_text(
+                    "Selecting text · esc cancel",
+                    "正在选择文本 · esc 取消",
+                ))
                     .dim()
                     .into(),
             )
@@ -222,12 +225,18 @@ impl App {
                 Rect::new(/*x*/ 0, /*y*/ 0, screen_size.width, available),
                 frame.buffer,
             );
+            let header_height =
+                crate::chatwidget::SESSION_HEADER_HEIGHT.min(transcript_bottom);
+            chat_widget.render_pinned_session_header(
+                Rect::new(/*x*/ 0, /*y*/ 0, screen_size.width, header_height),
+                frame.buffer,
+            );
             let mut completion_tip_area = view.render_with_turn_tip_space(
                 Rect::new(
                     /*x*/ 0,
-                    /*y*/ 0,
+                    header_height,
                     transcript_width,
-                    transcript_bottom,
+                    transcript_bottom.saturating_sub(header_height),
                 ),
                 frame.buffer,
                 &self.transcript_cells,
@@ -283,12 +292,18 @@ impl App {
                 // their separator. Resizing must not preserve a stale return control.
                 ratatui::widgets::Clear.render(bottom_area, frame.buffer);
                 transcript_bottom = bottom_area.y;
+                let header_height =
+                    crate::chatwidget::SESSION_HEADER_HEIGHT.min(transcript_bottom);
+                chat_widget.render_pinned_session_header(
+                    Rect::new(/*x*/ 0, /*y*/ 0, screen_size.width, header_height),
+                    frame.buffer,
+                );
                 completion_tip_area = view.render_with_turn_tip_space(
                     Rect::new(
                         /*x*/ 0,
-                        /*y*/ 0,
+                        header_height,
                         transcript_width,
-                        transcript_bottom,
+                        transcript_bottom.saturating_sub(header_height),
                     ),
                     frame.buffer,
                     &self.transcript_cells,

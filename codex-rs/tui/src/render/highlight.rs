@@ -211,7 +211,7 @@ fn adaptive_default_theme_selection() -> (EmbeddedThemeName, &'static str) {
         Some(bg) if crate::color::is_light(bg) => {
             (EmbeddedThemeName::CatppuccinLatte, "catppuccin-latte")
         }
-        _ => (EmbeddedThemeName::CatppuccinMocha, "catppuccin-mocha"),
+        _ => (EmbeddedThemeName::Dracula, "dracula"),
     }
 }
 

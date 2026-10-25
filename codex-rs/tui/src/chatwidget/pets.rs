@@ -20,62 +20,21 @@ fn next_configured_pet_load_generation() -> ConfiguredPetLoadGeneration {
 }
 
 pub(super) fn load_ambient_pet(
-    config: &crate::local_settings::LocalSettings,
-    frame_requester: FrameRequester,
+    _config: &crate::local_settings::LocalSettings,
+    _frame_requester: FrameRequester,
 ) -> Option<crate::pets::AmbientPet> {
-    let selected_pet = config.tui.pet.as_deref()?;
-    if selected_pet == crate::pets::DISABLED_PET_ID {
-        return None;
-    }
-
-    crate::pets::AmbientPet::load(
-        Some(selected_pet),
-        &config.codex_home,
-        frame_requester,
-        config.tui.animations,
-    )
-    .ok()
+    // Terminal pets are retired, while existing pet config keys remain readable.
+    None
 }
 
 pub(super) fn start_configured_pet_load_if_needed(
-    config: &crate::local_settings::LocalSettings,
-    ambient_pet_missing: bool,
-    frame_requester: FrameRequester,
-    app_event_tx: AppEventSender,
-    pet_http_client: codex_http_client::RouteAwareClientPool,
+    _config: &crate::local_settings::LocalSettings,
+    _ambient_pet_missing: bool,
+    _frame_requester: FrameRequester,
+    _app_event_tx: AppEventSender,
+    _pet_http_client: codex_http_client::RouteAwareClientPool,
 ) -> ConfiguredPetLoadGeneration {
-    let generation = next_configured_pet_load_generation();
-    let Some(pet_id) = config.tui.pet.clone() else {
-        return generation;
-    };
-    if pet_id == crate::pets::DISABLED_PET_ID || !ambient_pet_missing {
-        return generation;
-    }
-
-    let codex_home = config.codex_home.clone();
-    let animations_enabled = config.tui.animations;
-    let event_pet_id = pet_id.clone();
-    spawn_pet_load(
-        async move {
-            crate::pets::load_pet_with_assets(
-                pet_id,
-                codex_home,
-                frame_requester,
-                animations_enabled,
-                &pet_http_client,
-            )
-            .await
-            .map(Some)
-            .map_err(|err| err.to_string())
-        },
-        app_event_tx,
-        move |result| AppEvent::ConfiguredPetLoaded {
-            generation,
-            pet_id: event_pet_id,
-            result,
-        },
-    );
-    generation
+    next_configured_pet_load_generation()
 }
 
 impl ChatWidget {
@@ -109,16 +68,18 @@ impl ChatWidget {
             return None;
         }
 
-        let anchor_bottom_y = match self.local_settings.tui.pet_anchor {
-            TuiPetAnchor::Composer => composer_bottom_y,
-            TuiPetAnchor::ScreenBottom => area.bottom(),
-        };
-        self.ambient_pet
-            .as_ref()?
-            .draw_request(area, anchor_bottom_y)
+        let pet = self.ambient_pet.as_ref()?;
+        match self.local_settings.tui.pet_anchor {
+            TuiPetAnchor::TopRight => pet.draw_request_top_right(area),
+            TuiPetAnchor::Composer => pet.draw_request(area, composer_bottom_y),
+            TuiPetAnchor::ScreenBottom => pet.draw_request(area, area.bottom()),
+        }
     }
 
     pub(super) fn ambient_pet_wrap_reserved_cols(&self) -> u16 {
+        if self.local_settings.tui.pet_anchor == TuiPetAnchor::TopRight {
+            return 0;
+        }
         self.ambient_pet
             .as_ref()
             .filter(|pet| pet.image_enabled())
@@ -198,10 +159,12 @@ impl ChatWidget {
         // Warnings are collected outside the live transcript. A command the user
         // just invoked also needs an immediate explanation above the composer.
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            title: Some("Pets unavailable".to_string()),
+            title: Some(
+                crate::i18n::ui_text("Pets unavailable", "宠物不可用").to_string(),
+            ),
             subtitle: Some(message.to_string()),
             items: vec![SelectionItem {
-                name: "Close".to_string(),
+                name: crate::i18n::ui_text("Close", "关闭").to_string(),
                 dismiss_on_select: true,
                 ..Default::default()
             }],
@@ -259,7 +222,13 @@ impl ChatWidget {
                 true
             }
             Err(err) => {
-                self.add_warning_message(format!("Failed to load configured pet: {err}"));
+                self.add_warning_message(if crate::i18n::is_chinese(
+                    crate::i18n::current_language(),
+                ) {
+                    format!("加载已配置宠物失败：{err}")
+                } else {
+                    format!("Failed to load configured pet: {err}")
+                });
                 false
             }
         }

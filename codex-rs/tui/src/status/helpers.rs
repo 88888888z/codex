@@ -21,14 +21,24 @@ pub(crate) fn compose_model_display(
 ) -> (String, Vec<String>) {
     let mut details: Vec<String> = Vec::new();
     if let Some((_, effort)) = entries.iter().find(|(k, _)| *k == "reasoning effort") {
-        details.push(format!("reasoning {}", effort.to_ascii_lowercase()));
+        details.push(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+            format!("思考强度 {}", effort.to_ascii_lowercase())
+        } else {
+            format!("reasoning {}", effort.to_ascii_lowercase())
+        });
     }
     if let Some((_, summary)) = entries.iter().find(|(k, _)| *k == "reasoning summaries") {
         let summary = summary.trim();
         if summary.eq_ignore_ascii_case("none") || summary.eq_ignore_ascii_case("off") {
-            details.push("summaries off".to_string());
+            details.push(
+                crate::i18n::ui_text("summaries off", "摘要已关闭").to_string(),
+            );
         } else if !summary.is_empty() {
-            details.push(format!("summaries {}", summary.to_ascii_lowercase()));
+            details.push(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("摘要 {}", summary.to_ascii_lowercase())
+            } else {
+                format!("summaries {}", summary.to_ascii_lowercase())
+            });
         }
     }
 
@@ -53,7 +63,7 @@ pub(crate) fn compose_agents_summary(config: &Config, paths: &[PathUri]) -> Stri
         let file_name = p
             .file_name()
             .map(|name| name.to_string_lossy().to_string())
-            .unwrap_or_else(|| "<unknown>".to_string());
+            .unwrap_or_else(|| crate::i18n::ui_text("<unknown>", "<未知>").to_string());
         let display = if let Some(parent) = p.parent() {
             if parent == config.cwd.as_path() {
                 file_name.clone()
@@ -85,7 +95,7 @@ pub(crate) fn compose_agents_summary(config: &Config, paths: &[PathUri]) -> Stri
     }
 
     if rels.is_empty() {
-        "<none>".to_string()
+        crate::i18n::ui_text("<none>", "<无>").to_string()
     } else {
         rels.join(", ")
     }
@@ -175,6 +185,8 @@ pub(crate) fn format_reset_timestamp(
     let time = dt.format(clock_format.time_format()).to_string();
     if dt.date_naive() == captured_at.date_naive() {
         time
+    } else if crate::i18n::is_chinese(crate::i18n::current_language()) {
+        format!("{}（{}）", time, dt.format("%m月%d日"))
     } else {
         format!("{time} on {}", dt.format("%-d %b"))
     }

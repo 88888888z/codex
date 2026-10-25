@@ -268,8 +268,12 @@ impl From<&AmbientPetDraw> for SixelClearArea {
 fn clear_sixel_area(writer: &mut impl Write, area: SixelClearArea) -> std::io::Result<()> {
     use crossterm::cursor::MoveTo;
     use crossterm::queue;
+    use crossterm::style::Attribute;
+    use crossterm::style::ResetColor;
+    use crossterm::style::SetAttribute;
 
     let blank = " ".repeat(area.columns.into());
+    queue!(writer, ResetColor, SetAttribute(Attribute::Reset))?;
     for row in area.clear_top_y..area.clear_bottom_y {
         queue!(writer, MoveTo(area.x, row))?;
         write!(writer, "{blank}")?;

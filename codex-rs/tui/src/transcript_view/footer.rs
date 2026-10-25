@@ -23,8 +23,17 @@ impl TranscriptView {
         if let Some(mode) = &self.copy_mode {
             return Some(TranscriptFooter {
                 text: vec![
-                    Line::from(format!("Copy {}", mode.label.to_lowercase())).bold(),
-                    navigation_line("↑/↓/j/k select · g/G ends · enter copy · esc close"),
+                    Line::from(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        format!("复制{}", mode.label)
+                    } else {
+                        format!("Copy {}", mode.label.to_lowercase())
+                    })
+                    .bold(),
+                    navigation_line(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        "↑/↓/j/k 选择 · g/G 两端 · enter 复制 · esc 关闭"
+                    } else {
+                        "↑/↓/j/k select · g/G ends · enter copy · esc close"
+                    }),
                 ]
                 .into(),
                 cursor_column: None,
@@ -61,10 +70,17 @@ impl TranscriptView {
                     first_fitting_line(
                         [
                             self.status_line_with_navigation(
-                                &format!(
-                                    "{} copy · enter copy & follow · esc clear",
-                                    crate::key_hint::ctrl(KeyCode::Char('c')).display_label()
-                                ),
+                                &if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                                    format!(
+                                        "{} 复制 · enter 复制并跟随 · esc 清除",
+                                        crate::key_hint::ctrl(KeyCode::Char('c')).display_label()
+                                    )
+                                } else {
+                                    format!(
+                                        "{} copy · enter copy & follow · esc clear",
+                                        crate::key_hint::ctrl(KeyCode::Char('c')).display_label()
+                                    )
+                                },
                                 motion,
                             ),
                             selection_hint(width),
@@ -102,14 +118,21 @@ impl TranscriptView {
             if status.width() > usize::from(width) {
                 status = if self.is_loading_history() {
                     let loading = if navigation.is_empty() {
-                        if "↑ Loading…".width() <= usize::from(width) {
-                            "Loading…"
+                        let loading = crate::i18n::ui_text("Loading…", "加载中…");
+                        if Line::from(format!("↑ {loading}")).width() <= usize::from(width) {
+                            loading
                         } else {
                             "…"
                         }
-                    } else if "↑ Loading… · ".width() + navigation.width() <= usize::from(width)
+                    } else if Line::from(format!(
+                        "↑ {} · ",
+                        crate::i18n::ui_text("Loading…", "加载中…")
+                    ))
+                    .width()
+                        + navigation.width()
+                        <= usize::from(width)
                     {
-                        "Loading… · "
+                        crate::i18n::ui_text("Loading… · ", "加载中… · ")
                     } else {
                         "… "
                     };
@@ -118,13 +141,15 @@ impl TranscriptView {
                     spans.extend(navigation_line(navigation).spans);
                     Line::from(spans)
                 } else if self.history == TranscriptHistoryState::Failed {
-                    let mut spans = vec!["Retry: ".dim()];
+                    let mut spans =
+                        vec![crate::i18n::ui_text("Retry: ", "重试：").dim()];
                     spans.extend(key_label_spans(&JumpTarget::Beginning.hint_label()));
                     Line::from(spans)
                 } else if navigation.is_empty() {
-                    Line::from("New activity").dim()
+                    Line::from(crate::i18n::ui_text("New activity", "新活动").dim())
                 } else if self.unseen_activity {
-                    let mut spans = vec!["New · ".dim()];
+                    let mut spans =
+                        vec![crate::i18n::ui_text("New · ", "新活动 · ").dim()];
                     spans.extend(navigation_line(navigation).spans);
                     Line::from(spans)
                 } else {
@@ -132,10 +157,17 @@ impl TranscriptView {
                 };
             }
             let retry = if self.history == TranscriptHistoryState::Failed {
-                format!(
-                    "{} retry",
-                    crate::key_hint::ctrl(KeyCode::Home).display_label()
-                )
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!(
+                        "{} 重试",
+                        crate::key_hint::ctrl(KeyCode::Home).display_label()
+                    )
+                } else {
+                    format!(
+                        "{} retry",
+                        crate::key_hint::ctrl(KeyCode::Home).display_label()
+                    )
+                }
             } else {
                 navigation.to_owned()
             };
@@ -158,9 +190,14 @@ impl TranscriptView {
     ) -> Line<'static> {
         if self.is_loading_history() {
             let mut spans = vec!["↑ ".fg(accent_color())];
-            spans.extend(shimmer_text("Loading earlier messages…", motion));
+            spans.extend(shimmer_text(
+                crate::i18n::ui_text("Loading earlier messages…", "正在加载更早的消息…"),
+                motion,
+            ));
             if self.unseen_activity {
-                spans.push(" · New activity".dim());
+                spans.push(
+                    crate::i18n::ui_text(" · New activity", " · 新活动").dim(),
+                );
             }
             if !navigation.is_empty() {
                 spans.push(" · ".dim());
@@ -170,18 +207,23 @@ impl TranscriptView {
         }
         if self.selection.is_some() && self.history == TranscriptHistoryState::Failed {
             let mut spans = navigation_line(navigation).spans;
-            spans.push(" · Retry: ".dim());
+            spans.push(crate::i18n::ui_text(" · Retry: ", " · 重试：").dim());
             spans.extend(key_label_spans(&JumpTarget::Beginning.hint_label()));
             return Line::from(spans);
         }
         let history = match self.history {
             TranscriptHistoryState::Failed => {
-                let mut spans = vec!["Retry history: ".dim()];
+                let mut spans =
+                    vec![crate::i18n::ui_text("Retry history: ", "重试历史记录：").dim()];
                 spans.extend(key_label_spans(&JumpTarget::Beginning.hint_label()));
                 spans.push(".  ".dim());
                 spans
             }
-            TranscriptHistoryState::Partial => vec!["Earlier messages available.  ".dim()],
+            TranscriptHistoryState::Partial => vec![crate::i18n::ui_text(
+                "Earlier messages available.  ",
+                "有更早的消息可用。  ",
+            )
+            .dim()],
             TranscriptHistoryState::LoadingOlder
             | TranscriptHistoryState::LoadingBeginning
             | TranscriptHistoryState::Complete
@@ -189,9 +231,9 @@ impl TranscriptView {
         };
         let activity = if self.unseen_activity {
             if history.is_empty() && navigation.is_empty() {
-                "New activity"
+                crate::i18n::ui_text("New activity", "新活动")
             } else {
-                "New activity · "
+                crate::i18n::ui_text("New activity · ", "新活动 · ")
             }
         } else {
             ""
@@ -211,17 +253,32 @@ impl TranscriptView {
 }
 
 fn selection_hint(width: u16) -> Line<'static> {
-    first_fitting_line(
+    let chinese = crate::i18n::is_chinese(crate::i18n::current_language());
+    let candidates = if chinese {
         [
-            &format!(
+            format!(
+                "{} 复制 · enter 复制并跟随 · esc 清除",
+                crate::key_hint::ctrl(KeyCode::Char('c')).display_label()
+            ),
+            "enter 复制并跟随 · esc 清除".to_string(),
+            "enter 复制+↓ · esc".to_string(),
+            "esc 清除".to_string(),
+        ]
+    } else {
+        [
+            format!(
                 "{} copy · enter copy & follow · esc clear",
                 crate::key_hint::ctrl(KeyCode::Char('c')).display_label()
             ),
-            "enter copy & follow · esc clear",
-            "enter copy+↓ · esc",
-            "esc clear",
+            "enter copy & follow · esc clear".to_string(),
+            "enter copy+↓ · esc".to_string(),
+            "esc clear".to_string(),
         ]
-        .map(navigation_line),
+    };
+    first_fitting_line(
+        candidates
+            .into_iter()
+            .map(|hint| navigation_line(&hint)),
         width,
     )
 }
@@ -236,28 +293,37 @@ pub(super) fn navigation_line(navigation: &str) -> Line<'static> {
         if index > 0 {
             spans.push(" · ".dim());
         }
-        let action = [
-            " copy & follow",
-            " clear selection",
-            " copy+↓",
-            " previous",
-            " accept",
-            " cancel",
-            " older",
-            " newer",
-            " latest",
-            " retry",
-            " select",
-            " copy",
-            " clear",
-            " next",
-            " close",
-        ]
-        .into_iter()
-        .find(|action| hint.ends_with(*action));
-        if let Some(action) = action {
-            spans.extend(key_label_spans(&hint[..hint.len() - action.len()]));
-            spans.push(action.dim());
+        let actions = [
+            (" copy & follow", " 复制并跟随"),
+            (" clear selection", " 清除选择"),
+            (" copy+↓", " 复制+↓"),
+            (" previous", " 上一个"),
+            (" accept", " 接受"),
+            (" cancel", " 取消"),
+            (" older", " 更早"),
+            (" newer", " 更新"),
+            (" latest", " 最新"),
+            (" retry", " 重试"),
+            (" select", " 选择"),
+            (" copy", " 复制"),
+            (" clear", " 清除"),
+            (" next", " 下一个"),
+            (" close", " 关闭"),
+        ];
+        let action = actions
+            .into_iter()
+            .find_map(|(english, chinese)| {
+                if hint.ends_with(english) {
+                    Some((english, crate::i18n::ui_text(english, chinese)))
+                } else if hint.ends_with(chinese) {
+                    Some((chinese, chinese))
+                } else {
+                    None
+                }
+            });
+        if let Some((suffix, label)) = action {
+            spans.extend(key_label_spans(&hint[..hint.len() - suffix.len()]));
+            spans.push(label.dim());
         } else if hint == "esc" {
             spans.extend(key_label_spans(hint));
         } else {

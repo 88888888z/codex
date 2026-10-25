@@ -5266,8 +5266,8 @@
               "$ref": "#/definitions/TuiPetAnchor"
             }
           ],
-          "default": "composer",
-          "description": "Where the terminal pet should anchor vertically.\n\nDefaults to `composer`, which follows the current TUI composer viewport."
+          "default": "top-right",
+          "description": "Where the terminal pet should anchor vertically.\n\nDefaults to `top-right`, away from the composer."
         },
         "presets": {
           "additionalProperties": {
@@ -6489,6 +6489,13 @@
     },
     "TuiPetAnchor": {
       "oneOf": [
+        {
+          "description": "Anchor the pet to the top-right edge of the terminal screen.",
+          "enum": [
+            "top-right"
+          ],
+          "type": "string"
+        },
         {
           "description": "Anchor the pet to the bottom of the current TUI composer viewport.",
           "enum": [

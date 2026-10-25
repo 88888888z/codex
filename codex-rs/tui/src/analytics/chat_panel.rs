@@ -7,6 +7,7 @@ use super::render::columns;
 use super::styles::number;
 use super::styles::secondary_style;
 use crate::analytics::sections::Section;
+use crate::i18n::ui_text;
 use crate::line_truncation::truncate_line_with_ellipsis_if_overflow;
 use crate::style::accent_style;
 use crate::wrapping::RtOptions;
@@ -22,7 +23,10 @@ impl AnalyticsView {
         let width = row_width.saturating_sub(/*rhs*/ 1).max(/*other*/ 1);
         let wrap = |lines: Vec<Line<'static>>| word_wrap_lines(lines, RtOptions::new(width));
         let mut lines = wrap(vec![
-            "Active in past 30 days · sorted by lifetime credits"
+            crate::i18n::ui_text(
+                "Active in past 30 days · sorted by lifetime credits",
+                "最近 30 天活跃 · 按累计额度排序",
+            )
                 .set_style(secondary_style())
                 .into(),
         ]);
@@ -36,17 +40,23 @@ impl AnalyticsView {
         };
         if chats.rows.is_empty() {
             lines.extend(wrap(vec![
-                "No recent local chats.".set_style(secondary_style()).into(),
+                crate::i18n::ui_text("No recent local chats.", "没有最近的本地会话。")
+                    .set_style(secondary_style())
+                    .into(),
             ]));
             return (lines, 0..1);
         }
         let missing = chats.rows.iter().filter(|row| row.usage.is_none()).count();
         if missing > 0 {
             lines.extend(wrap(vec![
-                format!(
-                    "{missing} chat estimate{} unavailable",
-                    if missing == 1 { "" } else { "s" }
-                )
+                (if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("{missing} 个会话估算不可用")
+                } else {
+                    format!(
+                        "{missing} chat estimate{} unavailable",
+                        if missing == 1 { "" } else { "s" }
+                    )
+                })
                 .set_style(secondary_style())
                 .into(),
             ]));
@@ -59,13 +69,13 @@ impl AnalyticsView {
         });
         let stacked_amounts = show_usd && width < 70;
         lines.extend(wrap(vec![columns(
-            "  Chat".bold().into(),
+            ui_text("  Chat", "  会话").bold().into(),
             if stacked_amounts {
-                "Est. $ / credits"
+                crate::i18n::ui_text("Est. $ / credits", "预计费用 / 额度")
             } else if show_usd {
-                "Est. $ spent  Lifetime credits"
+                crate::i18n::ui_text("Est. $ spent  Lifetime credits", "预计费用  累计额度")
             } else {
-                "Lifetime credits"
+                crate::i18n::ui_text("Lifetime credits", "累计额度")
             }
             .bold()
             .into(),
@@ -167,27 +177,33 @@ impl AnalyticsView {
                             if table {
                                 format!(
                                     "  {:<model_width$}  {:<12}  {:<12}",
-                                    "Model",
-                                    "Effort",
-                                    "Speed",
+                                    crate::i18n::ui_text("Model", "模型"),
+                                    crate::i18n::ui_text("Effort", "思考强度"),
+                                    crate::i18n::ui_text("Speed", "速度"),
                                     model_width = width - 46
                                 )
                                 .set_style(secondary_style())
                                 .into()
                             } else {
-                                "  Model / effort / speed"
+                                ui_text("  Model / effort / speed", "  模型 / 思考强度 / 速度")
                                     .set_style(secondary_style())
                                     .into()
                             },
-                            "Credits".bold().into(),
+                            crate::i18n::ui_text("Credits", "额度").bold().into(),
                             width,
                         ));
                     }
                     for group in groups {
                         let model =
-                            self.model_name(group.model.as_deref().unwrap_or("Not reported"));
-                        let effort = group.reasoning_effort.as_deref().unwrap_or("Not reported");
-                        let speed = group.speed.as_deref().unwrap_or("Not reported");
+                            self.model_name(group.model.as_deref().unwrap_or(
+                                crate::i18n::ui_text("Not reported", "未上报"),
+                            ));
+                        let effort = group.reasoning_effort.as_deref().unwrap_or(
+                            crate::i18n::ui_text("Not reported", "未上报"),
+                        );
+                        let speed = group.speed.as_deref().unwrap_or(
+                            crate::i18n::ui_text("Not reported", "未上报"),
+                        );
                         let amount = data::credits(group.estimated_usage_credits_micros);
                         let label = if table {
                             // Wrap long model names instead of hiding distinctions between groups.
@@ -229,27 +245,43 @@ impl AnalyticsView {
                     }
                     if usage.groups.is_empty() {
                         row.push(
-                            "  Breakdown unavailable"
+                            ui_text("  Breakdown unavailable", "  明细不可用")
                                 .set_style(secondary_style())
                                 .into(),
                         );
                     }
                     if zeros > 0 {
                         row.push(
-                            format!(
-                                "  {zeros} zero-credit {}{} · a {}",
-                                if zeros == 1 { "group" } else { "groups" },
-                                if self.show_zero_credit_groups {
-                                    ""
-                                } else {
-                                    " hidden"
-                                },
-                                if self.show_zero_credit_groups {
-                                    "hide zeros"
-                                } else {
-                                    "show all"
-                                },
-                            )
+                            (if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                                format!(
+                                    "  {zeros} 个零额度分组{} · a {}",
+                                    if self.show_zero_credit_groups {
+                                        ""
+                                    } else {
+                                        "已隐藏"
+                                    },
+                                    if self.show_zero_credit_groups {
+                                        "隐藏零额度"
+                                    } else {
+                                        "显示全部"
+                                    },
+                                )
+                            } else {
+                                format!(
+                                    "  {zeros} zero-credit {}{} · a {}",
+                                    if zeros == 1 { "group" } else { "groups" },
+                                    if self.show_zero_credit_groups {
+                                        ""
+                                    } else {
+                                        " hidden"
+                                    },
+                                    if self.show_zero_credit_groups {
+                                        "hide zeros"
+                                    } else {
+                                        "show all"
+                                    },
+                                )
+                            })
                             .set_style(secondary_style())
                             .into(),
                         );
@@ -269,7 +301,10 @@ impl AnalyticsView {
             })
             .collect::<Vec<_>>();
         let coverage = wrap(vec![
-            "Local chats · excludes archived chats and subagent usage"
+            crate::i18n::ui_text(
+                "Local chats · excludes archived chats and subagent usage",
+                "本地会话 · 不含已归档会话和子 Agent 用量",
+            )
                 .set_style(secondary_style())
                 .into(),
         ]);
@@ -285,8 +320,13 @@ impl AnalyticsView {
     ) -> (Vec<Line<'static>>, Range<usize>) {
         let wrap = |lines: Vec<Line<'static>>| word_wrap_lines(lines, RtOptions::new(width));
         let count = rows.len();
+        let range_text = if crate::i18n::is_chinese(crate::i18n::current_language()) {
+            format!("显示 {count}–{count}，共 {count} 个会话")
+        } else {
+            format!("Showing {count}–{count} of {count} chats")
+        };
         let range_height = wrap(vec![
-            format!("Showing {count}–{count} of {count} chats").into(),
+            range_text.into(),
         ])
         .len();
         // Measure wrapped details before choosing neighbors so the range describes the rendered rows.
@@ -315,7 +355,11 @@ impl AnalyticsView {
         }
         lines.push(Line::default());
         lines.extend(wrap(vec![
-            format!("Showing {}–{end} of {count} chats", first + 1)
+            (if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("显示 {}–{end}，共 {count} 个会话", first + 1)
+            } else {
+                format!("Showing {}–{end} of {count} chats", first + 1)
+            })
                 .set_style(secondary_style())
                 .into(),
         ]));

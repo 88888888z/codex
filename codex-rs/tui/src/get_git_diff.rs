@@ -6,8 +6,10 @@
 //! repository, the function returns `Ok((false, String::new()))`.
 
 use std::path::Path;
+use std::path::Component;
 use std::time::Duration;
 
+use crate::diff_review::DiffFileStatus;
 use crate::workspace_command::WorkspaceCommand;
 use crate::workspace_command::WorkspaceCommandExecutor;
 use crate::workspace_command::WorkspaceCommandOutput;
@@ -52,6 +54,35 @@ pub(crate) async fn get_git_diff(
     runner: &dyn WorkspaceCommandExecutor,
     cwd: &Path,
 ) -> Result<(bool, String), String> {
+    get_git_diff_with_color(
+        runner,
+        cwd,
+        /*color*/ true,
+        /*include_staged*/ false,
+    )
+    .await
+}
+
+/// Return the working-tree diff without terminal color escape sequences.
+pub(crate) async fn get_git_diff_plain(
+    runner: &dyn WorkspaceCommandExecutor,
+    cwd: &Path,
+) -> Result<(bool, String), String> {
+    get_git_diff_with_color(
+        runner,
+        cwd,
+        /*color*/ false,
+        /*include_staged*/ true,
+    )
+    .await
+}
+
+async fn get_git_diff_with_color(
+    runner: &dyn WorkspaceCommandExecutor,
+    cwd: &Path,
+    color: bool,
+    include_staged: bool,
+) -> Result<(bool, String), String> {
     // First check if we are inside a Git repository.
     if !inside_git_repo(runner, cwd).await? {
         return Ok((false, String::new()));
@@ -63,20 +94,27 @@ pub(crate) async fn get_git_diff(
 
     // Keep `/diff` informational: repository configuration must not select executable diff helpers.
     let diff_config_overrides = diff_filter_config_overrides(runner, cwd, fsmonitor).await?;
+    let mut tracked_args = vec![
+        "diff",
+        "--no-textconv",
+        "--no-ext-diff",
+        "--submodule=short",
+        "--ignore-submodules=dirty",
+    ];
+    if color {
+        tracked_args.push("--color");
+    }
+    if include_staged {
+        tracked_args.push("--no-renames");
+        tracked_args.push("HEAD");
+    }
     let (tracked_diff_res, untracked_output_res) = tokio::join!(
         run_git_capture_diff(
             runner,
             cwd,
             fsmonitor,
             &diff_config_overrides,
-            &[
-                "diff",
-                "--no-textconv",
-                "--no-ext-diff",
-                "--submodule=short",
-                "--ignore-submodules=dirty",
-                "--color",
-            ]
+            &tracked_args
         ),
         run_git_capture_stdout(
             runner,
@@ -101,24 +139,101 @@ pub(crate) async fn get_git_diff(
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        let args = [
+        let mut args = vec![
             "diff",
             "--no-textconv",
             "--no-ext-diff",
             "--submodule=short",
             "--ignore-submodules=dirty",
-            "--color",
             "--no-index",
             "--",
             null_path,
             file,
         ];
+        if color {
+            args.insert(/*index*/ 5, "--color");
+        }
         let diff =
             run_git_capture_diff(runner, cwd, fsmonitor, &diff_config_overrides, &args).await?;
         untracked_diff.push_str(&diff);
     }
 
     Ok((true, format!("{tracked_diff}{untracked_diff}")))
+}
+
+/// Restore one path from `HEAD` or remove an untracked addition.
+pub(crate) async fn rollback_diff_file(
+    runner: &dyn WorkspaceCommandExecutor,
+    cwd: &Path,
+    path: &Path,
+    status: DiffFileStatus,
+) -> Result<(), String> {
+    validate_relative_path(path)?;
+    let path = path
+        .to_str()
+        .ok_or_else(|| "diff path is not valid UTF-8".to_string())?;
+
+    if status == DiffFileStatus::Added {
+        // Ignore failure when the path was untracked; clean below handles that case.
+        let _ = run_git_command(
+            runner,
+            cwd,
+            FsmonitorOverride::Disabled,
+            &[],
+            &["rm", "-f", "--cached", "--", path],
+        )
+        .await?;
+        let output = run_git_command(
+            runner,
+            cwd,
+            FsmonitorOverride::Disabled,
+            &[],
+            &["clean", "-f", "--", path],
+        )
+        .await?;
+        if output.success() {
+            return Ok(());
+        }
+        return Err(format!(
+            "git clean failed with status {}",
+            output.exit_code
+        ));
+    }
+
+    let output = run_git_command(
+        runner,
+        cwd,
+        FsmonitorOverride::Disabled,
+        &[],
+        &[
+            "restore",
+            "--source=HEAD",
+            "--staged",
+            "--worktree",
+            "--",
+            path,
+        ],
+    )
+    .await?;
+    if output.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "git restore failed with status {}",
+            output.exit_code
+        ))
+    }
+}
+
+fn validate_relative_path(path: &Path) -> Result<(), String> {
+    if path.as_os_str().is_empty()
+        || path
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err("diff path must stay inside the working directory".to_string());
+    }
+    Ok(())
 }
 
 /// Helper that executes `git` with the given `args` and returns `stdout` as a

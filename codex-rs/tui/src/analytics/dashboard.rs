@@ -55,7 +55,9 @@ impl AnalyticsView {
                             if section == Section::Usage && self.business() {
                                 format!(
                                     " · {}",
-                                    self.token_model.as_deref().unwrap_or("All models")
+                                    self.token_model.as_deref().unwrap_or(
+                                        crate::i18n::ui_text("All models", "全部模型"),
+                                    )
                                 )
                             } else {
                                 String::new()
@@ -69,12 +71,15 @@ impl AnalyticsView {
                     section,
                     Section::Usage | Section::Credits | Section::Activity | Section::Plan
                 ) {
+                    let group = self
+                        .group_label(section, self.sections[section].group)
+                        .to_lowercase();
                     content.push(
-                        format!(
-                            "By {}",
-                            self.group_label(section, self.sections[section].group)
-                                .to_lowercase()
-                        )
+                        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("按 {group}")
+                        } else {
+                            format!("By {group}")
+                        }
                         .set_style(secondary_style())
                         .into(),
                     );
@@ -107,7 +112,12 @@ impl AnalyticsView {
                         if let Some(chats) = self.chats.ready() {
                             if chats.rows.is_empty() {
                                 content.push(
-                                    "No recent local chats.".set_style(secondary_style()).into(),
+                                    crate::i18n::ui_text(
+                                        "No recent local chats.",
+                                        "没有最近的本地会话。",
+                                    )
+                                    .set_style(secondary_style())
+                                    .into(),
                                 );
                             }
                             for chat in chats.rows.iter().take(/*n*/ 5) {
@@ -129,13 +139,19 @@ impl AnalyticsView {
                             }
                             content.push(Line::default());
                             content.push(
-                                "Local chats · excludes subagents"
+                                crate::i18n::ui_text(
+                                    "Local chats · excludes subagents",
+                                    "本地会话 · 不含子 Agent",
+                                )
                                     .set_style(secondary_style())
                                     .into(),
                             );
                             if chats.rows.iter().any(|chat| chat.usage.is_none()) {
                                 content.push(
-                                    "Some estimates unavailable"
+                                    crate::i18n::ui_text(
+                                        "Some estimates unavailable",
+                                        "部分估算不可用",
+                                    )
                                         .set_style(secondary_style())
                                         .into(),
                                 );

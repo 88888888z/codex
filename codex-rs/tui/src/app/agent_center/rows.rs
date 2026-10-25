@@ -7,6 +7,7 @@ use super::render::line;
 use super::render::row;
 use super::*;
 use crate::bottom_pane::selection_style;
+use crate::i18n::ui_text;
 use crate::resume_picker::format_relative_time;
 use crate::status::format_directory_display;
 
@@ -49,15 +50,15 @@ impl AgentsOverviewView {
         if indices.is_empty() {
             line(
                 if state.connection_notice.is_some() {
-                    "Reconnecting…"
+                    ui_text("Reconnecting…", "正在重新连接…")
                 } else if state.loading && self.rows.is_empty() {
-                    "Loading tasks…"
+                    ui_text("Loading tasks…", "正在加载任务…")
                 } else if state.refresh_failed {
-                    "Could not load tasks"
+                    ui_text("Could not load tasks", "无法加载任务")
                 } else if self.rows.is_empty() {
-                    "No tasks yet"
+                    ui_text("No tasks yet", "还没有任务")
                 } else {
-                    "No matching tasks"
+                    ui_text("No matching tasks", "没有匹配的任务")
                 }
                 .dim(),
                 area,
@@ -78,9 +79,9 @@ impl AgentsOverviewView {
         let viewport = row(area, padding, area.height - padding * 2);
         if padding > 0 {
             let (title, status, updated) = columns(row(area, /*offset*/ 0, /*height*/ 1));
-            line("Tasks".dim(), title, buf);
-            line("Status".dim(), status, buf);
-            Line::from("Updated".dim())
+            line(ui_text("Tasks", "任务").dim(), title, buf);
+            line(ui_text("Status", "状态").dim(), status, buf);
+            Line::from(ui_text("Updated", "更新时间").dim())
                 .right_aligned()
                 .render(updated, buf);
         }
@@ -122,11 +123,11 @@ impl AgentsOverviewView {
                         style,
                     );
                     let label = if state.loading {
-                        "Loading more…"
+                        ui_text("Loading more…", "正在加载更多…")
                     } else if state.refresh_failed {
-                        "Show more (retry)"
+                        ui_text("Show more (retry)", "显示更多（重试）")
                     } else {
-                        "Show more"
+                        ui_text("Show more", "显示更多")
                     };
                     let marker = if selected { "›" } else { " " };
                     line(
@@ -141,7 +142,7 @@ impl AgentsOverviewView {
             let rect = row(viewport, offset as u16, /*height*/ 1);
             if matches!(entry, CenterRow::Group(_)) {
                 let group = if self.is_pinned(index) {
-                    "Pinned".to_owned()
+                    ui_text("Pinned", "已固定").to_owned()
                 } else {
                     match state.grouping {
                         AgentsOverviewGrouping::Project => {
@@ -169,6 +170,8 @@ impl AgentsOverviewView {
                     .count();
                 let count = if count == total {
                     count.to_string()
+                } else if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("{count}/{total}")
                 } else {
                     format!("{count} of {total}")
                 };
@@ -229,7 +232,11 @@ impl AgentsOverviewView {
                     /*height*/ 1,
                 );
                 title.width -= 8;
-                line(Line::from("  voice").style(style), badge, buf);
+                line(
+                    Line::from(ui_text("  voice", "  语音").to_string()).style(style),
+                    badge,
+                    buf,
+                );
             }
             let title_style = if index == self.selected {
                 style

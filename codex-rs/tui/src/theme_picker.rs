@@ -370,7 +370,9 @@ pub(crate) fn build_theme_picker_params_for_language(
         .iter()
         .enumerate()
         .map(|(idx, entry)| {
-            let display_name = if entry.is_custom {
+            let display_name = if entry.name == "dracula" {
+                "Dracula".to_string()
+            } else if entry.is_custom {
                 if crate::i18n::is_chinese(language) {
                     format!("{}（自定义）", entry.name)
                 } else {
@@ -386,6 +388,14 @@ pub(crate) fn build_theme_picker_params_for_language(
             let name_for_action = entry.name.clone();
             SelectionItem {
                 name: display_name,
+                description: (entry.name == "dracula").then(|| {
+                    crate::i18n::text(
+                        language,
+                        "Dark purple theme inspired by VS Code Dracula",
+                        "参考 VS Code Dracula 的深色紫调主题",
+                    )
+                    .to_string()
+                }),
                 is_current,
                 dismiss_on_select: true,
                 search_value: Some(entry.name.clone()),

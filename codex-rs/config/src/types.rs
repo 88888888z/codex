@@ -760,8 +760,10 @@ impl fmt::Display for NotificationCondition {
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum TuiPetAnchor {
-    /// Anchor the pet to the bottom of the current TUI composer viewport.
+    /// Anchor the pet to the top-right edge of the terminal screen.
     #[default]
+    TopRight,
+    /// Anchor the pet to the bottom of the current TUI composer viewport.
     Composer,
     /// Anchor the pet to the physical bottom of the terminal screen.
     ScreenBottom,

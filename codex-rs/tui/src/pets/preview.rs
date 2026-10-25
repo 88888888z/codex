@@ -114,7 +114,7 @@ impl Renderable for PetPickerPreviewRenderable {
                     None,
                 ),
                 PetPickerPreviewStatus::Disabled => (
-                    "Terminal pets disabled",
+                    crate::i18n::ui_text("Terminal pets disabled", "终端宠物已禁用"),
                     Some(
                         crate::i18n::ui_text("No pet will be shown.", "不会显示宠物。")
                             .to_string(),
@@ -122,7 +122,10 @@ impl Renderable for PetPickerPreviewRenderable {
                 ),
                 PetPickerPreviewStatus::Ready => return,
                 PetPickerPreviewStatus::Error { message } => {
-                    ("Preview unavailable", Some(message.clone()))
+                    (
+                        crate::i18n::ui_text("Preview unavailable", "预览不可用"),
+                        Some(message.clone()),
+                    )
                 }
             }
         };

@@ -53,6 +53,8 @@ impl App {
             && !matches!(
                 &event,
                 AppEvent::OpenDaemonMenu
+                    | AppEvent::DiffReviewResult(_, _)
+                    | AppEvent::RollbackDiffFile { .. }
                     | AppEvent::OpenWarnings
                     | AppEvent::StatusLineSetup { .. }
                     | AppEvent::StatusLineSetupCancelled
@@ -66,6 +68,8 @@ impl App {
                     | AppEvent::OpenProviderPresetPicker
                     | AppEvent::SaveProviderProfile(_)
                     | AppEvent::ActivateProviderProfile(_)
+                    | AppEvent::OpenProviderDeletePicker
+                    | AppEvent::ConfirmProviderProfileDelete(_)
                     | AppEvent::DeleteProviderProfile(_)
                     | AppEvent::SyntaxThemePreviewed
                     | AppEvent::OpenKeymapActionMenu { .. }
@@ -1312,6 +1316,46 @@ impl App {
                     "D I F F".to_string(),
                     self.keymap.pager.clone(),
                 ));
+                tui.frame_requester().schedule_frame();
+            }
+            AppEvent::DiffReviewResult(cwd, text) => {
+                if cwds_differ(&cwd, self.chat_widget.config_ref().cwd.as_path()) {
+                    return Ok(AppRunControl::Continue);
+                }
+                self.chat_widget.on_diff_complete();
+                let _ = tui.enter_alt_screen();
+                let data = crate::diff_review::parse_diff_review(cwd, &text);
+                self.overlay = Some(Overlay::new_diff_review(
+                    crate::diff_review::DiffReviewOverlay::new(
+                        data,
+                        self.app_event_tx.clone(),
+                        self.keymap.pager.clone(),
+                    ),
+                ));
+                tui.frame_requester().schedule_frame();
+            }
+            AppEvent::RollbackDiffFile { cwd, path, status } => {
+                let Some(runner) = self.workspace_command_runner.clone() else {
+                    self.chat_widget
+                        .add_error_message("无法回滚：工作区命令执行器不可用。".to_string());
+                    return Ok(AppRunControl::Continue);
+                };
+                match crate::get_git_diff::rollback_diff_file(
+                    runner.as_ref(),
+                    &cwd,
+                    &path,
+                    status,
+                )
+                .await
+                {
+                    Ok(()) => self.chat_widget.add_info_message(
+                        format!("已回滚 `{}`。", path.display()),
+                        /*hint*/ None,
+                    ),
+                    Err(error) => self
+                        .chat_widget
+                        .add_error_message(format!("回滚失败：{error}")),
+                }
                 tui.frame_requester().schedule_frame();
             }
             AppEvent::OpenAppLink {
@@ -3605,6 +3649,12 @@ impl App {
                             .add_error_message(format!("切换模型配置失败：{error:#}"));
                     }
                 }
+            }
+            AppEvent::OpenProviderDeletePicker => {
+                self.chat_widget.open_provider_delete_picker();
+            }
+            AppEvent::ConfirmProviderProfileDelete(profile) => {
+                self.chat_widget.confirm_provider_profile_delete(profile);
             }
             AppEvent::DeleteProviderProfile(profile) => {
                 match crate::provider_profiles::delete_profile(

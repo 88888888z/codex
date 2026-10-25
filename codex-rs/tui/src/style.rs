@@ -26,18 +26,19 @@ pub(crate) const CHATGPT_BLUE_200: (u8, u8, u8) = (99, 168, 248);
 /// Shared accent for picker selection backgrounds and transcript foreground emphasis.
 pub(crate) const UI_ACCENT: (u8, u8, u8) = CHATGPT_BLUE_200;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SurfaceLevel {
-    Raised,
-    Floating,
+/// Deep lilac keeps the pinned session header distinct on light and dark terminals.
+const SESSION_HEADER_PURPLE: (u8, u8, u8) = (142, 92, 230);
+
+pub(crate) fn session_header_border_style() -> Style {
+    Style::default().fg(best_color(SESSION_HEADER_PURPLE))
 }
 
 /// Cool translucent-looking surfaces derived from the current terminal background.
-pub(crate) fn surface_style(level: SurfaceLevel) -> Style {
-    surface_style_for(default_bg(), level)
+fn surface_style() -> Style {
+    surface_style_for(default_bg())
 }
 
-fn surface_style_for(terminal_bg: Option<(u8, u8, u8)>, level: SurfaceLevel) -> Style {
+fn surface_style_for(terminal_bg: Option<(u8, u8, u8)>) -> Style {
     let Some(background) = terminal_bg else {
         return Style::default();
     };
@@ -46,21 +47,10 @@ fn surface_style_for(terminal_bg: Option<(u8, u8, u8)>, level: SurfaceLevel) -> 
     } else {
         (255, 255, 255)
     };
-    let alpha = match level {
-        SurfaceLevel::Raised => {
-            if is_light(background) {
-                0.025
-            } else {
-                0.045
-            }
-        }
-        SurfaceLevel::Floating => {
-            if is_light(background) {
-                0.045
-            } else {
-                0.075
-            }
-        }
+    let alpha = if is_light(background) {
+        0.045
+    } else {
+        0.075
     };
     Style::default().bg(best_color(blend(overlay, background, alpha)))
 }
@@ -91,11 +81,11 @@ pub(crate) fn focused_border_style() -> Style {
 }
 
 pub(crate) fn composer_surface_style() -> Style {
-    surface_style(SurfaceLevel::Raised)
+    Style::default()
 }
 
 pub(crate) fn panel_surface_style() -> Style {
-    surface_style(SurfaceLevel::Floating)
+    surface_style()
 }
 
 /// Dim the content behind a modal without changing foreground colors.
@@ -143,17 +133,9 @@ pub fn user_message_style() -> Style {
     user_message_style_for(default_bg())
 }
 
-/// Submitted prompts use a lighter fill than the editable composer in either theme.
+/// Submitted prompts use the terminal's own background.
 pub(crate) fn history_prompt_style() -> Style {
-    let Some(background) = default_bg() else {
-        return Style::default();
-    };
-    let (foreground, alpha) = if is_light(background) {
-        ((0, 0, 0), 0.018)
-    } else {
-        ((255, 255, 255), 0.10)
-    };
-    Style::default().bg(best_color(blend(foreground, background, alpha)))
+    Style::default()
 }
 
 /// A quiet outline keeps submitted prompts distinct without competing with their content.

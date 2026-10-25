@@ -107,8 +107,14 @@ impl AnalyticsView {
             .ready()
             .map(|plan| crate::subscription::SubscriptionDisplay::Analytics.label(*plan));
         let heading = Line::from(vec![
-            plan.map(|plan| format!("Usage · {plan}"))
-                .unwrap_or_else(|| "Usage".into())
+            plan.map(|plan| {
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("用量 · {plan}")
+                } else {
+                    format!("Usage · {plan}")
+                }
+            })
+                .unwrap_or_else(|| crate::i18n::ui_text("Usage", "用量").into())
                 .bold(),
             account
                 .map(|account| format!(" · {account}"))
@@ -157,7 +163,10 @@ impl AnalyticsView {
             let message = self
                 .account
                 .message()
-                .unwrap_or("Analytics is not available for this account type.");
+                .unwrap_or(crate::i18n::ui_text(
+                    "Analytics is not available for this account type.",
+                    "此账户类型无法使用分析页面。",
+                ));
             (
                 textwrap::wrap(message, width)
                     .into_iter()

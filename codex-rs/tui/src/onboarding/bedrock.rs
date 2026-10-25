@@ -5,6 +5,7 @@ use super::auth::SignInState;
 use super::auth::onboarding_request_id;
 use super::keys;
 use crate::key_hint::KeyBindingListExt;
+use crate::i18n::ui_text;
 use crate::wrapping::word_wrap_lines;
 use codex_app_server_client::AppServerRequestHandle;
 use codex_app_server_protocol::AwsCredentialType;
@@ -366,76 +367,146 @@ impl BedrockState {
             return;
         }
         let mut lines: Vec<Line> = vec![
-            Line::from(vec!["> ".into(), "Set up Amazon Bedrock".bold()]),
+            Line::from(vec![
+                "> ".into(),
+                ui_text("Set up Amazon Bedrock", "设置 Amazon Bedrock").bold(),
+            ]),
             "".into(),
         ];
         let mut footer = Vec::new();
         match &self.view {
             BedrockView::GovCloudWarning(_) => {
-                lines = vec!["Using Codex with AWS GovCloud".bold().into(), "".into()];
+                lines = vec![
+                    ui_text("Using Codex with AWS GovCloud", "在 AWS GovCloud 中使用 Codex")
+                        .bold()
+                        .into(),
+                    "".into(),
+                ];
                 lines.push(Line::from(vec![
-                    "You are using Codex with AWS GovCloud. Please ensure you or your administrator have read the ".into(),
-                    "application configuration and security guidance"
+                    ui_text(
+                        "You are using Codex with AWS GovCloud. Please ensure you or your administrator have read the ",
+                        "你正在 AWS GovCloud 中使用 Codex。请确保你或管理员已阅读",
+                    )
+                    .into(),
+                    ui_text(
+                        "application configuration and security guidance",
+                        "应用配置与安全指南",
+                    )
                         .cyan()
                         .underlined(),
-                    " before proceeding.".into(),
+                    ui_text(" before proceeding.", "后再继续。").into(),
                 ]));
                 footer.push("".into());
-                footer.push("> Acknowledge".cyan().into());
+                footer.push(ui_text("> Acknowledge", "> 确认").cyan().into());
             }
             BedrockView::Discovering(_) => {
-                lines.push("  Checking for existing AWS credentials...".dim().into());
+                lines.push(
+                    ui_text(
+                        "  Checking for existing AWS credentials...",
+                        "  正在检查现有 AWS 凭据…",
+                    )
+                    .dim()
+                    .into(),
+                );
             }
             BedrockView::Configuring(_) => {
-                lines.push("  Setting up Amazon Bedrock...".dim().into());
+                lines.push(
+                    ui_text("  Setting up Amazon Bedrock...", "  正在设置 Amazon Bedrock…")
+                        .dim()
+                        .into(),
+                );
             }
             BedrockView::Methods(list) => {
                 if *list == BedrockMethodList::Detected && self.profiles.len() == 1 {
                     let profile = &self.profiles[0];
-                    lines.push(format!("  AWS profile detected: {}", profile.name).into());
+                    let profile_label =
+                        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("  检测到 AWS 配置：{}", profile.name)
+                        } else {
+                            format!("  AWS profile detected: {}", profile.name)
+                        };
+                    lines.push(profile_label.into());
                     if let Some(region) = &profile.region {
-                        lines.push(format!("  Region: {region}").dim().into());
+                        let region_label =
+                            if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                                format!("  区域：{region}")
+                            } else {
+                                format!("  Region: {region}")
+                            };
+                        lines.push(region_label.dim().into());
                     }
                 } else if *list == BedrockMethodList::Detected && self.profiles.len() > 1 {
-                    lines.push("  Choose an AWS profile.".into());
+                    lines.push(ui_text("  Choose an AWS profile.", "  选择 AWS 配置。").into());
                 } else if *list == BedrockMethodList::Detected
                     && !self.environment_credentials.is_empty()
                 {
-                    lines.push("  AWS credentials detected in your environment.".into());
+                    lines.push(
+                        ui_text(
+                            "  AWS credentials detected in your environment.",
+                            "  已在环境中检测到 AWS 凭据。",
+                        )
+                        .into(),
+                    );
                 } else {
                     if *list == BedrockMethodList::Detected {
-                        lines.push("  No AWS credentials found.".into());
+                        lines.push(
+                            ui_text("  No AWS credentials found.", "  未找到 AWS 凭据。").into(),
+                        );
                     }
-                    lines.push("  Choose how you authenticate with AWS.".into());
+                    lines.push(
+                        ui_text(
+                            "  Choose how you authenticate with AWS.",
+                            "  选择 AWS 身份验证方式。",
+                        )
+                        .into(),
+                    );
                 }
                 lines.push("".into());
                 self.render_methods(&mut lines);
             }
             BedrockView::ProfileEntry(value) => {
-                lines.push("  Enter the name of your AWS profile.".into());
+                lines.push(
+                    ui_text(
+                        "  Enter the name of your AWS profile.",
+                        "  输入 AWS 配置名称。",
+                    )
+                    .into(),
+                );
                 lines.push("".into());
                 lines.push(Line::from(vec![
-                    "  AWS profile: ".into(),
+                    ui_text("  AWS profile: ", "  AWS 配置：").into(),
                     value.clone().cyan(),
                 ]));
             }
             BedrockView::ApiKeyEntry(value) => {
-                lines.push("  Enter your Amazon Bedrock API key.".into());
+                lines.push(
+                    ui_text(
+                        "  Enter your Amazon Bedrock API key.",
+                        "  输入 Amazon Bedrock API 密钥。",
+                    )
+                    .into(),
+                );
                 lines.push("".into());
                 let mut masked_value = "•".repeat(value.chars().count().saturating_sub(1));
                 if let Some(character) = value.chars().last() {
                     masked_value.push(character);
                 }
                 lines.push(Line::from(vec![
-                    "  Bedrock API key: ".into(),
+                    ui_text("  Bedrock API key: ", "  Bedrock API 密钥：").into(),
                     masked_value.cyan(),
                 ]));
             }
             BedrockView::RegionEntry { value, .. } => {
-                lines.push("  Enter the AWS Region to use with Amazon Bedrock.".into());
+                lines.push(
+                    ui_text(
+                        "  Enter the AWS Region to use with Amazon Bedrock.",
+                        "  输入 Amazon Bedrock 使用的 AWS 区域。",
+                    )
+                    .into(),
+                );
                 lines.push("".into());
                 lines.push(Line::from(vec![
-                    "  AWS Region: ".into(),
+                    ui_text("  AWS Region: ", "  AWS 区域：").into(),
                     value.clone().cyan(),
                 ]));
             }
@@ -443,12 +514,12 @@ impl BedrockState {
                 values,
                 selected_field,
             } => {
-                lines.push("  Enter your AWS access keys.".into());
+                lines.push(ui_text("  Enter your AWS access keys.", "  输入 AWS 访问密钥。").into());
                 lines.push("".into());
                 for (index, label) in [
-                    "AWS access key ID",
-                    "AWS secret access key",
-                    "AWS session token (optional)",
+                    ui_text("AWS access key ID", "AWS 访问密钥 ID"),
+                    ui_text("AWS secret access key", "AWS 私有访问密钥"),
+                    ui_text("AWS session token (optional)", "AWS 会话令牌（可选）"),
                 ]
                 .into_iter()
                 .enumerate()
@@ -476,11 +547,15 @@ impl BedrockState {
             }
             BedrockView::EnvironmentInstructions => {
                 lines.push(
-                    "  Configure AWS credentials in your environment, then restart Codex.".into(),
+                    ui_text(
+                        "  Configure AWS credentials in your environment, then restart Codex.",
+                        "  在环境中配置 AWS 凭据，然后重启 Codex。",
+                    )
+                    .into(),
                 );
                 lines.push("".into());
                 lines.push(Line::from(vec![
-                    "  Setup guide: ".into(),
+                    ui_text("  Setup guide: ", "  设置指南：").into(),
                     "https://learn.chatgpt.com/docs/amazon-bedrock"
                         .cyan()
                         .underlined(),
@@ -493,16 +568,16 @@ impl BedrockState {
             footer.push("".into());
             if !matches!(self.view, BedrockView::Configuring(_)) {
                 footer.push(Line::from(vec![
-                    "  Press ".dim(),
+                    ui_text("  Press ", "  按 ").dim(),
                     keys::CONFIRM[0].into(),
-                    " to continue".dim(),
+                    ui_text(" to continue", " 继续").dim(),
                 ]));
             }
             if !matches!(self.view, BedrockView::GovCloudWarning(_)) {
                 footer.push(Line::from(vec![
-                    "  Press ".dim(),
+                    ui_text("  Press ", "  按 ").dim(),
                     keys::CANCEL[0].into(),
-                    " to go back".dim(),
+                    ui_text(" to go back", " 返回").dim(),
                 ]));
             }
         }
@@ -515,13 +590,13 @@ impl BedrockState {
         if matches!(self.view, BedrockView::GovCloudWarning(_))
             && lines.len() + footer.len() > usize::from(area.height)
         {
-            footer = vec!["> Acknowledge".cyan().into()];
+            footer = vec![ui_text("> Acknowledge", "> 确认").cyan().into()];
             if area.height > 2 {
                 footer.push(Line::from(vec![
                     keys::MOVE_UP[0].into(),
                     "/".dim(),
                     keys::MOVE_DOWN[0].into(),
-                    " scroll · ".dim(),
+                    ui_text(" scroll · ", " 滚动 · ").dim(),
                     keys::CONFIRM[0].into(),
                 ]));
             }
@@ -594,12 +669,20 @@ impl BedrockState {
                 BedrockMethod::Profile(profile_index) => {
                     let profile = &self.profiles[profile_index];
                     let title = if self.profiles.len() == 1 {
-                        format!("Continue with {}", profile.name)
+                        if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("使用 {} 继续", profile.name)
+                        } else {
+                            format!("Continue with {}", profile.name)
+                        }
                     } else {
                         profile.name.clone()
                     };
                     let description = if self.profiles.len() == 1 {
-                        "Use your existing AWS credentials".to_string()
+                        ui_text(
+                            "Use your existing AWS credentials",
+                            "使用现有 AWS 凭据",
+                        )
+                        .to_string()
                     } else {
                         profile.region.clone().unwrap_or_default()
                     };
@@ -609,44 +692,63 @@ impl BedrockState {
                     let description = if self.environment_credentials.iter().any(|credential| {
                         credential.credential_type == AwsCredentialType::BedrockApiKey
                     }) {
-                        "Use your existing Amazon Bedrock API key"
+                        ui_text(
+                            "Use your existing Amazon Bedrock API key",
+                            "使用现有 Amazon Bedrock API 密钥",
+                        )
                     } else {
-                        "Use your existing AWS credentials"
+                        ui_text("Use your existing AWS credentials", "使用现有 AWS 凭据")
                     };
                     (
-                        "Continue with detected credentials".to_string(),
+                        ui_text(
+                            "Continue with detected credentials",
+                            "使用检测到的凭据继续",
+                        )
+                        .to_string(),
                         description.to_string(),
                     )
                 }
                 BedrockMethod::OtherMethods => (
-                    if matches!(self.view, BedrockView::EnvironmentInstructions) {
-                        "Choose another sign-in method"
+                    (if matches!(self.view, BedrockView::EnvironmentInstructions) {
+                        ui_text("Choose another sign-in method", "选择其他登录方式")
                     } else {
-                        "Other AWS sign-in methods"
-                    }
+                        ui_text("Other AWS sign-in methods", "其他 AWS 登录方式")
+                    })
                     .to_string(),
                     if matches!(self.view, BedrockView::EnvironmentInstructions) {
                         ""
                     } else {
-                        "Use another profile, access keys, environment variables, or a Bedrock API key"
+                        ui_text(
+                            "Use another profile, access keys, environment variables, or a Bedrock API key",
+                            "使用其他配置、访问密钥、环境变量或 Bedrock API 密钥",
+                        )
                     }
                     .to_string(),
                 ),
                 BedrockMethod::ManualProfile => (
-                    "AWS profile".to_string(),
-                    "Use AWS SSO or a named profile".to_string(),
+                    ui_text("AWS profile", "AWS 配置").to_string(),
+                    ui_text("Use AWS SSO or a named profile", "使用 AWS SSO 或命名配置")
+                        .to_string(),
                 ),
                 BedrockMethod::AccessKeys => (
-                    "AWS access keys".to_string(),
-                    "Enter an access key ID and secret access key".to_string(),
+                    ui_text("AWS access keys", "AWS 访问密钥").to_string(),
+                    ui_text(
+                        "Enter an access key ID and secret access key",
+                        "输入访问密钥 ID 和私有访问密钥",
+                    )
+                    .to_string(),
                 ),
                 BedrockMethod::EnvironmentInstructions => (
-                    "Environment variables".to_string(),
-                    "Configure AWS credentials in your environment, then return here".to_string(),
+                    ui_text("Environment variables", "环境变量").to_string(),
+                    ui_text(
+                        "Configure AWS credentials in your environment, then return here",
+                        "在环境中配置 AWS 凭据，然后返回此处",
+                    )
+                    .to_string(),
                 ),
                 BedrockMethod::ApiKey => (
-                    "Bedrock API key".to_string(),
-                    "Enter a Bedrock API key".to_string(),
+                    ui_text("Bedrock API key", "Bedrock API 密钥").to_string(),
+                    ui_text("Enter a Bedrock API key", "输入 Bedrock API 密钥").to_string(),
                 ),
             };
             let selected = index == self.highlighted;
@@ -730,7 +832,11 @@ impl AuthModeWidget {
                             environment_credentials: Vec::new(),
                         }));
                     *error.write().unwrap_or_else(PoisonError::into_inner) =
-                        Some(format!("Unable to check AWS credentials: {err}"));
+                        Some(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("无法检查 AWS 凭据：{err}")
+                        } else {
+                            format!("Unable to check AWS credentials: {err}")
+                        });
                 }
             }
             drop(guard);
@@ -816,9 +922,13 @@ impl AuthModeWidget {
                     .map_err(|error| error.to_string())
                     .and_then(|response| match response {
                         LoginAccountResponse::AmazonBedrock {} => Ok(()),
-                        response => Err(format!(
-                            "Unexpected account/login/start response: {response:?}"
-                        )),
+                        response => Err(
+                            if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                                format!("收到意外的账户登录响应：{response:?}")
+                            } else {
+                                format!("Unexpected account/login/start response: {response:?}")
+                            },
+                        ),
                     }),
                 BedrockCredential::Profile(profile) => request_handle
                     .request_typed::<BedrockSetupResponse>(ClientRequest::BedrockSetup {
@@ -854,9 +964,13 @@ impl AuthModeWidget {
                     .map_err(|error| error.to_string())
                     .and_then(|response| match response {
                         LoginAccountResponse::AmazonBedrock {} => Ok(()),
-                        response => Err(format!(
-                            "Unexpected account/login/start response: {response:?}"
-                        )),
+                        response => Err(
+                            if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                                format!("收到意外的账户登录响应：{response:?}")
+                            } else {
+                                format!("Unexpected account/login/start response: {response:?}")
+                            },
+                        ),
                     }),
             };
             let mut guard = sign_in_state
@@ -878,7 +992,11 @@ impl AuthModeWidget {
                 }
                 Err(err) => {
                     *error.write().unwrap_or_else(PoisonError::into_inner) =
-                        Some(format!("Unable to set up Amazon Bedrock: {err}"));
+                        Some(if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                            format!("无法设置 Amazon Bedrock：{err}")
+                        } else {
+                            format!("Unable to set up Amazon Bedrock: {err}")
+                        });
                     *guard = SignInState::Bedrock(fallback);
                 }
             }

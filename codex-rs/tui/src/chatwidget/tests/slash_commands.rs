@@ -4,30 +4,6 @@ use crate::bottom_pane::slash_commands::ServiceTierCommand;
 use pretty_assertions::assert_eq;
 use serial_test::serial;
 
-fn force_pet_image_support(chat: &mut ChatWidget) {
-    chat.set_pet_image_support_for_tests(crate::pets::PetImageSupport::Supported(
-        crate::pets::ImageProtocol::Kitty,
-    ));
-}
-
-fn force_tmux_pet_image_unsupported(chat: &mut ChatWidget) {
-    chat.set_pet_image_support_for_tests(crate::pets::PetImageSupport::Unsupported(
-        crate::pets::PetImageUnsupportedReason::Tmux,
-    ));
-}
-
-fn force_terminal_pet_image_unsupported(chat: &mut ChatWidget) {
-    chat.set_pet_image_support_for_tests(crate::pets::PetImageSupport::Unsupported(
-        crate::pets::PetImageUnsupportedReason::Terminal,
-    ));
-}
-
-fn force_old_iterm2_pet_image_unsupported(chat: &mut ChatWidget) {
-    chat.set_pet_image_support_for_tests(crate::pets::PetImageSupport::Unsupported(
-        crate::pets::PetImageUnsupportedReason::Iterm2TooOld,
-    ));
-}
-
 fn fast_tier_command() -> ServiceTierCommand {
     ServiceTierCommand {
         id: ServiceTier::Fast.request_value().to_string(),
@@ -1597,15 +1573,6 @@ async fn slash_exit_aliases_request_exit() {
 }
 
 #[tokio::test]
-async fn slash_logout_requests_app_server_logout() {
-    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-
-    chat.dispatch_command(SlashCommand::Logout);
-
-    assert_matches!(rx.try_recv(), Ok(AppEvent::Logout));
-}
-
-#[tokio::test]
 async fn slash_copy_state_tracks_turn_complete_final_reply() {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
 
@@ -3118,156 +3085,6 @@ async fn slash_resume_with_arg_requests_named_session_while_mcp_startup_is_runni
         Ok(AppEvent::ResumeSessionByIdOrName(id_or_name)) if id_or_name == "my-saved-thread"
     );
     assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
-}
-
-#[tokio::test]
-#[serial]
-async fn slash_pets_opens_picker() {
-    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    force_pet_image_support(&mut chat);
-
-    chat.dispatch_command(SlashCommand::Pets);
-
-    assert!(chat.bottom_pane.has_active_view());
-    assert_matches!(rx.try_recv(), Err(TryRecvError::Empty));
-
-    let popup = render_bottom_popup(&chat, /*width*/ 80);
-    assert_chatwidget_snapshot!("slash_pets_picker", popup);
-}
-
-#[tokio::test]
-#[serial]
-async fn slash_pets_with_arg_selects_named_pet() {
-    let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    force_pet_image_support(&mut chat);
-
-    chat.bottom_pane
-        .set_composer_text("/pets chefito".to_string(), Vec::new(), Vec::new());
-    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
-    assert_matches!(rx.try_recv(), Ok(AppEvent::FollowTranscript));
-
-    assert_matches!(
-        rx.try_recv(),
-        Ok(AppEvent::PetSelected { pet_id }) if pet_id == "chefito"
-    );
-    assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
-}
-
-#[tokio::test]
-#[serial]
-async fn slash_pet_disable_aliases_work_on_unsupported_terminal() {
-    for input in ["/pets disable", "/pet hide"] {
-        let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-        force_tmux_pet_image_unsupported(&mut chat);
-
-        chat.bottom_pane
-            .set_composer_text(input.to_string(), Vec::new(), Vec::new());
-        chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
-        assert_matches!(rx.try_recv(), Ok(AppEvent::FollowTranscript));
-        assert_matches!(rx.try_recv(), Ok(AppEvent::PetDisabled));
-        assert_matches!(rx.try_recv(), Err(TryRecvError::Empty));
-        assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
-    }
-}
-
-#[tokio::test]
-#[serial]
-async fn slash_pets_in_tmux_shows_notice_and_preserves_draft() {
-    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    force_tmux_pet_image_unsupported(&mut chat);
-    chat.bottom_pane
-        .set_composer_text("Keep this draft".to_string(), Vec::new(), Vec::new());
-
-    chat.dispatch_command(SlashCommand::Pets);
-
-    assert!(chat.bottom_pane.has_active_view());
-    assert_chatwidget_snapshot!(
-        "slash_pets_unavailable_tmux_40",
-        render_bottom_popup(&chat, /*width*/ 40),
-    );
-    let cells = drain_insert_history_transcript(&mut rx);
-    let rendered = cells
-        .iter()
-        .map(|lines| lines_to_single_string(lines))
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert!(rendered.contains("Pets are disabled in tmux."));
-    assert!(rendered.contains("outside tmux"));
-
-    chat.handle_key_event(KeyEvent::from(KeyCode::Esc));
-    assert!(!chat.bottom_pane.has_active_view());
-    assert_eq!(chat.bottom_pane.composer_text(), "Keep this draft");
-}
-
-#[tokio::test]
-#[serial]
-async fn slash_pets_with_arg_on_unsupported_terminal_shows_notice_without_selection() {
-    let (mut chat, mut rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    force_tmux_pet_image_unsupported(&mut chat);
-
-    chat.bottom_pane
-        .set_composer_text("/pets chefito".to_string(), Vec::new(), Vec::new());
-    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
-
-    assert!(chat.bottom_pane.has_active_view());
-    assert!(render_bottom_popup(&chat, /*width*/ 80).contains("Pets are disabled in tmux."));
-    let cells = drain_insert_history_transcript(&mut rx);
-    let rendered = cells
-        .iter()
-        .map(|lines| lines_to_single_string(lines))
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert!(rendered.contains("Pets are disabled in tmux."));
-    assert_matches!(rx.try_recv(), Err(TryRecvError::Empty));
-    assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
-
-    chat.handle_key_event(KeyEvent::from(KeyCode::Enter));
-    assert!(!chat.bottom_pane.has_active_view());
-    assert_matches!(rx.try_recv(), Err(TryRecvError::Empty));
-    assert_matches!(op_rx.try_recv(), Err(TryRecvError::Empty));
-}
-
-#[tokio::test]
-#[serial]
-async fn slash_pets_on_unsupported_terminal_shows_terminal_warning() {
-    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    force_terminal_pet_image_unsupported(&mut chat);
-
-    chat.dispatch_command(SlashCommand::Pets);
-
-    assert!(chat.bottom_pane.has_active_view());
-    assert!(
-        render_bottom_popup(&chat, /*width*/ 80)
-            .contains("Pets aren’t available in this terminal.")
-    );
-    let cells = drain_insert_history_transcript(&mut rx);
-    let rendered = cells
-        .iter()
-        .map(|lines| lines_to_single_string(lines))
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert!(rendered.contains("Pets aren’t available in this terminal."));
-    assert!(rendered.contains("Kitty graphics or Sixel support"));
-}
-
-#[tokio::test]
-#[serial]
-async fn slash_pets_on_old_iterm2_shows_upgrade_warning() {
-    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    force_old_iterm2_pet_image_unsupported(&mut chat);
-
-    chat.dispatch_command(SlashCommand::Pets);
-
-    assert!(chat.bottom_pane.has_active_view());
-    assert!(render_bottom_popup(&chat, /*width*/ 80).contains("Pets require iTerm2 3.6 or newer."));
-    let cells = drain_insert_history_transcript(&mut rx);
-    let rendered = cells
-        .iter()
-        .map(|lines| lines_to_single_string(lines))
-        .collect::<Vec<_>>()
-        .join("\n");
-    assert!(rendered.contains("Pets require iTerm2 3.6 or newer."));
-    assert!(rendered.contains("Upgrade iTerm2 to use terminal pets."));
 }
 
 #[tokio::test]

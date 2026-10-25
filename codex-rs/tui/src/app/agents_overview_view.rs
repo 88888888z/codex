@@ -91,10 +91,10 @@ impl AgentsOverviewGroup {
 
     fn label(self) -> &'static str {
         match self {
-            Self::NeedsYou => "Needs input",
+            Self::NeedsYou => crate::i18n::ui_text("Needs input", "需要输入"),
             Self::Working => crate::i18n::ui_text("Working", "运行中"),
             Self::Ready => crate::i18n::ui_text("Ready", "就绪"),
-            Self::Finished => "Inactive",
+            Self::Finished => crate::i18n::ui_text("Inactive", "未活动"),
         }
     }
 }
@@ -111,7 +111,11 @@ pub(super) struct AgentsOverviewRow {
 
 fn display_title(thread: &Thread) -> &str {
     let title = thread.name.as_deref().unwrap_or(&thread.preview);
-    title.trim().lines().next().unwrap_or("Untitled task")
+    title
+        .trim()
+        .lines()
+        .next()
+        .unwrap_or(crate::i18n::ui_text("Untitled task", "未命名任务"))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -428,9 +432,11 @@ impl AgentsOverviewView {
     fn status(row: &AgentsOverviewRow) -> (&'static str, Span<'static>) {
         match row.group {
             AgentsOverviewGroup::NeedsYou if row.thread.status == ThreadStatus::SystemError => {
-                ("Error", "!".red())
+                (crate::i18n::ui_text("Error", "错误"), "!".red())
             }
-            AgentsOverviewGroup::NeedsYou => ("Needs input", "●".red()),
+            AgentsOverviewGroup::NeedsYou => {
+                (crate::i18n::ui_text("Needs input", "需要输入"), "●".red())
+            }
             AgentsOverviewGroup::Working => (
                 crate::i18n::ui_text("Working", "运行中"),
                 "●".green(),
@@ -439,7 +445,9 @@ impl AgentsOverviewView {
                 crate::i18n::ui_text("Ready", "就绪"),
                 "○".cyan(),
             ),
-            AgentsOverviewGroup::Finished => ("Inactive", "○".dim()),
+            AgentsOverviewGroup::Finished => {
+                (crate::i18n::ui_text("Inactive", "未活动"), "○".dim())
+            }
         }
     }
 
@@ -451,25 +459,28 @@ impl AgentsOverviewView {
         let width = usize::from(area.width);
         let model = crate::line_truncation::truncate_line_with_ellipsis_if_overflow(
             Line::from(vec![
-                "Model: ".dim(),
+                crate::i18n::ui_text("Model: ", "模型：").dim(),
                 model_name(&row.thread).to_string().into(),
             ]),
             width,
         );
         let reasoning = crate::line_truncation::truncate_line_with_ellipsis_if_overflow(
             Line::from(vec![
-                "Reasoning: ".dim(),
+                crate::i18n::ui_text("Reasoning: ", "思考强度：").dim(),
                 row.thread
                     .reasoning_effort
                     .as_ref()
-                    .map_or("Unknown", ReasoningEffort::as_str)
+                    .map_or(
+                        crate::i18n::ui_text("Unknown", "未知"),
+                        ReasoningEffort::as_str,
+                    )
                     .to_string()
                     .into(),
             ]),
             width,
         );
         let mut lines = vec![
-            Line::from("Task details".bold()),
+            Line::from(crate::i18n::ui_text("Task details", "任务详情").bold()),
             Line::default(),
             crate::line_truncation::truncate_line_with_ellipsis_if_overflow(
                 Line::from(Span::styled(
@@ -483,7 +494,7 @@ impl AgentsOverviewView {
             model,
             reasoning,
             Line::default(),
-            Line::from("Project".dim()),
+            Line::from(crate::i18n::ui_text("Project", "项目").dim()),
             Line::from(row.thread.cwd.display().to_string()),
         ];
         lines.extend(row.details.usage_lines.clone());
@@ -494,7 +505,7 @@ impl AgentsOverviewView {
             .and_then(|git| git.branch.as_ref())
         {
             lines.push(Line::default());
-            lines.push("Branch".dim().into());
+            lines.push(crate::i18n::ui_text("Branch", "分支").dim().into());
             lines.push(branch.clone().into());
         }
         // Keep destinations attached to their text through wrapping and clipping.
@@ -509,7 +520,10 @@ impl AgentsOverviewView {
         };
         let preview = super::agents_overview_details::preview_markdown(&row.thread.preview);
         let prompt_start = crate::wrapping::word_wrap_lines(lines.clone(), width).len();
-        lines.extend([Line::default(), Line::from("Prompt".dim())]);
+        lines.extend([
+            Line::default(),
+            Line::from(crate::i18n::ui_text("Prompt", "提示词").dim()),
+        ]);
         let prompt = crate::markdown_render::render_markdown_lines_with_width_and_cwd(
             match preview.as_str() {
                 "" => crate::i18n::ui_text("No prompt available.", "没有可用的提示词。"),
@@ -531,7 +545,9 @@ impl AgentsOverviewView {
             if let Some((message, cwd)) = &row.details.last_message {
                 details.extend(plain_hyperlink_lines(vec![
                     Line::default(),
-                    "Last message".dim().into(),
+                    crate::i18n::ui_text("Last message", "最后一条消息")
+                        .dim()
+                        .into(),
                 ]));
                 details.extend(
                     crate::markdown_render::render_markdown_lines_with_width_and_cwd(

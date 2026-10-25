@@ -13,6 +13,7 @@ use std::time::Instant;
 
 use crate::bottom_pane::BottomPaneView;
 use crate::bottom_pane::CancellationEvent;
+use crate::i18n::ui_text;
 use crate::key_hint::KeyBinding;
 use crate::keymap::RuntimeKeymap;
 use crate::render::renderable::Renderable;
@@ -62,42 +63,54 @@ impl KeymapDebugView {
     fn lines_at(&self, width: u16, now: Instant) -> Vec<Line<'static>> {
         let wrap_width = usize::from(width.max(1));
         let mut lines = vec![
-            Line::from("Keypress Inspector".bold()),
-            Line::from(
-                "Press any key to see what Codex receives. Esc is inspected; Ctrl+C closes.".dim(),
-            ),
+            Line::from(ui_text("Keypress Inspector", "按键检查器").bold()),
+            Line::from(ui_text(
+                "Press any key to see what Codex receives. Esc is inspected; Ctrl+C closes.",
+                "按任意键查看 Codex 收到的内容。Esc 也会被检查；Ctrl+C 关闭。",
+            )
+            .dim()),
         ];
         let hint = if self.should_show_delayed_hint(now) {
-            DELAYED_MISSING_KEY_HINT
+            ui_text(
+                DELAYED_MISSING_KEY_HINT,
+                "仍在等待？按键后如果没有任何变化，说明终端没有把该按键发送给 Codex。只有收到的按键才能设为快捷键。",
+            )
         } else {
-            SHORT_MISSING_KEY_HINT
+            ui_text(
+                SHORT_MISSING_KEY_HINT,
+                "提示：Codex 只能检查终端实际发送的按键。",
+            )
         };
         push_wrapped_dim(&mut lines, hint.to_string(), wrap_width, "", "");
 
         let Some(report) = &self.last_report else {
             lines.push(Line::from(""));
-            lines.push(Line::from("Waiting for a keypress...".cyan()));
+            lines.push(Line::from(ui_text("Waiting for a keypress...", "等待按键…").cyan()));
             return lines;
         };
 
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
-            "Detected: ".dim(),
+            ui_text("Detected: ", "检测到：").dim(),
             report.detected.display_label().cyan(),
         ]));
         match &report.config_key {
             Ok(config_key) => {
                 lines.push(Line::from(vec![
-                    "Config key: ".dim(),
+                    ui_text("Config key: ", "配置按键：").dim(),
                     config_key.clone().cyan(),
                 ]));
             }
             Err(error) => {
                 push_wrapped_dim(
                     &mut lines,
-                    format!("unsupported - {error}"),
+                    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                        format!("不支持：{error}")
+                    } else {
+                        format!("unsupported - {error}")
+                    },
                     wrap_width,
-                    "Config key: ",
+                    ui_text("Config key: ", "配置按键："),
                     "            ",
                 );
             }
@@ -106,13 +119,13 @@ impl KeymapDebugView {
             &mut lines,
             report.raw_event.clone(),
             wrap_width,
-            "Raw event: ",
+            ui_text("Raw event: ", "原始事件："),
             "           ",
         );
         lines.push(Line::from(""));
-        lines.push(Line::from("Assigned actions:".dim()));
+        lines.push(Line::from(ui_text("Assigned actions:", "绑定的操作：").dim()));
         if report.matches.is_empty() {
-            lines.push(Line::from("  none".dim()));
+            lines.push(Line::from(ui_text("  none", "  无").dim()));
         } else {
             for matched_action in &report.matches {
                 let action = format!(

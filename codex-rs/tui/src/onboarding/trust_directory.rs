@@ -15,6 +15,7 @@ use ratatui::widgets::Wrap;
 
 use crate::bottom_pane::picker_option_row;
 use crate::bottom_pane::render_menu_surface;
+use crate::i18n::ui_text;
 use crate::key_hint::KeyBindingListExt;
 use crate::onboarding::keys;
 use crate::onboarding::onboarding_screen::KeyboardHandler;
@@ -59,18 +60,32 @@ impl WidgetRef for &TrustDirectoryWidget {
         let mut children = vec![(
             0,
             Paragraph::new(if self.restricted && self.existing_task {
-                "This existing task may retain settings \
-                 and history, including project configuration or hooks loaded while it was trusted. \
-                 To use restricted settings, start a new task. The folder's trust setting will not change."
+                ui_text(
+                    "This existing task may retain settings \
+                     and history, including project configuration or hooks loaded while it was trusted. \
+                     To use restricted settings, start a new task. The folder's trust setting will not change.",
+                    "此现有任务可能保留此前受信任时加载的设置和历史，包括项目配置或 hooks。\
+                     如需使用受限设置，请新建任务。文件夹的信任设置不会改变。",
+                )
             } else if self.restricted {
-                "Config, hooks, and exec policies from untrusted folders stay disabled. \
-                 Trusted project folders can still contribute settings. Skills still load, \
-                 and tools follow your permission settings. Opening will not change saved trust."
+                ui_text(
+                    "Config, hooks, and exec policies from untrusted folders stay disabled. \
+                     Trusted project folders can still contribute settings. Skills still load, \
+                     and tools follow your permission settings. Opening will not change saved trust.",
+                    "未受信任文件夹中的配置、hooks 和执行策略会保持禁用。\
+                     受信任的项目文件夹仍可提供设置。Skills 仍会加载，工具遵循你的权限设置。\
+                     打开文件夹不会改变已保存的信任状态。",
+                )
             } else {
-                "Trust this folder? Codex can read, edit, and run files here, subject to \
-                 your permission settings. Folder settings can run code automatically, \
-                 even without a model request. Continue only if you trust these files. \
-                 Your trust decision will be saved."
+                ui_text(
+                    "Trust this folder? Codex can read, edit, and run files here, subject to \
+                     your permission settings. Folder settings can run code automatically, \
+                     even without a model request. Continue only if you trust these files. \
+                     Your trust decision will be saved.",
+                    "信任此文件夹？Codex 可以在此读取、编辑和运行文件，具体受你的权限设置限制。\
+                     文件夹设置可能在没有模型请求时自动运行代码。仅在信任这些文件时继续。\
+                     你的信任决定会被保存。",
+                )
             })
             .wrap(Wrap { trim: true })
             .inset(Insets::vh(/*v*/ 0, /*h*/ 2)),
@@ -80,19 +95,23 @@ impl WidgetRef for &TrustDirectoryWidget {
         let options: Vec<(&str, TrustDirectorySelection)> = vec![
             (
                 if self.restricted && self.existing_task {
-                    "Open existing task"
+                    ui_text("Open existing task", "打开现有任务")
                 } else if self.restricted {
-                    "Open restricted"
+                    ui_text("Open restricted", "以受限模式打开")
                 } else {
-                    "Trust and continue"
+                    ui_text("Trust and continue", "信任并继续")
                 },
                 TrustDirectorySelection::Trust,
             ),
             (
                 match self.cancel {
-                    TrustCancelAction::Quit => "Quit",
-                    TrustCancelAction::AgentsOverview => "Back to Agent Command Center",
-                    TrustCancelAction::CurrentTask => "Keep current directory",
+                    TrustCancelAction::Quit => ui_text("Quit", "退出"),
+                    TrustCancelAction::AgentsOverview => {
+                        ui_text("Back to Agent Command Center", "返回 Agent 指挥中心")
+                    }
+                    TrustCancelAction::CurrentTask => {
+                        ui_text("Keep current directory", "保持当前目录")
+                    }
                 },
                 TrustDirectorySelection::Quit,
             ),
@@ -123,16 +142,16 @@ impl WidgetRef for &TrustDirectoryWidget {
             Paragraph::new(Line::from(vec![
                 keys::CONFIRM[0].into(),
                 if self.show_windows_create_sandbox_hint && !self.restricted {
-                    " continue and create sandbox".dim()
+                    ui_text(" continue and create sandbox", " 继续并创建沙箱").dim()
                 } else {
-                    " continue".dim()
+                    ui_text(" continue", " 继续").dim()
                 },
                 " · ".dim(),
                 keys::CANCEL[0].into(),
                 match self.cancel {
-                    TrustCancelAction::Quit => " quit",
-                    TrustCancelAction::AgentsOverview => " back",
-                    TrustCancelAction::CurrentTask => " cancel",
+                    TrustCancelAction::Quit => ui_text(" quit", " 退出"),
+                    TrustCancelAction::AgentsOverview => ui_text(" back", " 返回"),
+                    TrustCancelAction::CurrentTask => ui_text(" cancel", " 取消"),
                 }
                 .dim(),
             ]))
@@ -144,7 +163,10 @@ impl WidgetRef for &TrustDirectoryWidget {
         #[allow(clippy::disallowed_methods)]
         let git_root_warning = (!self.restricted && self.cwd != self.trust_target).then(|| {
             Paragraph::new(
-                "Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:",
+                ui_text(
+                    "Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:",
+                    "注意：当前目录位于 Git 项目的子目录中。信任会应用到仓库根目录：",
+                ),
             )
             .yellow()
             .wrap(Wrap { trim: true })
@@ -181,7 +203,9 @@ impl WidgetRef for &TrustDirectoryWidget {
         column.push(/*flex*/ 1, RenderableItem::Borrowed(&""));
         column.push(
             /*flex*/ 0,
-            RenderableItem::Owned(Box::new(Line::from("  Folder access".bold()))),
+            RenderableItem::Owned(Box::new(Line::from(
+                ui_text("  Folder access", "  文件夹访问权限").bold(),
+            ))),
         );
         if cwd_height > 0 {
             column.push(/*flex*/ 0, path(&self.cwd, cwd_height));

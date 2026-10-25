@@ -69,12 +69,9 @@ pub enum SlashCommand {
     Theme,
     Language,
     Provider,
-    #[strum(to_string = "pets", serialize = "pet")]
-    Pets,
     Mcp,
     Apps,
     Plugins,
-    Logout,
     Quit,
     Exit,
     Rollout,
@@ -138,7 +135,6 @@ impl SlashCommand {
                 SlashCommand::Theme => "选择语法高亮主题",
                 SlashCommand::Language => "选择界面语言",
                 SlashCommand::Provider => "管理第三方模型服务配置",
-                SlashCommand::Pets => "选择或隐藏终端宠物",
                 SlashCommand::Ps => "列出后台终端",
                 SlashCommand::Stop => "停止所有后台终端",
                 SlashCommand::MemoryDrop | SlashCommand::MemoryUpdate => "请勿使用",
@@ -162,7 +158,6 @@ impl SlashCommand {
                 SlashCommand::Mcp => "列出 MCP 工具；使用 /mcp verbose 或 /mcp login <name>",
                 SlashCommand::Apps => "管理应用",
                 SlashCommand::Plugins => "浏览插件",
-                SlashCommand::Logout => "退出 Codex 账号",
                 SlashCommand::Rollout => "打印 rollout 文件路径",
                 SlashCommand::TestApproval => "测试审批请求",
             };
@@ -204,7 +199,6 @@ impl SlashCommand {
             SlashCommand::Theme => "choose a syntax highlighting theme",
             SlashCommand::Language => "choose the interface language",
             SlashCommand::Provider => "manage third-party model provider profiles",
-            SlashCommand::Pets => "choose or hide the terminal pet",
             SlashCommand::Ps => "list background terminals",
             SlashCommand::Stop => "stop all background terminals",
             SlashCommand::MemoryDrop => "DO NOT USE",
@@ -233,7 +227,6 @@ impl SlashCommand {
             SlashCommand::Mcp => "list MCP tools; use /mcp verbose or /mcp login <name>",
             SlashCommand::Apps => "manage apps",
             SlashCommand::Plugins => "browse plugins",
-            SlashCommand::Logout => "log out of Codex",
             SlashCommand::Rollout => "print the rollout file path",
             SlashCommand::TestApproval => "test approval request",
         }
@@ -269,7 +262,6 @@ impl SlashCommand {
                 | SlashCommand::Cd
                 | SlashCommand::Pwd
                 | SlashCommand::Usage
-                | SlashCommand::Pets
                 | SlashCommand::Language
                 | SlashCommand::Provider
                 | SlashCommand::Side
@@ -350,7 +342,6 @@ impl SlashCommand {
             | SlashCommand::Plan
             | SlashCommand::Cd
             | SlashCommand::Clear
-            | SlashCommand::Logout
             | SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate => false,
             SlashCommand::Diff
@@ -393,7 +384,7 @@ impl SlashCommand {
             SlashCommand::Rollout => true,
             SlashCommand::TestApproval => true,
             SlashCommand::Agents | SlashCommand::MultiAgents => true,
-            SlashCommand::Config | SlashCommand::Theme | SlashCommand::Pets => false,
+            SlashCommand::Config | SlashCommand::Theme => false,
         }
     }
 
@@ -431,12 +422,6 @@ mod tests {
     #[test]
     fn clean_alias_parses_to_stop_command() {
         assert_eq!(SlashCommand::from_str("clean"), Ok(SlashCommand::Stop));
-    }
-
-    #[test]
-    fn pet_alias_parses_to_pets_command() {
-        assert_eq!(SlashCommand::Pets.command(), "pets");
-        assert_eq!(SlashCommand::from_str("pet"), Ok(SlashCommand::Pets));
     }
 
     #[test]

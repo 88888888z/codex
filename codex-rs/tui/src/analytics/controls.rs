@@ -108,7 +108,9 @@ impl AnalyticsView {
             return;
         }
         if self.show_help {
-            "Usage shortcuts".bold().render(area, buf);
+            crate::i18n::ui_text("Usage shortcuts", "用量快捷键")
+                .bold()
+                .render(area, buf);
             return;
         }
         if self.visible_sections().is_empty() {
@@ -180,7 +182,9 @@ impl AnalyticsView {
                     " ".dim(),
                     self.token_model
                         .clone()
-                        .unwrap_or_else(|| "All models".into())
+                        .unwrap_or_else(|| {
+                            crate::i18n::ui_text("All models", "全部模型").into()
+                        })
                         .into(),
                 ]),
             ));
@@ -190,8 +194,8 @@ impl AnalyticsView {
                 Control::TaskMetric,
                 Line::from(vec![
                     key_hint::plain(KeyCode::Char('s')).into(),
-                    " sort: ".dim(),
-                    super::task_panel::METRICS[self.task_metric()].into(),
+                    crate::i18n::ui_text(" sort: ", " 排序：").dim(),
+                    super::task_panel::metric_label(self.task_metric()).into(),
                 ]),
             ));
         }
@@ -212,25 +216,32 @@ impl AnalyticsView {
             }
             plan_window.spans.extend([
                 if self.plan.window == 0 {
-                    "5-hour".set_style(accent_style()).bold()
+                    crate::i18n::ui_text("5-hour", "5 小时")
+                        .set_style(accent_style())
+                        .bold()
                 } else {
-                    "5-hour".dim()
+                    crate::i18n::ui_text("5-hour", "5 小时").dim()
                 },
                 " / ".dim(),
                 if self.plan.window == 1 {
-                    "Weekly".set_style(accent_style()).bold()
+                    crate::i18n::ui_text("Weekly", "每周")
+                        .set_style(accent_style())
+                        .bold()
                 } else {
-                    "Weekly".dim()
+                    crate::i18n::ui_text("Weekly", "每周").dim()
                 },
             ]);
             rows[row].push((Control::PlanWindow, plan_window));
         }
         if !self.zoomed {
-            let mut dashboard = Line::from("Dashboard".bold());
+            let mut dashboard =
+                Line::from(crate::i18n::ui_text("Dashboard", "仪表盘").bold());
             if let Some(hint) = self.keymap.primary_hint(crate::keymap::ListAction::Accept) {
                 dashboard.spans.push(" · ".dim());
                 dashboard.spans.extend(hint.spans());
-                dashboard.spans.push(" focus".dim());
+                dashboard
+                    .spans
+                    .push(crate::i18n::ui_text(" focus", " 聚焦").dim());
             }
             rows[0].insert(/*index*/ 0, (Control::Dashboard, dashboard));
         }
@@ -278,10 +289,12 @@ impl AnalyticsView {
             .and_then(|value| chrono::DateTime::from_timestamp(value, /*nsecs*/ 0));
         let metadata = updated
             .map(|updated| {
-                format!(
-                    "Updated · {} UTC",
-                    updated.format(self.clock_format.date_time_format())
-                )
+                let timestamp = updated.format(self.clock_format.date_time_format());
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("更新于 {timestamp} UTC")
+                } else {
+                    format!("Updated · {timestamp} UTC")
+                }
             })
             .unwrap_or_default();
         truncate(metadata.set_style(secondary_style()).into(), width).render(

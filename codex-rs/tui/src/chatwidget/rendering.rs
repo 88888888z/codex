@@ -10,7 +10,25 @@ use crate::wrapping::word_wrap_lines;
 use ratatui::style::Styled as _;
 use ratatui::text::Span;
 use ratatui::widgets::Block;
+use ratatui::widgets::BorderType;
+use ratatui::widgets::Borders;
 use std::cell::Cell;
+
+pub(crate) const SESSION_HEADER_HEIGHT: u16 = 3;
+
+struct PinnedSessionHeader<'a> {
+    chat: &'a ChatWidget,
+}
+
+impl Renderable for PinnedSessionHeader<'_> {
+    fn render(&self, area: Rect, buf: &mut Buffer) {
+        self.chat.render_pinned_session_header(area, buf);
+    }
+
+    fn desired_height(&self, _width: u16) -> u16 {
+        SESSION_HEADER_HEIGHT
+    }
+}
 
 struct ExternalWriterNotice {
     command_center_available: bool,
@@ -126,6 +144,57 @@ impl ExternalWriterNotice {
 }
 
 impl ChatWidget {
+    fn session_summary_line(&self, width: u16) -> Line<'static> {
+        let width = usize::from(width);
+        let permission = history_cell::is_yolo_mode(&self.config)
+            .then(|| crate::i18n::ui_text("permissions: YOLO mode", "权限：YOLO 模式"));
+        let permission_width = permission.map_or(0, |permission| {
+            crate::width::display_width(permission) + /*separator*/ 3
+        });
+        let directory_width = width
+            .saturating_sub("Codex".len() + /*separator*/ 3 + permission_width)
+            .max(/*other*/ 1);
+        let mut spans = vec!["Codex".bold(), " · ".dim()];
+        spans.push(
+            history_cell::SessionHeaderHistoryCell::format_directory_inner(
+                self.config.cwd.as_path(),
+                Some(directory_width),
+            )
+            .dim(),
+        );
+        if history_cell::is_yolo_mode(&self.config) {
+            spans.push(" · ".dim());
+            spans.push(
+                crate::i18n::ui_text("permissions: YOLO mode", "权限：YOLO 模式")
+                    .magenta()
+                    .bold(),
+            );
+        }
+        Line::from(spans)
+    }
+
+    pub(crate) fn render_pinned_session_header(&self, area: Rect, buf: &mut Buffer) {
+        let area = Rect {
+            height: area.height.min(SESSION_HEADER_HEIGHT),
+            ..area
+        };
+        if area.is_empty() {
+            return;
+        }
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(crate::style::session_header_border_style())
+            .style(Style::reset())
+            .render(area, buf);
+        if area.width > 4 && area.height > 1 {
+            let content = Rect::new(area.x + 2, area.y + 1, area.width - 4, 1);
+            Paragraph::new(self.session_summary_line(content.width))
+                .style(Style::reset())
+                .render(content, buf);
+        }
+    }
+
     pub(crate) fn as_renderable(&self) -> RenderableItem<'_> {
         let backdrop = self.as_backdrop_renderable();
         match self.centered_dialog() {
@@ -183,6 +252,10 @@ impl ChatWidget {
             None => RenderableItem::Owned(Box::new(())),
         };
         let mut flex = FlexRenderable::new();
+        flex.push(
+            /*flex*/ 0,
+            RenderableItem::Owned(Box::new(PinnedSessionHeader { chat: self })),
+        );
         flex.push(/*flex*/ 1, active_cell_renderable);
         for cell in self
             .realtime_conversation

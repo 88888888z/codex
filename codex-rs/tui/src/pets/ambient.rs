@@ -63,19 +63,19 @@ impl PetNotificationKind {
 
     fn label(self) -> &'static str {
         match self {
-            Self::Running => "Running",
-            Self::Waiting => "Needs input",
-            Self::Review => "Ready",
-            Self::Failed => "Blocked",
+            Self::Running => crate::i18n::ui_text("Running", "运行中"),
+            Self::Waiting => crate::i18n::ui_text("Needs input", "需要输入"),
+            Self::Review => crate::i18n::ui_text("Ready", "就绪"),
+            Self::Failed => crate::i18n::ui_text("Blocked", "受阻"),
         }
     }
 
     fn fallback_body(self) -> &'static str {
         match self {
-            Self::Running => "Thinking",
-            Self::Waiting => "Needs input",
-            Self::Review => "Ready",
-            Self::Failed => "Blocked",
+            Self::Running => crate::i18n::ui_text("Thinking", "思考中"),
+            Self::Waiting => crate::i18n::ui_text("Needs input", "需要输入"),
+            Self::Review => crate::i18n::ui_text("Ready", "就绪"),
+            Self::Failed => crate::i18n::ui_text("Blocked", "受阻"),
         }
     }
 
@@ -245,6 +245,32 @@ impl AmbientPet {
             x,
             y,
             clear_top_y: area.y,
+            columns: size.columns,
+            rows: size.rows,
+            height_px: size.height_px,
+            sixel_dir: self.sixel_dir.clone(),
+        })
+    }
+
+    /// Build a draw request pinned to the terminal's top-right edge.
+    pub(crate) fn draw_request_top_right(&self, area: Rect) -> Option<AmbientPetDraw> {
+        let protocol = self.support.protocol()?;
+        let size = self.image_size();
+        let notification = self.visible_notification(Instant::now());
+        let required_height = size.rows.saturating_add(notification.map_or(0, notification_height));
+        let right_margin = 2;
+        if area.width < size.columns.saturating_add(right_margin)
+            || area.height < required_height.saturating_add(/*top gap*/ 1)
+        {
+            return None;
+        }
+        let y = area.y.saturating_add(/*top gap*/ 1);
+        Some(AmbientPetDraw {
+            frame: self.current_frame_path()?,
+            protocol,
+            x: area.right().saturating_sub(size.columns.saturating_add(right_margin)),
+            y,
+            clear_top_y: y,
             columns: size.columns,
             rows: size.rows,
             height_px: size.height_px,

@@ -6,6 +6,7 @@ use super::sections::Section;
 use super::styles::number;
 use super::styles::secondary_style;
 use super::tasks::Chat;
+use crate::i18n::ui_text;
 use crate::line_truncation::truncate_line_with_ellipsis_if_overflow as truncate;
 use crate::style::accent_style;
 use crate::wrapping::RtOptions;
@@ -18,7 +19,13 @@ use ratatui::text::Line;
 use std::cmp::Ordering;
 use std::ops::Range;
 
-pub(super) const METRICS: [&str; 3] = ["Weekly %", "5-hour %", "Balance credits"];
+pub(super) fn metric_label(metric: usize) -> &'static str {
+    match metric {
+        0 => ui_text("Weekly %", "每周 %"),
+        1 => ui_text("5-hour %", "5 小时 %"),
+        _ => ui_text("Balance credits", "余额额度"),
+    }
+}
 
 fn compare(a: Option<&TaskUsageAmounts>, b: Option<&TaskUsageAmounts>, metric: usize) -> Ordering {
     if metric == 2 {
@@ -158,7 +165,7 @@ impl AnalyticsView {
                 wrap(vec![
                     self.tasks
                         .message()
-                        .unwrap_or("No task usage reported.")
+                        .unwrap_or(ui_text("No task usage reported.", "没有任务用量记录。"))
                         .to_string()
                         .into(),
                 ]),
@@ -167,22 +174,35 @@ impl AnalyticsView {
         };
         let metric = self.task_metric();
         let mut lines = wrap(vec![
-            format!(
-                "Usage estimates · active in past 30 days · sorted by {}",
-                METRICS[metric]
-            )
+            (if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!(
+                    "用量估算 · 最近 30 天内活跃 · 按{}排序",
+                    metric_label(metric)
+                )
+            } else {
+                format!(
+                    "Usage estimates · active in past 30 days · sorted by {}",
+                    metric_label(metric)
+                )
+            })
             .set_style(secondary_style())
             .into(),
             if metric == 2 {
-                "Credits debited from balance · includes adjustments"
+                ui_text(
+                    "Credits debited from balance · includes adjustments",
+                    "从余额扣除的额度 · 含调整",
+                )
             } else {
-                "Recorded usage / current full limit · may exceed 100%"
+                ui_text(
+                    "Recorded usage / current full limit · may exceed 100%",
+                    "已记录用量 / 当前完整上限 · 可能超过 100%",
+                )
             }
             .set_style(secondary_style())
             .into(),
         ]);
         if chats.rows.is_empty() {
-            lines.push("No recent local chats.".into());
+            lines.push(ui_text("No recent local chats.", "没有最近的本地会话。").into());
             return (lines, 0..1);
         }
         let missing = chats
@@ -201,7 +221,11 @@ impl AnalyticsView {
             .count();
         if missing + partial > 0 {
             lines.extend(wrap(vec![
-                format!("Partial ranking · {partial} partial · {missing} unavailable")
+                (if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("部分排名 · {partial} 项部分可用 · {missing} 项不可用")
+                } else {
+                    format!("Partial ranking · {partial} partial · {missing} unavailable")
+                })
                     .set_style(secondary_style())
                     .into(),
             ]));
@@ -216,14 +240,14 @@ impl AnalyticsView {
                     .map(|chat| amount(available(chat), *index).len())
                     .max()
                     .unwrap_or_default()
-                    .max(METRICS[*index].len())
+                    .max(metric_label(*index).len())
             })
             .collect::<Vec<_>>();
         let show_all = widths.iter().sum::<usize>() + widths.len() * 2 + 24 <= width;
         let metric_text = |chat: Option<&Chat>| {
             if !show_all {
                 return chat.map_or_else(
-                    || METRICS[metric].to_string(),
+                    || metric_label(metric).to_string(),
                     |chat| amount(available(chat), metric),
                 );
             }
@@ -232,7 +256,7 @@ impl AnalyticsView {
                 .zip(&widths)
                 .map(|(index, column_width)| {
                     let value = chat.map_or_else(
-                        || METRICS[*index].to_string(),
+                        || metric_label(*index).to_string(),
                         |chat| amount(available(chat), *index),
                     );
                     format!("{value:>column_width$}")
@@ -242,7 +266,7 @@ impl AnalyticsView {
         };
         lines.push(Line::default());
         lines.push(columns(
-            "  Chat".bold().into(),
+            ui_text("  Chat", "  会话").bold().into(),
             metric_text(/*chat*/ None).bold().into(),
             width,
         ));
@@ -259,7 +283,7 @@ impl AnalyticsView {
                     .as_ref()
                     .is_some_and(|task| task.data_status == TaskUsageStatus::Partial)
                 {
-                    " · partial"
+                    ui_text(" · partial", " · 部分可用")
                 } else {
                     ""
                 };
@@ -294,7 +318,7 @@ impl AnalyticsView {
                             .subsequent_indent("  ".into()),
                     ));
                     for index in self.task_metrics() {
-                        let label = METRICS[index];
+                        let label = metric_label(index);
                         row.push(columns(
                             format!("  {label}").into(),
                             amount(available(chat), index).into(),
@@ -311,13 +335,21 @@ impl AnalyticsView {
                             });
                             row.push(Line::default());
                             row.push(columns(
-                                "  Model / effort / speed".bold().into(),
-                                METRICS[metric].bold().into(),
+                                ui_text(
+                                    "  Model / effort / speed",
+                                    "  模型 / 思考强度 / 速度",
+                                )
+                                .bold()
+                                .into(),
+                                metric_label(metric).bold().into(),
                                 width,
                             ));
                             for group in groups {
                                 let model = self
-                                    .model_name(group.model.as_deref().unwrap_or("Not reported"));
+                                    .model_name(group.model.as_deref().unwrap_or(ui_text(
+                                        "Not reported",
+                                        "未上报",
+                                    )));
                                 let value = amount(Some(&group.amounts), metric);
                                 row.push(columns(
                                     truncate(
@@ -330,12 +362,18 @@ impl AnalyticsView {
                                 row.push(
                                     format!(
                                         "    {} · {} · {}",
-                                        group.reasoning_effort.as_deref().unwrap_or("Not reported"),
-                                        group.speed.as_deref().unwrap_or("Not reported"),
+                                        group.reasoning_effort.as_deref().unwrap_or(ui_text(
+                                            "Not reported",
+                                            "未上报"
+                                        )),
+                                        group.speed.as_deref().unwrap_or(ui_text(
+                                            "Not reported",
+                                            "未上报"
+                                        )),
                                         group
                                             .product_experience
                                             .as_deref()
-                                            .unwrap_or("Not reported")
+                                            .unwrap_or(ui_text("Not reported", "未上报"))
                                     )
                                     .set_style(secondary_style())
                                     .into(),
@@ -344,7 +382,7 @@ impl AnalyticsView {
                         }
                     } else {
                         row.push(
-                            "  Task usage unavailable."
+                            ui_text("  Task usage unavailable.", "  任务用量不可用。")
                                 .set_style(secondary_style())
                                 .into(),
                         );
@@ -364,23 +402,36 @@ impl AnalyticsView {
             })
             .collect::<Vec<_>>();
         let mut coverage = vec![
-            "Local chats · includes discovered descendants · excludes archived roots"
+            ui_text(
+                "Local chats · includes discovered descendants · excludes archived roots",
+                "本地会话 · 含发现的后代会话 · 不含已归档根会话",
+            )
                 .set_style(secondary_style())
                 .into(),
         ];
         if chats.truncated {
             coverage.push(
-                "Partial ranking · 100 most recently active chats"
+                ui_text(
+                    "Partial ranking · 100 most recently active chats",
+                    "部分排名 · 最近活跃的 100 个会话",
+                )
                     .set_style(secondary_style())
                     .into(),
             );
         }
         if let Some(time) = chats.updated_at {
             coverage.push(
-                format!(
-                    "Updated {} UTC · recent activity may be delayed",
-                    time.format(self.clock_format.date_time_format())
-                )
+                (if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!(
+                        "更新于 {} UTC · 最近活动可能有延迟",
+                        time.format(self.clock_format.date_time_format())
+                    )
+                } else {
+                    format!(
+                        "Updated {} UTC · recent activity may be delayed",
+                        time.format(self.clock_format.date_time_format())
+                    )
+                })
                 .set_style(secondary_style())
                 .into(),
             );
@@ -389,7 +440,17 @@ impl AnalyticsView {
             let count = rows.len();
             lines.extend(rows.into_iter().take(/*n*/ 5).flatten());
             lines.push(Line::default());
-            lines.push(format!("Showing top {} of {count} chats", count.min(/*other*/ 5)).into());
+            lines.push(
+                (if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!(
+                        "显示前 {} 个会话，共 {count} 个",
+                        count.min(/*other*/ 5)
+                    )
+                } else {
+                    format!("Showing top {} of {count} chats", count.min(/*other*/ 5))
+                })
+                .into(),
+            );
             lines.extend(wrap(coverage));
             (lines, 0..1)
         } else {

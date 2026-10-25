@@ -550,9 +550,6 @@ impl ChatWidget {
             SlashCommand::Quit | SlashCommand::Exit => {
                 self.request_quit_without_confirmation();
             }
-            SlashCommand::Logout => {
-                self.app_event_tx.send(AppEvent::Logout);
-            }
             SlashCommand::Copy => {
                 self.show_copy_picker();
             }
@@ -574,7 +571,7 @@ impl ChatWidget {
                     .unwrap_or_else(|| self.config.cwd.to_path_buf());
                 tokio::spawn(async move {
                     let text = match runner {
-                        Some(runner) => match get_git_diff(runner.as_ref(), &cwd).await {
+                        Some(runner) => match get_git_diff_plain(runner.as_ref(), &cwd).await {
                             Ok((is_git_repo, diff_text)) => {
                                 if is_git_repo {
                                     diff_text
@@ -587,7 +584,7 @@ impl ChatWidget {
                         None => "Failed to compute diff: workspace command runner unavailable"
                             .to_string(),
                     };
-                    tx.send(AppEvent::DiffResult(cwd, text));
+                    tx.send(AppEvent::DiffReviewResult(cwd, text));
                 });
             }
             SlashCommand::Mention => {
@@ -661,9 +658,6 @@ impl ChatWidget {
             }
             SlashCommand::Provider => {
                 self.open_provider_menu();
-            }
-            SlashCommand::Pets => {
-                self.open_pets_picker();
             }
             SlashCommand::Ps => {
                 self.add_ps_output();
@@ -1226,17 +1220,6 @@ impl ChatWidget {
                 self.app_event_tx
                     .send(AppEvent::ResumeSessionByIdOrName(args));
             }
-            SlashCommand::Pets
-                if matches!(
-                    args.trim().to_ascii_lowercase().as_str(),
-                    "disable" | "disabled" | "hide" | "hidden" | "off" | "none"
-                ) =>
-            {
-                self.app_event_tx.send(AppEvent::PetDisabled);
-            }
-            SlashCommand::Pets if !trimmed.is_empty() => {
-                self.select_pet_by_id(args);
-            }
             _ => self.dispatch_command_from_source(cmd, source),
         }
         if source == SlashCommandDispatchSource::Live && cmd != SlashCommand::Goal {
@@ -1457,7 +1440,6 @@ impl ChatWidget {
             | SlashCommand::Memories
             | SlashCommand::Quit
             | SlashCommand::Exit
-            | SlashCommand::Logout
             | SlashCommand::Mention
             | SlashCommand::Skills
             | SlashCommand::Import
@@ -1468,8 +1450,7 @@ impl ChatWidget {
             | SlashCommand::Theme
             | SlashCommand::Language
             | SlashCommand::Provider
-            | SlashCommand::Tui
-            | SlashCommand::Pets => QueueDrain::Stop,
+            | SlashCommand::Tui => QueueDrain::Stop,
         }
     }
 

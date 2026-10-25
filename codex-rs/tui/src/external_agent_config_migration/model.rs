@@ -39,8 +39,11 @@ pub(crate) fn external_agent_config_migration_groups(
     let mut groups = Vec::new();
     if !tools_and_setup.is_empty() {
         groups.push(ExternalAgentConfigMigrationGroupModel {
-            label: "Tools & setup".to_string(),
-            description: "Settings, instructions, integrations, agents, commands, and skills",
+            label: crate::i18n::ui_text("Tools & setup", "工具与配置").to_string(),
+            description: crate::i18n::ui_text(
+                "Settings, instructions, integrations, agents, commands, and skills",
+                "设置、指令、集成、Agent、命令和 Skills",
+            ),
             item_indices: tools_and_setup,
         });
     }
@@ -52,11 +55,18 @@ pub(crate) fn external_agent_config_migration_groups(
             .len();
         groups.push(ExternalAgentConfigMigrationGroupModel {
             label: if project_count == 1 {
-                "Current project".to_string()
+                crate::i18n::ui_text("Current project", "当前项目").to_string()
             } else {
-                format!("Projects ({project_count})")
+                if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                    format!("项目（{project_count}）")
+                } else {
+                    format!("Projects ({project_count})")
+                }
             },
-            description: "Add Codex files alongside your existing project files",
+            description: crate::i18n::ui_text(
+                "Add Codex files alongside your existing project files",
+                "在现有项目文件旁添加 Codex 文件",
+            ),
             item_indices: projects,
         });
     }
@@ -67,8 +77,12 @@ pub(crate) fn external_agent_config_migration_groups(
             .map(|details| details.sessions.len())
             .sum::<usize>();
         groups.push(ExternalAgentConfigMigrationGroupModel {
-            label: format!("Chat sessions ({session_count})"),
-            description: "Last 30 days of chats",
+            label: if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("聊天会话（{session_count}）")
+            } else {
+                format!("Chat sessions ({session_count})")
+            },
+            description: crate::i18n::ui_text("Last 30 days of chats", "最近 30 天的会话"),
             item_indices: chat_sessions,
         });
     }

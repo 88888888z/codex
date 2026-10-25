@@ -17,6 +17,9 @@ use crate::bottom_pane::SelectionItem;
 use crate::bottom_pane::SelectionViewParams;
 use crate::bottom_pane::custom_prompt_view::CustomPromptView;
 use crate::history_cell;
+use crate::i18n::current_language;
+use crate::i18n::is_chinese;
+use crate::i18n::ui_text;
 use crate::key_hint;
 use crate::render::renderable::ColumnRenderable;
 use codex_app_server_protocol::MarketplaceAddResponse;
@@ -64,8 +67,14 @@ impl ChatWidget {
     pub(crate) fn add_plugins_output(&mut self) {
         if !self.config.features.enabled(Feature::Plugins) {
             self.add_info_message(
-                "Plugins are disabled.".to_string(),
-                Some("Enable the plugins feature to use /plugins.".to_string()),
+                ui_text("Plugins are disabled.", "插件功能已禁用。").to_string(),
+                Some(
+                    ui_text(
+                        "Enable the plugins feature to use /plugins.",
+                        "启用插件功能后才能使用 /plugins。",
+                    )
+                    .to_string(),
+                ),
             );
             return;
         }
@@ -285,10 +294,20 @@ impl ChatWidget {
         let tx = self.app_event_tx.clone();
         let cwd = self.config.cwd.to_path_buf();
         let view = CustomPromptView::new(
-            "Add marketplace".to_string(),
-            "owner/repo, git URL, or local marketplace path".to_string(),
+            ui_text("Add marketplace", "添加插件市场").to_string(),
+            ui_text(
+                "owner/repo, git URL, or local marketplace path",
+                "owner/repo、Git URL 或本地插件市场路径",
+            )
+            .to_string(),
             String::new(),
-            Some("Examples: owner/repo, git URL, ./marketplace".to_string()),
+            Some(
+                ui_text(
+                    "Examples: owner/repo, git URL, ./marketplace",
+                    "示例：owner/repo、Git URL、./marketplace",
+                )
+                .to_string(),
+            ),
             Box::new(move |source: String| {
                 let source = source.trim().to_string();
                 if source.is_empty() {
@@ -461,8 +480,18 @@ impl ChatWidget {
                 self.plugin_install_auth_flow = None;
                 if self.plugin_install_apps_needing_auth.is_empty() {
                     self.add_info_message(
-                        format!("Installed {plugin_display_name} plugin."),
-                        Some("No additional app authentication is required.".to_string()),
+                        if is_chinese(current_language()) {
+                            format!("已安装 {plugin_display_name} 插件。")
+                        } else {
+                            format!("Installed {plugin_display_name} plugin.")
+                        },
+                        Some(
+                            ui_text(
+                                "No additional app authentication is required.",
+                                "无需额外的应用认证。",
+                            )
+                            .to_string(),
+                        ),
                     );
                     true
                 } else {
@@ -473,11 +502,22 @@ impl ChatWidget {
                         .collect::<Vec<_>>()
                         .join(", ");
                     self.add_info_message(
-                        format!("Installed {plugin_display_name} plugin."),
-                        Some(format!(
-                            "{} app(s) still need authentication: {app_names}",
-                            self.plugin_install_apps_needing_auth.len()
-                        )),
+                        if is_chinese(current_language()) {
+                            format!("已安装 {plugin_display_name} 插件。")
+                        } else {
+                            format!("Installed {plugin_display_name} plugin.")
+                        },
+                        Some(if is_chinese(current_language()) {
+                            format!(
+                                "仍有 {} 个应用需要认证：{app_names}",
+                                self.plugin_install_apps_needing_auth.len()
+                            )
+                        } else {
+                            format!(
+                                "{} app(s) still need authentication: {app_names}",
+                                self.plugin_install_apps_needing_auth.len()
+                            )
+                        }),
                     );
                     self.plugin_install_auth_flow = Some(PluginInstallAuthFlowState {
                         plugin_display_name,
@@ -520,19 +560,34 @@ impl ChatWidget {
                 self.newly_installed_marketplace_tab_id =
                     (!response.already_added).then_some(marketplace_tab_id);
                 let message = if response.already_added {
-                    format!(
-                        "Marketplace {} is already added.",
-                        response.marketplace_name
-                    )
+                    if is_chinese(current_language()) {
+                        format!("插件市场 {} 已添加。", response.marketplace_name)
+                    } else {
+                        format!(
+                            "Marketplace {} is already added.",
+                            response.marketplace_name
+                        )
+                    }
                 } else {
-                    format!("Added marketplace {}.", response.marketplace_name)
+                    if is_chinese(current_language()) {
+                        format!("已添加插件市场 {}。", response.marketplace_name)
+                    } else {
+                        format!("Added marketplace {}.", response.marketplace_name)
+                    }
                 };
                 self.add_info_message(
                     message,
-                    Some(format!(
-                        "Marketplace root: {}",
-                        response.installed_root.as_path().display()
-                    )),
+                    Some(if is_chinese(current_language()) {
+                        format!(
+                            "插件市场根目录：{}",
+                            response.installed_root.as_path().display()
+                        )
+                    } else {
+                        format!(
+                            "Marketplace root: {}",
+                            response.installed_root.as_path().display()
+                        )
+                    }),
                 );
             }
             Err(_) => {
@@ -564,15 +619,33 @@ impl ChatWidget {
             Ok(response) => {
                 self.plugins_active_tab_id = Some(ALL_PLUGINS_TAB_ID.to_string());
                 self.add_info_message(
-                    format!("Removed marketplace {marketplace_display_name}."),
+                    if is_chinese(current_language()) {
+                        format!("已移除插件市场 {marketplace_display_name}。")
+                    } else {
+                        format!("Removed marketplace {marketplace_display_name}.")
+                    },
                     Some(match response.installed_root {
                         Some(installed_root) => {
-                            format!("Marketplace root: {}", installed_root.as_path().display())
+                            if is_chinese(current_language()) {
+                                format!(
+                                    "插件市场根目录：{}",
+                                    installed_root.as_path().display()
+                                )
+                            } else {
+                                format!(
+                                    "Marketplace root: {}",
+                                    installed_root.as_path().display()
+                                )
+                            }
                         }
-                        None => format!(
-                            "Removed marketplace config for {}.",
-                            response.marketplace_name
-                        ),
+                        None => if is_chinese(current_language()) {
+                            format!("已移除 {} 的插件市场配置。", response.marketplace_name)
+                        } else {
+                            format!(
+                                "Removed marketplace config for {}.",
+                                response.marketplace_name
+                            )
+                        },
                     }),
                 );
             }

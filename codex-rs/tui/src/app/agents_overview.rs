@@ -93,36 +93,59 @@ impl App {
         if matches!(self.app_server_target, AppServerTarget::Embedded) {
             let workload_identity_selected = codex_login::is_workload_identity_selected();
             self.chat_widget.show_selection_view(SelectionViewParams {
-                title: Some("Shared agents unavailable".to_string()),
+                title: Some(
+                    crate::i18n::ui_text("Shared agents unavailable", "共享 Agent 不可用")
+                        .to_string(),
+                ),
                 subtitle: Some(
                     if workload_identity_selected {
-                        "The agents dashboard is unavailable while workload identity is active."
+                        crate::i18n::ui_text(
+                            "The agents dashboard is unavailable while workload identity is active.",
+                            "工作负载身份启用时无法使用 Agent 仪表盘。",
+                        )
                     } else if cfg!(any(unix, windows)) {
-                        "This session isn’t connected to a shared background server."
+                        crate::i18n::ui_text(
+                            "This session isn’t connected to a shared background server.",
+                            "此会话未连接到共享后台服务。",
+                        )
                     } else {
-                        "Connect to a remote background server to use the agents dashboard."
+                        crate::i18n::ui_text(
+                            "Connect to a remote background server to use the agents dashboard.",
+                            "请连接远程后台服务后使用 Agent 仪表盘。",
+                        )
                     }
                     .to_string(),
                 ),
                 footer_note: (cfg!(any(unix, windows)) && !workload_identity_selected).then(|| {
-                    Line::from(
+                    Line::from(crate::i18n::ui_text(
                         "Starting a background server will not interrupt or move this session."
-                            .dim(),
+                        ,
+                        "启动后台服务不会中断或移动此会话。",
                     )
+                    .dim())
                 }),
                 items: [
                     #[cfg(any(unix, windows))]
                     (!workload_identity_selected).then(|| SelectionItem {
-                        name: "Start background server".to_string(),
+                        name: crate::i18n::ui_text(
+                            "Start background server",
+                            "启动后台服务",
+                        )
+                        .to_string(),
                         description: Some(
-                            "Open `codex agents` in another terminal afterward".to_string(),
+                            crate::i18n::ui_text(
+                                "Open `codex agents` in another terminal afterward",
+                                "随后可在另一个终端打开 `codex agents`",
+                            )
+                            .to_string(),
                         ),
                         actions: vec![Box::new(|tx| tx.send(AppEvent::StartAgentsDaemon))],
                         dismiss_on_select: true,
                         ..Default::default()
                     }),
                     Some(SelectionItem {
-                        name: "Return to this session".to_string(),
+                        name: crate::i18n::ui_text("Return to this session", "返回此会话")
+                            .to_string(),
                         dismiss_on_select: true,
                         ..Default::default()
                     }),
@@ -158,9 +181,15 @@ impl App {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             state.loading = false;
             state.connection_notice = Some(if self.reconnect.failed {
-                "Reconnect failed — agent list is stale; relaunch to retry"
+                crate::i18n::ui_text(
+                    "Reconnect failed — agent list is stale; relaunch to retry",
+                    "重新连接失败，Agent 列表已过期；请重启后重试",
+                )
             } else {
-                "Reconnecting — agent list is stale"
+                crate::i18n::ui_text(
+                    "Reconnecting — agent list is stale",
+                    "正在重新连接，Agent 列表已过期",
+                )
             });
         } else {
             self.refresh_agents_overview_threads(app_server);

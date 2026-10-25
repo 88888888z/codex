@@ -213,15 +213,19 @@ fn build_keymap_picker_params_for_action(
     let mut tabs = Vec::new();
     tabs.push(SelectionTab {
         id: KEYMAP_ALL_TAB_ID.to_string(),
-        label: "All".to_string(),
+        label: crate::i18n::ui_text("All", "全部").to_string(),
         header: keymap_header(
-            "All configurable shortcuts.".to_string(),
-            format!("{total} actions, {custom_count} customized, {unbound_count} unbound."),
+            crate::i18n::ui_text("All configurable shortcuts.", "全部可配置快捷键。")
+                .to_string(),
+            action_count_line(total, Some((custom_count, unbound_count))),
         ),
         items: keymap_selection_items(
             rows.iter(),
-            "No shortcuts available",
-            "No configurable shortcuts are available",
+            crate::i18n::ui_text("No shortcuts available", "没有可用快捷键"),
+            crate::i18n::ui_text(
+                "No configurable shortcuts are available",
+                "没有可配置的快捷键",
+            ),
         ),
     });
 
@@ -229,15 +233,19 @@ fn build_keymap_picker_params_for_action(
     let common_count = common_rows.len();
     tabs.push(SelectionTab {
         id: KEYMAP_COMMON_TAB_ID.to_string(),
-        label: "Common".to_string(),
+        label: crate::i18n::ui_text("Common", "常用").to_string(),
         header: keymap_header(
-            "Frequently customized shortcuts.".to_string(),
-            action_count_line(common_count),
+            crate::i18n::ui_text("Frequently customized shortcuts.", "经常自定义的快捷键。")
+                .to_string(),
+            action_count_line(common_count, None),
         ),
         items: keymap_selection_items(
             common_rows,
-            "No common shortcuts",
-            "No common shortcut actions are available",
+            crate::i18n::ui_text("No common shortcuts", "没有常用快捷键"),
+            crate::i18n::ui_text(
+                "No common shortcut actions are available",
+                "没有可用的常用快捷键操作",
+            ),
         ),
     });
 
@@ -247,15 +255,23 @@ fn build_keymap_picker_params_for_action(
         .collect::<Vec<_>>();
     tabs.push(SelectionTab {
         id: KEYMAP_CUSTOM_TAB_ID.to_string(),
-        label: format!("Customized ({custom_count})"),
+        label: if crate::i18n::is_chinese(crate::i18n::current_language()) {
+            format!("已自定义（{custom_count}）")
+        } else {
+            format!("Customized ({custom_count})")
+        },
         header: keymap_header(
-            "Root-level shortcut overrides.".to_string(),
-            action_count_line(custom_count),
+            crate::i18n::ui_text("Root-level shortcut overrides.", "根级快捷键覆盖。")
+                .to_string(),
+            action_count_line(custom_count, None),
         ),
         items: keymap_selection_items(
             custom_rows,
-            "No customized shortcuts",
-            "No root-level keymap overrides have been configured",
+            crate::i18n::ui_text("No customized shortcuts", "没有已自定义的快捷键"),
+            crate::i18n::ui_text(
+                "No root-level keymap overrides have been configured",
+                "尚未配置根级快捷键覆盖",
+            ),
         ),
     });
 
@@ -265,15 +281,26 @@ fn build_keymap_picker_params_for_action(
         .collect::<Vec<_>>();
     tabs.push(SelectionTab {
         id: KEYMAP_UNBOUND_TAB_ID.to_string(),
-        label: format!("Unbound ({unbound_count})"),
+        label: if crate::i18n::is_chinese(crate::i18n::current_language()) {
+            format!("未绑定（{unbound_count}）")
+        } else {
+            format!("Unbound ({unbound_count})")
+        },
         header: keymap_header(
-            "Actions without an active shortcut.".to_string(),
-            action_count_line(unbound_count),
+            crate::i18n::ui_text(
+                "Actions without an active shortcut.",
+                "没有活动快捷键的操作。",
+            )
+            .to_string(),
+            action_count_line(unbound_count, None),
         ),
         items: keymap_selection_items(
             unbound_rows,
-            "No unbound shortcuts",
-            "Every configurable action currently has a shortcut",
+            crate::i18n::ui_text("No unbound shortcuts", "没有未绑定的快捷键"),
+            crate::i18n::ui_text(
+                "Every configurable action currently has a shortcut",
+                "每个可配置操作当前都已绑定快捷键",
+            ),
         ),
     });
 
@@ -286,11 +313,17 @@ fn build_keymap_picker_params_for_action(
         tabs.push(SelectionTab {
             id: tab.id.to_string(),
             label: tab.label.to_string(),
-            header: keymap_header(tab.description.to_string(), action_count_line(count)),
+            header: keymap_header(
+                tab.description.to_string(),
+                action_count_line(count, None),
+            ),
             items: keymap_selection_items(
                 tab_rows,
-                "No shortcuts in this group",
-                "No configurable actions are available in this group",
+                crate::i18n::ui_text("No shortcuts in this group", "此分组没有快捷键"),
+                crate::i18n::ui_text(
+                    "No configurable actions are available in this group",
+                    "此分组没有可配置操作",
+                ),
             ),
         });
     }
@@ -308,7 +341,10 @@ fn build_keymap_picker_params_for_action(
         tabs,
         initial_tab_id: Some(KEYMAP_ALL_TAB_ID.to_string()),
         is_searchable: true,
-        search_placeholder: Some("Type to search shortcuts".to_string()),
+        search_placeholder: Some(
+            crate::i18n::ui_text("Type to search shortcuts", "输入以搜索快捷键")
+                .to_string(),
+        ),
         col_width_mode: ColumnWidthMode::AutoAllRows,
         row_display: SelectionRowDisplay::SingleLine,
         name_column_width,
@@ -320,20 +356,34 @@ fn build_keymap_picker_params_for_action(
 fn keymap_debug_tab() -> SelectionTab {
     SelectionTab {
         id: KEYMAP_DEBUG_TAB_ID.to_string(),
-        label: "Debug".to_string(),
+        label: crate::i18n::ui_text("Debug", "调试").to_string(),
         header: keymap_header(
-            "Inspect keypresses from your terminal.".to_string(),
-            "See the key Codex detects and any shortcuts assigned to it.".to_string(),
+            crate::i18n::ui_text(
+                "Inspect keypresses from your terminal.",
+                "检查终端发送的按键。",
+            )
+            .to_string(),
+            crate::i18n::ui_text(
+                "See the key Codex detects and any shortcuts assigned to it.",
+                "查看 Codex 识别到的按键及其绑定的快捷键。",
+            )
+            .to_string(),
         ),
         items: vec![SelectionItem {
-            name: "Inspect keypresses".to_string(),
+            name: crate::i18n::ui_text("Inspect keypresses", "检查按键").to_string(),
             description: Some(
-                "Press Enter, then any key to inspect it (Ctrl+C exits)"
-                    .to_string(),
+                crate::i18n::ui_text(
+                    "Press Enter, then any key to inspect it (Ctrl+C exits)",
+                    "按 Enter，然后按任意键进行检查（Ctrl+C 退出）",
+                )
+                .to_string(),
             ),
             selected_description: Some(
-                "Open a live inspector that shows the detected key, config key, and matching actions"
-                    .to_string(),
+                crate::i18n::ui_text(
+                    "Open a live inspector that shows the detected key, config key, and matching actions",
+                    "打开实时检查器，显示识别的按键、配置键和匹配操作",
+                )
+                .to_string(),
             ),
             actions: vec![Box::new(|tx| {
                 tx.send(AppEvent::OpenKeymapDebug);
@@ -456,26 +506,42 @@ fn keymap_row_prefix(row: &KeymapActionRow) -> Vec<Span<'static>> {
 
 fn keymap_header(description: String, summary: String) -> Box<dyn Renderable> {
     let mut header = ColumnRenderable::new();
-    header.push(Line::from("Keymap".bold()));
+    header.push(Line::from(crate::i18n::ui_text("Keymap", "快捷键").bold()));
     header.push(Line::from(description.dim()));
     header.push(Line::from(summary.dim()));
     Box::new(header)
 }
 
-fn action_count_line(count: usize) -> String {
-    match count {
-        1 => "1 action.".to_string(),
-        _ => format!("{count} actions."),
+fn action_count_line(count: usize, details: Option<(usize, usize)>) -> String {
+    if crate::i18n::is_chinese(crate::i18n::current_language()) {
+        if let Some((customized, unbound)) = details {
+            format!("{count} 个操作，{customized} 个已自定义，{unbound} 个未绑定。")
+        } else {
+            format!("{count} 个操作。")
+        }
+    } else if let Some((customized, unbound)) = details {
+        format!("{count} actions, {customized} customized, {unbound} unbound.")
+    } else {
+        match count {
+            1 => "1 action.".to_string(),
+            _ => format!("{count} actions."),
+        }
     }
 }
 
 fn keymap_picker_hint_line() -> Line<'static> {
     [
-        ("left/right", " group · "),
-        ("enter", " edit shortcut · "),
-        ("*", " custom · "),
-        ("-", " unbound · "),
-        ("esc", " close"),
+        (
+            "left/right",
+            crate::i18n::ui_text(" group · ", " 分组 · "),
+        ),
+        (
+            "enter",
+            crate::i18n::ui_text(" edit shortcut · ", " 编辑快捷键 · "),
+        ),
+        ("*", crate::i18n::ui_text(" custom · ", " 已自定义 · ")),
+        ("-", crate::i18n::ui_text(" unbound · ", " 未绑定 · ")),
+        ("esc", crate::i18n::ui_text(" close", " 关闭")),
     ]
     .into_iter()
     .flat_map(|(key, label)| {
@@ -488,9 +554,15 @@ fn keymap_picker_hint_line() -> Line<'static> {
 
 fn keymap_debug_hint_line() -> Line<'static> {
     let mut spans = crate::key_hint::key_label_spans("enter");
-    spans.push(" start inspector · ".set_style(crate::style::footer_hint_label_style()));
+    spans.push(
+        crate::i18n::ui_text(" start inspector · ", " 开始检查 · ")
+            .set_style(crate::style::footer_hint_label_style()),
+    );
     spans.extend(crate::key_hint::key_label_spans("esc"));
-    spans.push(" close".set_style(crate::style::footer_hint_label_style()));
+    spans.push(
+        crate::i18n::ui_text(" close", " 关闭")
+            .set_style(crate::style::footer_hint_label_style()),
+    );
     spans.into()
 }
 

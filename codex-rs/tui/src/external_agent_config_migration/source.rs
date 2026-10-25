@@ -166,10 +166,21 @@ impl WidgetRef for &ExternalAgentConfigSourceScreen {
         Clear.render(area, buf);
         let mut column = ColumnRenderable::new();
         column.push("");
-        column.push(Paragraph::new("Choose an import source".bold()).wrap(Wrap { trim: false }));
+        column.push(
+            Paragraph::new(
+                crate::i18n::ui_text("Choose an import source", "选择导入来源").bold(),
+            )
+            .wrap(Wrap { trim: false }),
+        );
         column.push("");
         column.push(
-            Paragraph::new("Select the app whose setup you want to import.".dim())
+            Paragraph::new(
+                crate::i18n::ui_text(
+                    "Select the app whose setup you want to import.",
+                    "选择要导入配置的应用。",
+                )
+                .dim(),
+            )
                 .wrap(Wrap { trim: false })
                 .inset(Insets::tlbr(
                     /*top*/ 0, /*left*/ 2, /*bottom*/ 0, /*right*/ 0,

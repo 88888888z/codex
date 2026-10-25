@@ -64,16 +64,28 @@ impl PetImageUnsupportedReason {
     fn message(self) -> &'static str {
         match self {
             Self::Tmux => {
-                "Pets are disabled in tmux. Terminal images don’t stay pane-local in tmux and can corrupt scrollback or move between panes. Run Codex outside tmux to use pets."
+                crate::i18n::ui_text(
+                    "Pets are disabled in tmux. Terminal images don’t stay pane-local in tmux and can corrupt scrollback or move between panes. Run Codex outside tmux to use pets.",
+                    "tmux 中已禁用宠物。终端图片无法稳定限制在单个窗格内，可能破坏回滚内容或移动到其他窗格。请在 tmux 外运行 Codex 以使用宠物。",
+                )
             }
             Self::Zellij => {
-                "Pets are disabled in Zellij. Terminal images don’t stay reliably pane-local in Zellij. Run Codex outside Zellij to use pets."
+                crate::i18n::ui_text(
+                    "Pets are disabled in Zellij. Terminal images don’t stay reliably pane-local in Zellij. Run Codex outside Zellij to use pets.",
+                    "Zellij 中已禁用宠物。终端图片无法可靠地限制在单个窗格内。请在 Zellij 外运行 Codex 以使用宠物。",
+                )
             }
             Self::Iterm2TooOld => {
-                "Pets require iTerm2 3.6 or newer. Upgrade iTerm2 to use terminal pets."
+                crate::i18n::ui_text(
+                    "Pets require iTerm2 3.6 or newer. Upgrade iTerm2 to use terminal pets.",
+                    "宠物需要 iTerm2 3.6 或更高版本。请升级 iTerm2 后使用终端宠物。",
+                )
             }
             Self::Terminal => {
-                "Pets aren’t available in this terminal. Terminal pets need image support, and this terminal environment doesn’t expose a supported image protocol. Try a terminal with Kitty graphics or Sixel support, or run Codex outside tmux."
+                crate::i18n::ui_text(
+                    "Pets aren’t available in this terminal. Terminal pets need image support, and this terminal environment doesn’t expose a supported image protocol. Try a terminal with Kitty graphics or Sixel support, or run Codex outside tmux.",
+                    "此终端不支持宠物。终端宠物需要图片支持，但当前终端没有提供受支持的图片协议。请尝试支持 Kitty graphics 或 Sixel 的终端，或在 tmux 外运行 Codex。",
+                )
             }
         }
     }
@@ -290,7 +302,13 @@ pub fn sixel_frame(frame_path: &Path, cache_dir: &Path, height_px: u16) -> Resul
         .file_stem()
         .and_then(|stem| stem.to_str())
         .context("frame path has no valid file stem")?;
-    let path = cache_dir.join(format!("{stem}_h{height_px}_{SIXEL_CACHE_VERSION}.six"));
+    let background = crate::terminal_palette::default_bg();
+    let cache_background = background.map_or_else(String::new, |(red, green, blue)| {
+        format!("_bg{red:02x}{green:02x}{blue:02x}")
+    });
+    let path = cache_dir.join(format!(
+        "{stem}_h{height_px}_{SIXEL_CACHE_VERSION}{cache_background}.six"
+    ));
     if path.exists() {
         return Ok(path);
     }
@@ -302,12 +320,34 @@ pub fn sixel_frame(frame_path: &Path, cache_dir: &Path, height_px: u16) -> Resul
         .try_into()
         .unwrap_or(u32::MAX)
         .max(1);
-    let rgba = frame.resize(width, height, FilterType::Lanczos3).to_rgba8();
+    let mut rgba = frame.resize(width, height, FilterType::Lanczos3).to_rgba8();
+    if let Some(background) = background {
+        composite_on_background(&mut rgba, background);
+    }
     let (width, height) = rgba.dimensions();
     let sixel = sixel::encode_rgba(&rgba.into_raw(), width, height)?;
 
     fs::write(&path, sixel).with_context(|| format!("write {}", path.display()))?;
     Ok(path)
+}
+
+fn composite_on_background(rgba: &mut image::RgbaImage, background: (u8, u8, u8)) {
+    let (background_red, background_green, background_blue) = background;
+    for pixel in rgba.pixels_mut() {
+        let alpha = u32::from(pixel[3]);
+        if alpha == u32::from(u8::MAX) {
+            continue;
+        }
+        let inverse = u32::from(u8::MAX) - alpha;
+        pixel[0] = blend_on_background(pixel[0], background_red, alpha, inverse);
+        pixel[1] = blend_on_background(pixel[1], background_green, alpha, inverse);
+        pixel[2] = blend_on_background(pixel[2], background_blue, alpha, inverse);
+        pixel[3] = u8::MAX;
+    }
+}
+
+fn blend_on_background(channel: u8, background: u8, alpha: u32, inverse: u32) -> u8 {
+    ((u32::from(channel) * alpha + u32::from(background) * inverse + 127) / 255) as u8
 }
 
 #[cfg(test)]

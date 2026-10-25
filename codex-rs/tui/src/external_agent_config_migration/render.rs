@@ -83,14 +83,32 @@ impl WidgetRef for &ExternalAgentConfigMigrationScreen {
         let error_height = u16::from(self.error.is_some());
         let intro_lines = match self.view {
             MigrationView::Summary => vec![
-                Line::from("Bring over supported setup from another coding agent."),
-                Line::from("Codex may add files to your current project folder."),
-                Line::from("Your existing setup will not be changed."),
+                Line::from(crate::i18n::ui_text(
+                    "Bring over supported setup from another coding agent.",
+                    "从其他编程 Agent 导入受支持的配置。",
+                )),
+                Line::from(crate::i18n::ui_text(
+                    "Codex may add files to your current project folder.",
+                    "Codex 可能会向当前项目目录添加文件。",
+                )),
+                Line::from(crate::i18n::ui_text(
+                    "Your existing setup will not be changed.",
+                    "现有配置不会被修改。",
+                )),
             ],
             MigrationView::Customize => vec![
-                Line::from("Choose items to import."),
-                Line::from("Codex may add files to your current project folder."),
-                Line::from("Your existing setup will not be changed."),
+                Line::from(crate::i18n::ui_text(
+                    "Choose items to import.",
+                    "选择要导入的内容。",
+                )),
+                Line::from(crate::i18n::ui_text(
+                    "Codex may add files to your current project folder.",
+                    "Codex 可能会向当前项目目录添加文件。",
+                )),
+                Line::from(crate::i18n::ui_text(
+                    "Your existing setup will not be changed.",
+                    "现有配置不会被修改。",
+                )),
             ],
         };
         let intro_height = intro_lines.len() as u16;
@@ -123,8 +141,10 @@ impl WidgetRef for &ExternalAgentConfigMigrationScreen {
         .areas(inner_area);
 
         let title = match self.view {
-            MigrationView::Summary => "Import setup",
-            MigrationView::Customize => "Choose what to import",
+            MigrationView::Summary => crate::i18n::ui_text("Import setup", "导入配置"),
+            MigrationView::Customize => {
+                crate::i18n::ui_text("Choose what to import", "选择导入内容")
+            }
         };
         let heading = Line::from(vec!["> ".into(), title.bold()]);
         heading.render(header_area, buf);

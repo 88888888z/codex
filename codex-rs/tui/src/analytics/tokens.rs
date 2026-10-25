@@ -36,13 +36,15 @@ pub(super) fn filtered_history(
                 .map(|group| {
                     (
                         if group.is_other {
-                            "Other".into()
+                            crate::i18n::ui_text("Other", "其他").into()
                         } else {
                             group
                                 .dimensions
                                 .get("model")
                                 .cloned()
-                                .unwrap_or_else(|| "Unknown".into())
+                                .unwrap_or_else(|| {
+                                    crate::i18n::ui_text("Unknown", "未知").into()
+                                })
                         },
                         [
                             group.uncached_text_input_tokens,
@@ -69,7 +71,11 @@ pub(super) fn filtered_history(
                 })
                 .collect()
         } else {
-            return Err("Token breakdown is not available in this report.".into());
+            return Err(crate::i18n::ui_text(
+                "Token breakdown is not available in this report.",
+                "此报告没有 Token 明细。",
+            )
+            .into());
         };
         let values = days.entry(date).or_default();
         for (model, counts, total) in groups {
@@ -87,9 +93,17 @@ pub(super) fn filtered_history(
                 continue;
             }
             if missing_components {
-                return Err("Token counts were not reported.".into());
+                return Err(crate::i18n::ui_text(
+                    "Token counts were not reported.",
+                    "没有上报 Token 数量。",
+                )
+                .into());
             }
-            for (label, count) in ["Uncached input", "Cached input", "Output"]
+            for (label, count) in [
+                crate::i18n::ui_text("Uncached input", "未缓存输入"),
+                crate::i18n::ui_text("Cached input", "缓存输入"),
+                crate::i18n::ui_text("Output", "输出"),
+            ]
                 .into_iter()
                 .zip(counts)
             {
