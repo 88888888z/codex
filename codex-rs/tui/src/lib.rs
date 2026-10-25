@@ -204,6 +204,7 @@ mod render;
 mod resize_reflow_cap;
 mod resume_permissions;
 mod resume_picker;
+mod rewind;
 mod screen_reader;
 mod service_tier_resolution;
 mod session_archive_commands;

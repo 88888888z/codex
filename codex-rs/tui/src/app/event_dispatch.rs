@@ -55,6 +55,12 @@ impl App {
                 AppEvent::OpenDaemonMenu
                     | AppEvent::DiffReviewResult(_, _)
                     | AppEvent::RollbackDiffFile { .. }
+                    | AppEvent::OpenRewind { .. }
+                    | AppEvent::CreateRewindCheckpoint { .. }
+                    | AppEvent::LoadRewindPreview { .. }
+                    | AppEvent::RewindPreviewLoaded { .. }
+                    | AppEvent::RestoreRewindCheckpoint { .. }
+                    | AppEvent::RewindFilesRestored { .. }
                     | AppEvent::OpenWarnings
                     | AppEvent::StatusLineSetup { .. }
                     | AppEvent::StatusLineSetupCancelled
@@ -1320,6 +1326,55 @@ impl App {
                     ),
                 ));
                 tui.frame_requester().schedule_frame();
+            }
+            AppEvent::OpenRewind { cwd, thread_id } => {
+                self.open_rewind_overlay(tui, cwd, thread_id).await?;
+            }
+            AppEvent::CreateRewindCheckpoint {
+                cwd,
+                thread_id,
+                label,
+            } => {
+                match self
+                    .capture_rewind_checkpoint(cwd, thread_id, None, label, false)
+                    .await
+                {
+                    Ok(Some(checkpoint)) => self.chat_widget.add_info_message(
+                        format!("已创建检查点「{}」。", checkpoint.label),
+                        Some("使用 /rewind 查看和恢复。".to_string()),
+                    ),
+                    Ok(None) => self.chat_widget.add_info_message(
+                        "当前目录不在 Git 仓库中，无法创建检查点。".to_string(),
+                        None,
+                    ),
+                    Err(error) => self
+                        .chat_widget
+                        .add_error_message(format!("创建检查点失败：{error}")),
+                }
+                tui.frame_requester().schedule_frame();
+            }
+            AppEvent::LoadRewindPreview {
+                request_id,
+                checkpoint,
+            } => {
+                self.schedule_rewind_preview(request_id, checkpoint);
+            }
+            AppEvent::RewindPreviewLoaded {
+                request_id,
+                checkpoint_id,
+                result,
+            } => {
+                self.apply_rewind_preview(tui, request_id, checkpoint_id, result);
+            }
+            AppEvent::RestoreRewindCheckpoint { checkpoint, target } => {
+                self.begin_rewind_restore(tui, checkpoint, target);
+            }
+            AppEvent::RewindFilesRestored {
+                checkpoint,
+                target,
+                result,
+            } => {
+                self.finish_rewind_file_restore(tui, checkpoint, target, result);
             }
             AppEvent::RollbackDiffFile { cwd, path, status } => {
                 let Some(runner) = self.workspace_command_runner.clone() else {

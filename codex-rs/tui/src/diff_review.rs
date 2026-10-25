@@ -133,6 +133,29 @@ pub(crate) struct DiffReviewData {
     files: Vec<DiffFile>,
 }
 
+impl DiffReviewData {
+    pub(crate) fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.files.is_empty()
+    }
+
+    pub(crate) fn added_removed(&self) -> (usize, usize) {
+        self.files.iter().fold((0, 0), |(added, removed), file| {
+            let (file_added, file_removed) = file.added_removed();
+            (added + file_added, removed + file_removed)
+        })
+    }
+
+    pub(crate) fn prepare_highlight(&mut self) {
+        for file in &mut self.files {
+            file.prepare_highlight();
+        }
+    }
+}
+
 #[derive(Default)]
 struct FileBuilder {
     old_path: Option<PathBuf>,
@@ -375,9 +398,7 @@ impl DiffReviewOverlay {
         app_event_tx: AppEventSender,
         keymap: PagerKeymap,
     ) -> Self {
-        for file in &mut data.files {
-            file.prepare_highlight();
-        }
+        data.prepare_highlight();
         Self {
             data,
             selected: 0,
@@ -428,168 +449,22 @@ impl DiffReviewOverlay {
     }
 
     fn render_tree(&self, area: Rect, buf: &mut Buffer) {
-        let block = if self.focus == DiffFocus::Tree {
-            focused_panel(ui_text("Changes", "变更"))
-        } else {
-            panel(ui_text("Changes", "变更"))
-        };
-        let inner = block.inner(area);
-        block.render(area, buf);
-        let (rows, selected_row) = self.tree_rows();
-        let height = usize::from(inner.height);
-        let start = selected_row
-            .saturating_sub(height / 2)
-            .min(rows.len().saturating_sub(height));
-        Paragraph::new(rows.into_iter().skip(start).take(height).collect::<Vec<_>>())
-            .render(inner, buf);
-        if !self.data.files.is_empty()
-            && selected_row >= start
-            && selected_row < start.saturating_add(height)
-            && let Some(background) = selection_style().bg
-        {
-            let row = inner.y + (selected_row - start) as u16;
-            buf.set_style(
-                Rect::new(inner.x, row, inner.width, 1),
-                Style::default().bg(background),
-            );
-        }
-    }
-
-    fn tree_rows(&self) -> (Vec<Line<'static>>, usize) {
-        let mut rows = Vec::new();
-        let mut directories = BTreeSet::new();
-        let mut selected_row = 0;
-        for (index, file) in self.data.files.iter().enumerate() {
-            let components = file.path.components().collect::<Vec<_>>();
-            for depth in 0..components.len().saturating_sub(1) {
-                let directory = components[..=depth]
-                    .iter()
-                    .map(|component| component.as_os_str().to_string_lossy())
-                    .collect::<Vec<_>>()
-                    .join("/");
-                if directories.insert(directory.clone()) {
-                    rows.push(Line::from(format!("{}{}/", "  ".repeat(depth), components[depth].as_os_str().to_string_lossy())).dim());
-                }
-            }
-            let file_name = components
-                .last()
-                .map(|component| component.as_os_str().to_string_lossy())
-                .unwrap_or_default();
-            let marker = if index == self.selected { "›" } else { " " };
-            let (added, removed) = file.added_removed();
-            let marker_style = if index == self.selected {
-                Style::default().fg(accent_color()).bold()
-            } else {
-                Style::default()
-            };
-            let mut line = Line::from(vec![
-                Span::styled(marker, marker_style),
-                Span::styled(
-                    format!(
-                        " {}{} {} ",
-                        "  ".repeat(components.len().saturating_sub(1)),
-                        file_name,
-                        file.status.marker()
-                    ),
-                    file.status.tree_style(),
-                ),
-                Span::styled(
-                    format!("+{added} -{removed}"),
-                    Style::default().dim(),
-                ),
-            ]);
-            if index == self.selected {
-                line = line.bold();
-                selected_row = rows.len();
-            }
-            rows.push(line);
-        }
-        (rows, selected_row)
+        render_tree_panel(
+            &self.data,
+            self.selected,
+            self.focus == DiffFocus::Tree,
+            area,
+            buf,
+        );
     }
 
     fn render_file(&self, area: Rect, buf: &mut Buffer) {
-        let Some(file) = self.data.files.get(self.selected) else {
-            Paragraph::new(ui_text("No changes detected.", "没有检测到变更。").dim())
-                .block(panel(ui_text("Before / After", "修改前 / 修改后")))
-                .render(area, buf);
-            return;
-        };
-        let title = format!(
-            "{}  ·  {}",
-            self.display_path(file),
-            file.status.label()
-        );
-        let block = if self.focus == DiffFocus::View {
-            focused_panel(title)
-        } else {
-            panel(title)
-        };
-        let inner = block.inner(area);
-        block.render(area, buf);
-        if inner.width < 8 || inner.height == 0 {
-            return;
-        }
-        let [old_area, _, new_area] = Layout::horizontal([
-            Constraint::Percentage(50),
-            Constraint::Length(1),
-            Constraint::Percentage(50),
-        ])
-        .areas(inner);
-        let old_block = panel(ui_text("Before", "修改前"));
-        let new_block = panel(ui_text("After", "修改后"));
-        let old_inner = old_block.inner(old_area);
-        let new_inner = new_block.inner(new_area);
-        old_block.render(old_area, buf);
-        new_block.render(new_area, buf);
-        let max_scroll = file
-            .rows
-            .len()
-            .saturating_sub(usize::from(old_inner.height));
-        let scroll = self.scroll.min(max_scroll) as u16;
-        for offset in 0..old_inner.height {
-            let row_index = usize::from(scroll + offset);
-            let Some(row) = file.rows.get(row_index) else {
-                break;
-            };
-            let old_syntax = row
-                .old
-                .as_ref()
-                .and_then(|line| file.old_syntax.get(line.highlight_index))
-                .map(Vec::as_slice);
-            render_diff_row(
-                Rect::new(
-                    old_inner.x,
-                    old_inner.y + offset,
-                    old_inner.width,
-                    1,
-                ),
-                row.old.as_ref(),
-                old_syntax,
-                DiffSide::Old,
-                row.changed,
-                buf,
-            );
-            let new_syntax = row
-                .new
-                .as_ref()
-                .and_then(|line| file.new_syntax.get(line.highlight_index))
-                .map(Vec::as_slice);
-            render_diff_row(
-                Rect::new(
-                    new_inner.x,
-                    new_inner.y + offset,
-                    new_inner.width,
-                    1,
-                ),
-                row.new.as_ref(),
-                new_syntax,
-                DiffSide::New,
-                row.changed,
-                buf,
-            );
-        }
-        Span::from("│").dim().render(
-            Rect::new(old_area.right(), inner.y, 1, inner.height),
+        render_file_panel(
+            &self.data,
+            self.selected,
+            self.scroll,
+            self.focus == DiffFocus::View,
+            area,
             buf,
         );
     }
@@ -608,25 +483,23 @@ impl DiffReviewOverlay {
                 format!("Rollback {file}? y confirm · n/Esc cancel")
             };
             Line::from(prompt)
-            .fg(Color::Yellow)
-            .render(Rect::new(area.x, area.y, area.width, 1), buf);
+                .fg(Color::Yellow)
+                .render(Rect::new(area.x, area.y, area.width, 1), buf);
         } else {
             let focus = match self.focus {
                 DiffFocus::Tree => ui_text("Tree", "目录树"),
                 DiffFocus::View => ui_text("View", "代码视图"),
             };
             let hints = if crate::i18n::is_chinese(crate::i18n::current_language()) {
-                format!(
-                    "区域：{focus} · Tab 切换 · ↑/↓ 操作 · PgUp/PgDn 滚动 · r 回滚 · Esc 关闭"
-                )
+                format!("区域：{focus} · Tab 切换 · ↑/↓ 操作 · PgUp/PgDn 滚动 · r 回滚 · Esc 关闭")
             } else {
                 format!(
                     "Focus: {focus} · Tab switch · ↑/↓ act · PgUp/PgDn scroll · r rollback · Esc close"
                 )
             };
             Line::from(hints)
-            .dim()
-            .render(Rect::new(area.x, area.y, area.width, 1), buf);
+                .dim()
+                .render(Rect::new(area.x, area.y, area.width, 1), buf);
         }
     }
 
@@ -732,6 +605,203 @@ impl DiffReviewOverlay {
     }
 }
 
+pub(crate) fn render_diff_preview(
+    data: &DiffReviewData,
+    area: Rect,
+    buf: &mut Buffer,
+    selected: usize,
+    scroll: usize,
+    tree_focused: bool,
+    view_focused: bool,
+) {
+    let tree_width = area.width.saturating_mul(/*percent*/ 28).max(22).min(38);
+    let [tree_area, content_area] = Layout::horizontal([
+        Constraint::Length(tree_width.min(area.width)),
+        Constraint::Min(1),
+    ])
+    .areas(area);
+    render_tree_panel(data, selected, tree_focused, tree_area, buf);
+    render_file_panel(data, selected, scroll, view_focused, content_area, buf);
+}
+
+fn render_tree_panel(
+    data: &DiffReviewData,
+    selected: usize,
+    focused: bool,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    let block = if focused {
+        focused_panel(ui_text("Changes", "变更"))
+    } else {
+        panel(ui_text("Changes", "变更"))
+    };
+    let inner = block.inner(area);
+    block.render(area, buf);
+    let (rows, selected_row) = tree_rows(data, selected);
+    let height = usize::from(inner.height);
+    let start = selected_row
+        .saturating_sub(height / 2)
+        .min(rows.len().saturating_sub(height));
+    Paragraph::new(
+        rows.into_iter()
+            .skip(start)
+            .take(height)
+            .collect::<Vec<_>>(),
+    )
+    .render(inner, buf);
+    if !data.files.is_empty()
+        && selected_row >= start
+        && selected_row < start.saturating_add(height)
+        && let Some(background) = selection_style().bg
+    {
+        let row = inner.y + (selected_row - start) as u16;
+        buf.set_style(
+            Rect::new(inner.x, row, inner.width, 1),
+            Style::default().bg(background),
+        );
+    }
+}
+
+fn tree_rows(data: &DiffReviewData, selected: usize) -> (Vec<Line<'static>>, usize) {
+    let mut rows = Vec::new();
+    let mut directories = BTreeSet::new();
+    let mut selected_row = 0;
+    for (index, file) in data.files.iter().enumerate() {
+        let components = file.path.components().collect::<Vec<_>>();
+        for depth in 0..components.len().saturating_sub(1) {
+            let directory = components[..=depth]
+                .iter()
+                .map(|component| component.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+            if directories.insert(directory.clone()) {
+                rows.push(
+                    Line::from(format!(
+                        "{}{}/",
+                        "  ".repeat(depth),
+                        components[depth].as_os_str().to_string_lossy()
+                    ))
+                    .dim(),
+                );
+            }
+        }
+        let file_name = components
+            .last()
+            .map(|component| component.as_os_str().to_string_lossy())
+            .unwrap_or_default();
+        let marker = if index == selected { "›" } else { " " };
+        let (added, removed) = file.added_removed();
+        let marker_style = if index == selected {
+            Style::default().fg(accent_color()).bold()
+        } else {
+            Style::default()
+        };
+        let mut line = Line::from(vec![
+            Span::styled(marker, marker_style),
+            Span::styled(
+                format!(
+                    " {}{} {} ",
+                    "  ".repeat(components.len().saturating_sub(1)),
+                    file_name,
+                    file.status.marker()
+                ),
+                file.status.tree_style(),
+            ),
+            Span::styled(format!("+{added} -{removed}"), Style::default().dim()),
+        ]);
+        if index == selected {
+            line = line.bold();
+            selected_row = rows.len();
+        }
+        rows.push(line);
+    }
+    (rows, selected_row)
+}
+
+fn render_file_panel(
+    data: &DiffReviewData,
+    selected: usize,
+    scroll: usize,
+    focused: bool,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    let Some(file) = data.files.get(selected) else {
+        Paragraph::new(ui_text("No changes detected.", "没有检测到变更。").dim())
+            .block(panel(ui_text("Before / After", "修改前 / 修改后")))
+            .render(area, buf);
+        return;
+    };
+    let title = format!(
+        "{}  ·  {}",
+        display_path(&file.path, &data.cwd),
+        file.status.label()
+    );
+    let block = if focused {
+        focused_panel(title)
+    } else {
+        panel(title)
+    };
+    let inner = block.inner(area);
+    block.render(area, buf);
+    if inner.width < 8 || inner.height == 0 {
+        return;
+    }
+    let [old_area, _, new_area] = Layout::horizontal([
+        Constraint::Percentage(50),
+        Constraint::Length(1),
+        Constraint::Percentage(50),
+    ])
+    .areas(inner);
+    let old_block = panel(ui_text("Before", "修改前"));
+    let new_block = panel(ui_text("After", "修改后"));
+    let old_inner = old_block.inner(old_area);
+    let new_inner = new_block.inner(new_area);
+    old_block.render(old_area, buf);
+    new_block.render(new_area, buf);
+    let max_scroll = file
+        .rows
+        .len()
+        .saturating_sub(usize::from(old_inner.height));
+    let scroll = scroll.min(max_scroll) as u16;
+    for offset in 0..old_inner.height {
+        let row_index = usize::from(scroll + offset);
+        let Some(row) = file.rows.get(row_index) else {
+            break;
+        };
+        let old_syntax = row
+            .old
+            .as_ref()
+            .and_then(|line| file.old_syntax.get(line.highlight_index))
+            .map(Vec::as_slice);
+        render_diff_row(
+            Rect::new(old_inner.x, old_inner.y + offset, old_inner.width, 1),
+            row.old.as_ref(),
+            old_syntax,
+            DiffSide::Old,
+            row.changed,
+            buf,
+        );
+        let new_syntax = row
+            .new
+            .as_ref()
+            .and_then(|line| file.new_syntax.get(line.highlight_index))
+            .map(Vec::as_slice);
+        render_diff_row(
+            Rect::new(new_inner.x, new_inner.y + offset, new_inner.width, 1),
+            row.new.as_ref(),
+            new_syntax,
+            DiffSide::New,
+            row.changed,
+            buf,
+        );
+    }
+    Span::from("│")
+        .dim()
+        .render(Rect::new(old_area.right(), inner.y, 1, inner.height), buf);
+}
+
 #[derive(Clone, Copy)]
 enum DiffSide {
     Old,
@@ -756,9 +826,8 @@ fn render_diff_row(
     if let Some(background) = background {
         buf.set_style(area, Style::default().bg(background));
     }
-    let line_style = background.map_or_else(Style::default, |background| {
-        Style::default().bg(background)
-    });
+    let line_style =
+        background.map_or_else(Style::default, |background| Style::default().bg(background));
     let number_width = area.width.min(5);
     let number_color = if changed {
         match side {
@@ -769,10 +838,14 @@ fn render_diff_row(
         Color::DarkGray
     };
     Span::styled(
-        format!("{:>number_width$}", line.number, number_width = usize::from(number_width)),
-        Style::default().fg(number_color).bg(
-            background.unwrap_or(Color::Reset),
+        format!(
+            "{:>number_width$}",
+            line.number,
+            number_width = usize::from(number_width)
         ),
+        Style::default()
+            .fg(number_color)
+            .bg(background.unwrap_or(Color::Reset)),
     )
     .render(Rect::new(area.x, area.y, number_width, 1), buf);
     if area.width > number_width {
@@ -787,12 +860,7 @@ fn render_diff_row(
             },
         );
         Paragraph::new(content).render(
-            Rect::new(
-                area.x + number_width,
-                area.y,
-                area.width - number_width,
-                1,
-            ),
+            Rect::new(area.x + number_width, area.y, area.width - number_width, 1),
             buf,
         );
     }
@@ -829,8 +897,5 @@ fn focused_panel(title: impl Into<Line<'static>>) -> Block<'static> {
 }
 
 fn display_path(path: &Path, cwd: &Path) -> String {
-    path.strip_prefix(cwd)
-        .unwrap_or(path)
-        .display()
-        .to_string()
+    path.strip_prefix(cwd).unwrap_or(path).display().to_string()
 }

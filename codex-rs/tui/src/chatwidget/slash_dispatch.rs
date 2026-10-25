@@ -561,6 +561,25 @@ impl ChatWidget {
                 self.emit_raw_output_mode_changed(enabled);
             }
             SlashCommand::Tui => self.show_tui_mode_picker(),
+            SlashCommand::Checkpoint => {
+                self.app_event_tx.send(AppEvent::CreateRewindCheckpoint {
+                    cwd: self
+                        .current_cwd
+                        .clone()
+                        .unwrap_or_else(|| self.config.cwd.to_path_buf()),
+                    thread_id: self.thread_id(),
+                    label: None,
+                });
+            }
+            SlashCommand::Rewind => {
+                self.app_event_tx.send(AppEvent::OpenRewind {
+                    cwd: self
+                        .current_cwd
+                        .clone()
+                        .unwrap_or_else(|| self.config.cwd.to_path_buf()),
+                    thread_id: self.thread_id(),
+                });
+            }
             SlashCommand::Diff => {
                 self.add_diff_in_progress();
                 let tx = self.app_event_tx.clone();
@@ -996,6 +1015,19 @@ impl ChatWidget {
                 self.handle_provider_command_args(trimmed);
                 self.app_event_tx.send(AppEvent::SettingsSelectionClosed);
             }
+            SlashCommand::Checkpoint => {
+                self.app_event_tx.send(AppEvent::CreateRewindCheckpoint {
+                    cwd: self
+                        .current_cwd
+                        .clone()
+                        .unwrap_or_else(|| self.config.cwd.to_path_buf()),
+                    thread_id: self.thread_id(),
+                    label: Some(trimmed.to_string()),
+                });
+            }
+            SlashCommand::Rewind => self.add_error_message(
+                crate::i18n::ui_text("Usage: /rewind", "用法：/rewind").to_string(),
+            ),
             SlashCommand::Raw => match trimmed.to_ascii_lowercase().as_str() {
                 "on" => {
                     self.set_raw_output_mode_and_notify(/*enabled*/ true);
@@ -1397,6 +1429,8 @@ impl ChatWidget {
             | SlashCommand::Vim
             | SlashCommand::Daybreak
             | SlashCommand::Diff
+            | SlashCommand::Checkpoint
+            | SlashCommand::Rewind
             | SlashCommand::App
             | SlashCommand::Rename
             | SlashCommand::Voice

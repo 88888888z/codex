@@ -860,6 +860,45 @@ pub(crate) enum AppEvent {
     /// Plain unified diff used by the structured diff review surface.
     DiffReviewResult(PathBuf, String),
 
+    /// Open the checkpoint timeline for the current Git workspace and thread.
+    OpenRewind {
+        cwd: PathBuf,
+        thread_id: Option<ThreadId>,
+    },
+
+    /// Capture the current workspace as a checkpoint.
+    CreateRewindCheckpoint {
+        cwd: PathBuf,
+        thread_id: Option<ThreadId>,
+        label: Option<String>,
+    },
+
+    /// Build the side-by-side restore preview for one checkpoint.
+    LoadRewindPreview {
+        request_id: u64,
+        checkpoint: crate::rewind::CheckpointSummary,
+    },
+
+    /// Preview data for the selected checkpoint.
+    RewindPreviewLoaded {
+        request_id: u64,
+        checkpoint_id: String,
+        result: Result<crate::diff_review::DiffReviewData, String>,
+    },
+
+    /// Restore a selected checkpoint's files, conversation, or both.
+    RestoreRewindCheckpoint {
+        checkpoint: crate::rewind::CheckpointSummary,
+        target: crate::rewind::RewindRestoreTarget,
+    },
+
+    /// File restoration finished and may continue with a conversation revert.
+    RewindFilesRestored {
+        checkpoint: crate::rewind::CheckpointSummary,
+        target: crate::rewind::RewindRestoreTarget,
+        result: Result<crate::rewind::RewindRestoreOutcome, String>,
+    },
+
     /// Restore one changed file selected in the structured diff review.
     RollbackDiffFile {
         cwd: PathBuf,

@@ -108,6 +108,56 @@ pub(super) async fn try_submit_user_turn(
             return Ok(true);
         }
     };
+    if !app.app_server_target.uses_remote_workspace() && !app.side_threads.contains_key(&thread_id)
+    {
+        let prompt = items
+            .iter()
+            .filter_map(|item| match item {
+                codex_app_server_protocol::UserInput::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let label = prompt
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .map(|line| {
+                line.chars()
+                    .filter(|character| !character.is_control())
+                    .take(/*max_chars*/ 80)
+                    .collect::<String>()
+            })
+            .unwrap_or_else(|| {
+                crate::i18n::ui_text("Automatic checkpoint", "自动检查点").to_string()
+            });
+        let last_visible_prompt = app
+            .transcript_cells
+            .iter()
+            .rev()
+            .find_map(|cell| {
+                cell.as_any()
+                    .downcast_ref::<crate::history_cell::UserHistoryCell>()
+            })
+            .map(|cell| cell.message.as_str());
+        let nth_user_message = (!prompt.is_empty() && last_visible_prompt == Some(prompt.as_str()))
+            .then(|| {
+                crate::app_backtrack::user_count(&app.transcript_cells).checked_sub(/*rhs*/ 1)
+            })
+            .flatten();
+        if let Err(error) = app
+            .capture_rewind_checkpoint(
+                cwd.clone(),
+                Some(thread_id),
+                nth_user_message,
+                Some(label),
+                false,
+            )
+            .await
+        {
+            tracing::warn!(%error, "failed to capture automatic rewind checkpoint");
+        }
+    }
     let config = app.chat_widget.config_ref();
     let selected_profile = app.pending_server_profiles.get(&thread_id).or_else(|| {
         app.agents_overview

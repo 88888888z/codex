@@ -55,6 +55,8 @@ pub enum SlashCommand {
     Raw,
     Tui,
     Diff,
+    Checkpoint,
+    Rewind,
     Mention,
     Status,
     Daemon,
@@ -119,6 +121,8 @@ impl SlashCommand {
                 SlashCommand::Raw => "切换原始回滚模式，便于复制终端文本",
                 SlashCommand::Tui => "选择下次启动时的 TUI 模式",
                 SlashCommand::Diff => "显示 Git 差异（包括未跟踪文件）",
+                SlashCommand::Checkpoint => "保存当前工作区检查点",
+                SlashCommand::Rewind => "查看并恢复工作区检查点",
                 SlashCommand::Mention => "提及文件",
                 SlashCommand::Skills => "使用 Skills 改善 Codex 的特定任务表现",
                 SlashCommand::Import => "从 Claude Code 导入设置、项目和最近对话",
@@ -183,6 +187,8 @@ impl SlashCommand {
             SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
             SlashCommand::Tui => "choose the TUI mode for the next launch",
             SlashCommand::Diff => "show git diff (including untracked files)",
+            SlashCommand::Checkpoint => "save the current workspace checkpoint",
+            SlashCommand::Rewind => "review and restore workspace checkpoints",
             SlashCommand::Mention => "mention a file",
             SlashCommand::Skills => "use skills to improve how Codex performs specific tasks",
             SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
@@ -267,6 +273,7 @@ impl SlashCommand {
                 | SlashCommand::Side
                 | SlashCommand::Btw
                 | SlashCommand::Resume
+                | SlashCommand::Checkpoint
         )
     }
 
@@ -317,6 +324,8 @@ impl SlashCommand {
                 | SlashCommand::Raw
                 | SlashCommand::Language
                 | SlashCommand::Provider
+                | SlashCommand::Checkpoint
+                | SlashCommand::Rewind
         )
     }
 
@@ -342,6 +351,8 @@ impl SlashCommand {
             | SlashCommand::Plan
             | SlashCommand::Cd
             | SlashCommand::Clear
+            | SlashCommand::Checkpoint
+            | SlashCommand::Rewind
             | SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate => false,
             SlashCommand::Diff

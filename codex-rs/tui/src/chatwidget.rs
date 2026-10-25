@@ -1747,6 +1747,12 @@ impl ChatWidget {
         self.bottom_pane.is_task_running()
     }
 
+    pub(crate) fn set_rewind_in_progress(&mut self, running: bool) {
+        self.bottom_pane.set_task_running(running);
+        self.refresh_status_surfaces();
+        self.request_redraw();
+    }
+
     pub(crate) fn toggle_vim_mode_and_notify(&mut self) {
         let enabled = self.bottom_pane.toggle_vim_enabled();
         let message = if enabled {

@@ -465,8 +465,15 @@ impl App {
     }
 
     fn backtrack_selection(&self, nth_user_message: usize) -> Option<BacktrackSelection> {
-        let base_id = self.backtrack.base_id?;
-        if self.chat_widget.thread_id() != Some(base_id) {
+        self.backtrack_selection_for_thread(self.backtrack.base_id?, nth_user_message)
+    }
+
+    pub(crate) fn backtrack_selection_for_thread(
+        &self,
+        thread_id: ThreadId,
+        nth_user_message: usize,
+    ) -> Option<BacktrackSelection> {
+        if self.chat_widget.thread_id() != Some(thread_id) {
             return None;
         }
 
@@ -484,7 +491,7 @@ impl App {
             .collect();
 
         Some(BacktrackSelection {
-            thread_id: base_id,
+            thread_id,
             nth_user_message,
             prompt: UserMessage {
                 text: selected.message.clone(),

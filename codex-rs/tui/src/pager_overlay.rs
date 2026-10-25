@@ -47,6 +47,7 @@ pub(crate) enum Overlay {
     Static(StaticOverlay),
     Analytics(Box<crate::analytics::AnalyticsView>),
     Diff(Box<DiffReviewOverlay>),
+    Rewind(Box<crate::rewind::RewindOverlay>),
 }
 
 impl Overlay {
@@ -90,12 +91,16 @@ impl Overlay {
         Self::Diff(Box::new(overlay))
     }
 
+    pub(crate) fn new_rewind(overlay: crate::rewind::RewindOverlay) -> Self {
+        Self::Rewind(Box::new(overlay))
+    }
+
     pub(crate) fn handle_event(&mut self, tui: &mut tui::Tui, event: TuiEvent) -> Result<()> {
         let input = match self {
             Overlay::Transcript(_) => tui::OverlayInput::Transcript,
             Overlay::Static(_) => tui::OverlayInput::StaticPager,
             Overlay::Analytics(_) => tui::OverlayInput::Usage,
-            Overlay::Diff(_) => tui::OverlayInput::StaticPager,
+            Overlay::Diff(_) | Overlay::Rewind(_) => tui::OverlayInput::StaticPager,
         };
         tui.set_overlay_input(input)?;
         let result = match self {
@@ -103,6 +108,7 @@ impl Overlay {
             Overlay::Static(o) => o.handle_event(tui, event),
             Overlay::Analytics(o) => o.handle_event(tui, event),
             Overlay::Diff(o) => o.handle_event(tui, event),
+            Overlay::Rewind(o) => o.handle_event(tui, event),
         };
         if result.is_err() || self.is_done() {
             let restore = tui.set_overlay_input(tui::OverlayInput::Default);
@@ -117,6 +123,7 @@ impl Overlay {
             Overlay::Static(o) => o.is_done(),
             Overlay::Analytics(o) => o.is_done,
             Overlay::Diff(o) => o.is_done(),
+            Overlay::Rewind(o) => o.is_done(),
         }
     }
 }
