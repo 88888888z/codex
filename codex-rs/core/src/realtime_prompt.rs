@@ -1,10 +1,13 @@
 use codex_prompts::BACKEND_PROMPT;
+use codex_prompts::BACKEND_PROMPT_ZH_CN;
+use codex_prompts::PromptLanguage;
 const DEFAULT_USER_FIRST_NAME: &str = "there";
 const USER_FIRST_NAME_PLACEHOLDER: &str = "{{ user_first_name }}";
 
 pub(crate) fn prepare_realtime_backend_prompt(
     prompt: Option<Option<String>>,
     config_prompt: Option<String>,
+    language: PromptLanguage,
 ) -> String {
     if let Some(config_prompt) = config_prompt
         && !config_prompt.trim().is_empty()
@@ -18,7 +21,10 @@ pub(crate) fn prepare_realtime_backend_prompt(
         None => {}
     }
 
-    BACKEND_PROMPT
+    match language {
+        PromptLanguage::English => BACKEND_PROMPT,
+        PromptLanguage::Chinese => BACKEND_PROMPT_ZH_CN,
+    }
         .trim_end()
         .replace(USER_FIRST_NAME_PLACEHOLDER, &current_user_first_name())
 }
@@ -41,6 +47,7 @@ mod tests {
             prepare_realtime_backend_prompt(
                 Some(Some("prompt from request".to_string())),
                 Some("prompt from config".to_string()),
+                PromptLanguage::English,
             ),
             "prompt from config"
         );
@@ -52,6 +59,7 @@ mod tests {
             prepare_realtime_backend_prompt(
                 Some(Some("prompt from request".to_string())),
                 /*config_prompt*/ None,
+                PromptLanguage::English,
             ),
             "prompt from request"
         );
@@ -60,11 +68,19 @@ mod tests {
     #[test]
     fn prepare_realtime_backend_prompt_preserves_empty_request_prompt() {
         assert_eq!(
-            prepare_realtime_backend_prompt(Some(Some(String::new())), /*config_prompt*/ None),
+            prepare_realtime_backend_prompt(
+                Some(Some(String::new())),
+                /*config_prompt*/ None,
+                PromptLanguage::English,
+            ),
             ""
         );
         assert_eq!(
-            prepare_realtime_backend_prompt(Some(None), /*config_prompt*/ None),
+            prepare_realtime_backend_prompt(
+                Some(None),
+                /*config_prompt*/ None,
+                PromptLanguage::English,
+            ),
             ""
         );
     }
@@ -72,7 +88,11 @@ mod tests {
     #[test]
     fn prepare_realtime_backend_prompt_renders_default() {
         let prompt =
-            prepare_realtime_backend_prompt(/*prompt*/ None, /*config_prompt*/ None);
+            prepare_realtime_backend_prompt(
+                /*prompt*/ None,
+                /*config_prompt*/ None,
+                PromptLanguage::English,
+            );
 
         assert!(prompt.starts_with("## Identity, tone, and role"));
         assert!(prompt.contains("You are Codex, an OpenAI general-purpose agentic assistant"));

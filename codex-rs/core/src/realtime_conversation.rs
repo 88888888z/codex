@@ -1542,6 +1542,9 @@ pub(crate) async fn build_realtime_session_config(
     let prompt = prepare_realtime_backend_prompt(
         params.prompt.clone(),
         config.experimental_realtime_ws_backend_prompt.clone(),
+        codex_prompts::PromptLanguage::from_chinese(
+            config.tui_language.effective() == codex_config::types::TuiLanguage::Chinese,
+        ),
     );
     let startup_context = if params.include_startup_context {
         match config.experimental_realtime_ws_startup_context.clone() {

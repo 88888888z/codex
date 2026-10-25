@@ -1039,6 +1039,24 @@ impl std::fmt::Display for TuiLanguage {
     }
 }
 
+impl TuiLanguage {
+    /// Resolve `auto` against the process locale.
+    pub fn effective(self) -> Self {
+        match self {
+            Self::Auto => {
+                let locale = ["LC_ALL", "LC_MESSAGES", "LANG"]
+                    .into_iter()
+                    .find_map(|name| std::env::var(name).ok().filter(|value| !value.is_empty()));
+                match locale {
+                    Some(locale) if locale.to_ascii_lowercase().starts_with("zh") => Self::Chinese,
+                    _ => Self::English,
+                }
+            }
+            explicit => explicit,
+        }
+    }
+}
+
 const fn default_true() -> bool {
     true
 }

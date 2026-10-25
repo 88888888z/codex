@@ -198,6 +198,7 @@ fn ordering_follows_render_policy() {
                 "- repo-zeta: Description. (file: /skills/repo-zeta/SKILL.md)".to_string(),
                 "- user-alpha: Description. (file: /skills/user-alpha/SKILL.md)".to_string(),
             ],
+            /*chinese*/ false,
         )
     );
     assert_eq!(
@@ -213,6 +214,7 @@ fn ordering_follows_render_policy() {
                 "- repo-alpha: Description. (file: /skills/repo-alpha-z/SKILL.md)".to_string(),
                 "- repo-alpha: Description. (file: /skills/repo-alpha-a/SKILL.md)".to_string(),
             ],
+            /*chinese*/ false,
         )
     );
 }
@@ -256,6 +258,7 @@ fn description_selection_follows_render_policy() {
                 "- fallback: fallback description (file: /skills/fallback/SKILL.md)".to_string(),
                 "- shortened: full description (file: /skills/shortened/SKILL.md)".to_string(),
             ],
+            /*chinese*/ false,
         )
     );
     assert_eq!(
@@ -267,6 +270,7 @@ fn description_selection_follows_render_policy() {
                 "- shortened: short description (file: /skills/shortened/SKILL.md)".to_string(),
                 "- fallback: fallback description (file: /skills/fallback/SKILL.md)".to_string(),
             ],
+            /*chinese*/ false,
         )
     );
 }
@@ -712,7 +716,10 @@ fn mixed_catalog_reserves_executor_omission_marker_by_omitting_host_first() {
         ]
     );
     assert!(
-        host.into_fragment(/*include_skills_usage_instructions*/ false)
+        host.into_fragment(
+            /*include_skills_usage_instructions*/ false,
+            /*chinese*/ false,
+        )
             .is_none()
     );
 }
@@ -1098,7 +1105,10 @@ fn catalog_report_counts_partial_description_truncation() {
         }
     );
     let fragment = render
-        .into_fragment(/*include_skills_usage_instructions*/ false)
+        .into_fragment(
+            /*include_skills_usage_instructions*/ false,
+            /*chinese*/ false,
+        )
         .expect("partial description should render");
     assert!(fragment.body().expect_text().contains(expected_line));
 }
@@ -1141,7 +1151,10 @@ fn catalog_emits_omission_marker_when_every_minimum_skill_line_exceeds_budget() 
     .expect("core-compatible report should render");
     assert_eq!(core_render.report, expected_report);
     let core_fragment = core_render
-        .into_fragment(/*include_skills_usage_instructions*/ false)
+        .into_fragment(
+            /*include_skills_usage_instructions*/ false,
+            /*chinese*/ false,
+        )
         .expect("core-compatible rendering should preserve an empty skills fragment");
     assert!(core_fragment.body().expect_text().contains("## Skills"));
     assert!(!core_fragment.body().expect_text().contains("- oversized:"));
@@ -1155,7 +1168,10 @@ fn catalog_emits_omission_marker_when_every_minimum_skill_line_exceeds_budget() 
     .expect("catalog should render");
     assert_eq!(render.report, expected_report);
     let fragment = render
-        .into_fragment(/*include_skills_usage_instructions*/ false)
+        .into_fragment(
+            /*include_skills_usage_instructions*/ false,
+            /*chinese*/ false,
+        )
         .expect("omission marker should fit");
 
     assert!(!fragment.body().expect_text().contains("- oversized:"));
@@ -1201,7 +1217,10 @@ fn catalog_preserves_report_when_no_fragment_fits_budget() {
     );
     assert!(
         render
-            .into_fragment(/*include_skills_usage_instructions*/ false)
+            .into_fragment(
+                /*include_skills_usage_instructions*/ false,
+                /*chinese*/ false,
+            )
             .is_none()
     );
 }

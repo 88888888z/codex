@@ -4,16 +4,20 @@ use super::WorldStateSection;
 use super::WorldStateUpdate;
 use crate::context::ContextWindowGuidance;
 use crate::context::ContextualUserFragment;
+use codex_prompts::PromptLanguage;
 
 const REPLACEMENT_NOTICE: &str =
     "This context-window guidance replaces all previously provided context-window guidance.";
 const REMOVAL_NOTICE: &str = "The previously provided context-window guidance no longer applies.";
+const REPLACEMENT_NOTICE_ZH_CN: &str = "以下上下文窗口指引将替换之前提供的全部上下文窗口指引。";
+const REMOVAL_NOTICE_ZH_CN: &str = "之前提供的上下文窗口指引不再生效。";
 
 /// Model-visible guidance for managing the current context window.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ContextWindowGuidanceState {
     // Empty string means no guidance.
     message: String,
+    language: PromptLanguage,
 }
 
 impl ContextWindowGuidanceState {
@@ -23,7 +27,13 @@ impl ContextWindowGuidanceState {
                 .filter(|message| !message.trim().is_empty())
                 .unwrap_or_default()
                 .to_string(),
+            language: PromptLanguage::English,
         }
+    }
+
+    pub(crate) fn with_language(mut self, language: PromptLanguage) -> Self {
+        self.language = language;
+        self
     }
 }
 
@@ -59,9 +69,20 @@ impl WorldStateSection for ContextWindowGuidanceState {
             if !previous_may_contain_guidance {
                 return (Some(self.message.clone()), Vec::new());
             }
-            REMOVAL_NOTICE.to_string()
+            match self.language {
+                PromptLanguage::English => REMOVAL_NOTICE,
+                PromptLanguage::Chinese => REMOVAL_NOTICE_ZH_CN,
+            }
+            .to_string()
         } else if previous_may_contain_guidance {
-            format!("{REPLACEMENT_NOTICE}\n\n{}", self.message)
+            format!(
+                "{}\n\n{}",
+                match self.language {
+                    PromptLanguage::English => REPLACEMENT_NOTICE,
+                    PromptLanguage::Chinese => REPLACEMENT_NOTICE_ZH_CN,
+                },
+                self.message
+            )
         } else {
             self.message.clone()
         };

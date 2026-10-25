@@ -324,6 +324,7 @@ async fn user_turn_selects_symlinked_skill_by_advertised_discovery_path() -> Res
     let skill_body = "instructions from the canonical linked skill";
     let mut extensions = ExtensionRegistryBuilder::<Config>::new();
     install(&mut extensions, |config: &Config| SkillsExtensionConfig {
+        chinese: false,
         include_instructions: config.include_skill_instructions,
         max_context_tokens: config.skill_max_context_tokens,
         bundled_skills_enabled: false,

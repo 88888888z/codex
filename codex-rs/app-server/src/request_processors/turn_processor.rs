@@ -17,6 +17,7 @@ use codex_protocol::protocol::TurnSettingsUpdate;
 use codex_protocol::protocol::TurnSettingsUpdateOutcome;
 use codex_protocol::turn_input::AnnotatedResponseItem;
 use codex_protocol::turn_input::ResponseItemAnnotations;
+use codex_models_manager::collaboration_mode_presets::builtin_collaboration_mode_presets_for_language;
 use codex_skills::system_cache_root_dir;
 
 use crate::image_url::REMOTE_IMAGE_URL_ERROR;
@@ -406,9 +407,14 @@ impl TurnRequestProcessor {
     fn normalize_collaboration_mode(
         &self,
         mut collaboration_mode: CollaborationMode,
+        language: codex_config::types::TuiLanguage,
     ) -> CollaborationMode {
         if collaboration_mode.settings.developer_instructions.is_none()
-            && let Some(instructions) = builtin_collaboration_mode_presets()
+            && let Some(instructions) = builtin_collaboration_mode_presets_for_language(
+                codex_prompts::PromptLanguage::from_chinese(
+                    language.effective() == codex_config::types::TuiLanguage::Chinese,
+                ),
+            )
                 .into_iter()
                 .find(|preset| preset.mode == Some(collaboration_mode.mode))
                 .and_then(|preset| preset.developer_instructions.flatten())
@@ -824,8 +830,9 @@ impl TurnRequestProcessor {
             ));
         }
 
+        let language = thread.config().await.tui_language;
         let collaboration_mode =
-            collaboration_mode.map(|mode| self.normalize_collaboration_mode(mode));
+            collaboration_mode.map(|mode| self.normalize_collaboration_mode(mode, language));
         let has_environment_override = environment_requests.is_some();
         // `thread/settings/update` only acknowledges that the update was queued.
         // Clients that send dependent partial updates should wait for

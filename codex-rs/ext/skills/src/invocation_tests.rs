@@ -44,6 +44,7 @@ fn detect_executor_skill(command: &str, environments: &[&str]) -> Option<SkillIn
         host_catalog: None,
         cloud_status: crate::step_state::CatalogStatus::Unavailable,
         config: crate::SkillsExtensionConfig {
+            chinese: false,
             include_instructions: true,
             max_context_tokens: None,
             bundled_skills_enabled: false,

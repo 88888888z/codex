@@ -122,8 +122,11 @@ pub(crate) async fn spawn(
             ),
             _ => None,
         };
-        let child_multi_agent_messages = ResolvedModelMessages::from_model(
+        let child_multi_agent_messages = ResolvedModelMessages::from_model_with_language(
             child_model_info.as_ref().unwrap_or(turn.model_info()),
+            codex_prompts::PromptLanguage::from_chinese(
+                config.tui_language.effective() == codex_config::types::TuiLanguage::Chinese,
+            ),
         )
         .multi_agent();
         Some(resolve_usage_hints(

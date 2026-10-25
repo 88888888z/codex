@@ -5,6 +5,7 @@ codex_rust_crate(
     compile_data = [
         "models.json",
         "prompt.md",
+        "prompt.zh-CN.md",
     ],
     crate_name = "codex_models_manager",
 )

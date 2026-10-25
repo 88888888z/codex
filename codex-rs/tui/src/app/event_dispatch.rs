@@ -1297,26 +1297,6 @@ impl App {
                 self.enqueue_thread_history_entry_response(thread_id, event)
                     .await?;
             }
-            AppEvent::DiffResult(cwd, text) => {
-                if cwds_differ(&cwd, self.chat_widget.config_ref().cwd.as_path()) {
-                    return Ok(AppRunControl::Continue);
-                }
-                // Clear the in-progress state in the bottom pane
-                self.chat_widget.on_diff_complete();
-                // Enter alternate screen using TUI helper and build pager lines
-                let _ = tui.enter_alt_screen();
-                let pager_lines: Vec<ratatui::text::Line<'static>> = if text.trim().is_empty() {
-                    vec!["No changes detected.".italic().into()]
-                } else {
-                    text.lines().map(ansi_escape_line).collect()
-                };
-                self.overlay = Some(Overlay::new_static_with_lines(
-                    pager_lines,
-                    "D I F F".to_string(),
-                    self.keymap.pager.clone(),
-                ));
-                tui.frame_requester().schedule_frame();
-            }
             AppEvent::DiffReviewResult(cwd, text) => {
                 if cwds_differ(&cwd, self.chat_widget.config_ref().cwd.as_path()) {
                     return Ok(AppRunControl::Continue);
@@ -3607,7 +3587,9 @@ impl App {
                 match apply_result {
                     Ok(()) => {
                         self.local_settings.tui.language = language;
+                        self.config.tui_language = language;
                         self.chat_widget.set_tui_language(language);
+                        self.chat_widget.submit_op(AppCommand::reload_user_config());
                         self.chat_widget.refresh_config_panel(/*notice*/ None);
                         tui.frame_requester().schedule_frame();
                     }

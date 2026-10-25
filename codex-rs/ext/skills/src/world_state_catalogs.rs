@@ -368,7 +368,9 @@ impl<'a> CatalogRenderingContext<'a> {
             .map(|rendered| rendered.report.clone())
             .unwrap_or_default();
         let body = rendered
-            .and_then(|rendered| rendered.into_fragment(self.include_usage))
+            .and_then(|rendered| {
+                rendered.into_fragment(self.include_usage, self.step_state.config.chinese)
+            })
             .map(|fragment| fragment.body().into_text().unwrap_or_default());
         let include_instructions = self.step_state.config.include_instructions;
         let metrics = self.input.extension_metrics.clone();
@@ -398,6 +400,7 @@ impl<'a> CatalogRenderingContext<'a> {
                     .previous_world_state
                     .and_then(|state| state.get(crate::world_state::SKILLS_WORLD_STATE_ID)),
                 on_render,
+                self.step_state.config.chinese,
             ),
             CatalogKind::Cloud => cloud_skills_world_state_section(
                 body,
@@ -405,10 +408,17 @@ impl<'a> CatalogRenderingContext<'a> {
                 status == CatalogStatus::Enabled,
                 allocation,
                 on_render,
+                self.step_state.config.chinese,
             ),
             CatalogKind::Host => {
                 self.input.turn_store.insert(HostSkillsCatalogInWorldState);
-                host_skills_world_state_section(body, include_instructions, &report, on_render)
+                host_skills_world_state_section(
+                    body,
+                    include_instructions,
+                    &report,
+                    on_render,
+                    self.step_state.config.chinese,
+                )
             }
         }
     }

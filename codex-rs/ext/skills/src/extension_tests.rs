@@ -48,6 +48,7 @@ fn empty_catalog_records_zero_metrics_without_a_fragment() {
         /*include_skills_usage_instructions*/ false,
         SkillCatalogRenderPolicy::ExtensionCompatible,
         SkillMetadataBudget::Characters(8_000),
+        /*chinese*/ false,
     );
 
     assert!(rendered.fragment.is_none());

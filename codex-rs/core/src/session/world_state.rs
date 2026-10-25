@@ -29,6 +29,7 @@ use codex_extension_api::WorldStateContributionInput;
 use codex_features::Feature;
 use codex_file_system::FileSystemSandboxContext;
 use codex_prompts::ApprovalPromptContext;
+use codex_prompts::PromptLanguage;
 use codex_prompts::ResolvedModelMessages;
 use codex_prompts::render_model_instructions;
 use codex_protocol::error::Result as CodexResult;
@@ -70,7 +71,12 @@ impl Session {
         let turn_context = step_context.turn.as_ref();
         let settings = &step_context.settings;
         let model_info = settings.model_info.as_ref();
-        let model_messages = ResolvedModelMessages::from_model(model_info);
+        let prompt_language = PromptLanguage::from_chinese(
+            turn_context.config.tui_language.effective()
+                == codex_config::types::TuiLanguage::Chinese,
+        );
+        let model_messages =
+            ResolvedModelMessages::from_model_with_language(model_info, prompt_language);
         tracing::trace!(
             selected_capability_root_count = step_context
                 .extension_data
@@ -101,6 +107,7 @@ impl Session {
                 Some(BaseInstructionsProvenance::Custom) | None => base_instructions.text,
             };
             ModelInstructionsState::for_incremental_tools(&model_info.slug, instructions)
+                .with_language(prompt_language)
         } else {
             let model_instructions = render_current_instructions();
             let base_instructions = self.get_prompt_base_instructions().await.text;
@@ -126,6 +133,7 @@ impl Session {
                 previous_model.as_deref(),
                 model_instructions,
             )
+            .with_language(prompt_language)
         };
         let environment_subagents = if turn_context.config.include_environment_context {
             match turn_context.multi_agent_version {
@@ -198,7 +206,9 @@ impl Session {
             .as_ref()
             .and_then(|config| config.guidance_message.as_deref())
             .filter(|_| token_budget_enabled);
-        world_state.add_section(ContextWindowGuidanceState::new(guidance));
+        world_state.add_section(
+            ContextWindowGuidanceState::new(guidance).with_language(prompt_language),
+        );
         let realtime = &step_context.realtime;
         world_state.add_section(RealtimeState::new(
             realtime.active,
@@ -214,8 +224,12 @@ impl Session {
                 .mode_instructions
                 .as_ref()
                 .and_then(|instructions| instructions.end.as_deref()),
-        ));
-        world_state.add_section(AgentsMdState::new(step_context.loaded_agents_md.as_deref()));
+        )
+        .with_language(prompt_language));
+        world_state.add_section(
+            AgentsMdState::new(step_context.loaded_agents_md.as_deref())
+                .with_language(prompt_language),
+        );
         let exec_policy = self
             .services
             .exec_policy
@@ -263,6 +277,7 @@ impl Session {
                 model_messages.collaboration_modes(),
                 turn_context.config.update_plan_enabled,
                 turn_context.config.model_catalog.is_some(),
+                prompt_language,
             ));
         }
         if !crate::guardian::is_basic_session_source(&turn_context.session_source) {
@@ -311,7 +326,8 @@ impl Session {
                     .config
                     .features
                     .enabled(Feature::DeferredExecutor),
-        ));
+        )
+        .with_language(prompt_language));
         let apps_available =
             if turn_context.config.include_apps_instructions && turn_context.apps_enabled() {
                 AppToolPolicyEvaluator::new(&turn_context.config.config_layer_stack)
@@ -327,12 +343,14 @@ impl Session {
             apps_available && model_info.include_apps_usage_instructions;
         world_state.add_section(AppsInstructionsState::new(
             apps_usage_instructions_available,
-        ));
+        )
+        .with_language(prompt_language));
         let plugins_usage_instructions_available =
             step_context.mcp.plugins_available() && model_info.include_plugin_usage_instructions;
         world_state.add_section(PluginsInstructionsState::new(
             plugins_usage_instructions_available,
-        ));
+        )
+        .with_language(prompt_language));
         if turn_context
             .config
             .features
@@ -373,6 +391,7 @@ impl Session {
             .unwrap_or(ContentItemNamespace::Functions);
         let mut multi_agent_mode = MultiAgentModeState::new(
             super::multi_agents::effective_multi_agent_mode(step_context),
+            prompt_language,
         )
         .with_namespace(v2_namespace.clone());
         if let Some(usage_hint_text) = super::multi_agents::usage_hint_text(step_context) {
@@ -429,7 +448,8 @@ impl Session {
                     .requirements()
                     .additional_developer_instructions
                     .as_ref(),
-            ));
+            )
+            .with_language(prompt_language));
         }
         Ok(world_state)
     }

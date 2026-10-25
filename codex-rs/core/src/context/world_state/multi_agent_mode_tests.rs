@@ -4,12 +4,13 @@ use crate::context::MultiAgentRoleInstructions;
 use crate::context::world_state::WorldState;
 use crate::context::world_state::test_support::FragmentSectionTestExt as _;
 use codex_protocol::models::ResponseItem;
+use codex_prompts::PromptLanguage;
 use codex_protocol_test_support::ContentItemTestExt;
 use codex_utils_output_truncation::approx_token_count;
 use pretty_assertions::assert_eq;
 
 fn state(mode: Option<MultiAgentMode>) -> MultiAgentModeState {
-    MultiAgentModeState::new(mode)
+    MultiAgentModeState::new(mode, PromptLanguage::English)
 }
 
 #[test]
@@ -45,7 +46,10 @@ fn snapshots() {
 fn persisted_mode_is_restored_only_when_missing_from_history() {
     let state = state(Some(MultiAgentMode::ExplicitRequestOnly));
     let retained: ResponseItem = ContextualUserFragment::into(
-        MultiAgentModeInstructions::from_mode(MultiAgentMode::ExplicitRequestOnly)
+        MultiAgentModeInstructions::from_mode(
+            MultiAgentMode::ExplicitRequestOnly,
+            PromptLanguage::English,
+        )
             .expect("explicit mode should render"),
     );
     let mut world_state = WorldState::default();
@@ -78,11 +82,11 @@ fn persisted_mode_is_restored_only_when_missing_from_history() {
 #[test]
 fn unchanged_mode_is_reemitted_after_usage_hint_migration() {
     let previous = state(Some(MultiAgentMode::Proactive));
-    let current = MultiAgentModeState::new(Some(MultiAgentMode::Proactive)).with_usage_hint(
-        &MultiAgentUsageHintState::new(MultiAgentRoleInstructions::Configured(
-            "Current usage instructions.".to_string(),
-        )),
-    );
+    let current =
+        MultiAgentModeState::new(Some(MultiAgentMode::Proactive), PromptLanguage::English)
+            .with_usage_hint(&MultiAgentUsageHintState::new(
+                MultiAgentRoleInstructions::Configured("Current usage instructions.".to_string()),
+            ));
 
     let instructions = current
         .render_fragment_diff(PreviousSectionState::Known(&previous))
@@ -91,7 +95,10 @@ fn unchanged_mode_is_reemitted_after_usage_hint_migration() {
 
     assert_eq!(
         instructions.render().expect_text(),
-        MultiAgentModeInstructions::from_mode(MultiAgentMode::Proactive)
+        MultiAgentModeInstructions::from_mode(
+            MultiAgentMode::Proactive,
+            PromptLanguage::English,
+        )
             .expect("proactive mode should render")
             .render()
             .expect_text()
@@ -107,10 +114,12 @@ fn catalog_role_updates_remain_separate_from_active_mode() {
         max_concurrency: 2,
         wait_agent_enabled: false,
         expose_model_overrides: false,
+        language: PromptLanguage::English,
     };
     let previous_hint = MultiAgentUsageHintState::new(catalog_role("Previous role."));
     let previous_mode =
-        MultiAgentModeState::new(Some(MultiAgentMode::Proactive)).with_usage_hint(&previous_hint);
+        MultiAgentModeState::new(Some(MultiAgentMode::Proactive), PromptLanguage::English)
+            .with_usage_hint(&previous_hint);
     let mut previous = WorldState::default();
     previous.add_section(previous_hint);
     previous.add_section(previous_mode);
@@ -123,7 +132,8 @@ fn catalog_role_updates_remain_separate_from_active_mode() {
     let current_role = catalog_role("Current role.");
     let current_hint = MultiAgentUsageHintState::new(current_role.clone());
     let current_mode =
-        MultiAgentModeState::new(Some(MultiAgentMode::Proactive)).with_usage_hint(&current_hint);
+        MultiAgentModeState::new(Some(MultiAgentMode::Proactive), PromptLanguage::English)
+            .with_usage_hint(&current_hint);
     let mut current = WorldState::default();
     current.add_section(current_hint);
     current.add_section(current_mode);
@@ -133,7 +143,8 @@ fn catalog_role_updates_remain_separate_from_active_mode() {
             .render_history_diff(Some(&previous_snapshot), &history)
             .1,
     );
-    let expected_mode = MultiAgentModeInstructions::from_mode(MultiAgentMode::Proactive)
+    let expected_mode =
+        MultiAgentModeInstructions::from_mode(MultiAgentMode::Proactive, PromptLanguage::English)
         .expect("proactive mode should render");
     assert_eq!(
         updates,

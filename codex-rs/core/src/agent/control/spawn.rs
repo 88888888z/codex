@@ -1136,7 +1136,13 @@ impl LocalAgentControl {
                 let parent_config = parent_thread.session.get_config().await;
                 let parent_usage_hints = resolve_usage_hints(
                     &parent_config.multi_agent_v2,
-                    ResolvedModelMessages::bundled().multi_agent(),
+                    ResolvedModelMessages::bundled_with_language(
+                        codex_prompts::PromptLanguage::from_chinese(
+                            parent_config.tui_language.effective()
+                                == codex_config::types::TuiLanguage::Chinese,
+                        ),
+                    )
+                    .multi_agent(),
                     !parent_config.update_plan_enabled,
                 );
                 [parent_usage_hints.root, parent_usage_hints.subagent]
@@ -1366,7 +1372,13 @@ impl LocalAgentControl {
                 .unwrap_or_else(|| {
                     resolve_usage_hints(
                         &config.multi_agent_v2,
-                        ResolvedModelMessages::bundled().multi_agent(),
+                        ResolvedModelMessages::bundled_with_language(
+                            codex_prompts::PromptLanguage::from_chinese(
+                                config.tui_language.effective()
+                                    == codex_config::types::TuiLanguage::Chinese,
+                            ),
+                        )
+                        .multi_agent(),
                         !config.update_plan_enabled,
                     )
                     .subagent

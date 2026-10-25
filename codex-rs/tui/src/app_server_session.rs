@@ -4161,6 +4161,15 @@ mod tests {
         let _ = config
             .features
             .enable(Feature::TerminalVisualizationInstructions);
+        let visualization_instructions = match config.tui_language.effective() {
+            codex_config::types::TuiLanguage::Chinese => {
+                crate::terminal_visualization_instructions::TERMINAL_VISUALIZATION_INSTRUCTIONS_ZH_CN
+            }
+            codex_config::types::TuiLanguage::English
+            | codex_config::types::TuiLanguage::Auto => {
+                crate::terminal_visualization_instructions::TERMINAL_VISUALIZATION_INSTRUCTIONS
+            }
+        };
         let treatment_start = thread_start_params_from_config(
             &config,
             ThreadParamsMode::Embedded,
@@ -4183,7 +4192,7 @@ mod tests {
         );
         let expected = format!(
             "Developer override.\n\n{}",
-            crate::terminal_visualization_instructions::TERMINAL_VISUALIZATION_INSTRUCTIONS
+            visualization_instructions
         );
 
         assert_eq!(

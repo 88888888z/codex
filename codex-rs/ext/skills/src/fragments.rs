@@ -15,6 +15,7 @@ pub(crate) struct AvailableSkillsInstructions {
     prompt_kind: SkillPromptKind,
     skill_root_lines: Vec<String>,
     skill_lines: Vec<String>,
+    chinese: bool,
 }
 
 impl AvailableSkillsInstructions {
@@ -23,18 +24,20 @@ impl AvailableSkillsInstructions {
         skill_root_lines: Vec<String>,
         mut skill_lines: Vec<String>,
         include_skills_usage_instructions: bool,
+        chinese: bool,
     ) -> Self {
         if include_skills_usage_instructions {
-            skill_lines.push("### How to use skills".to_string());
-            if let Some(instructions) = prompt_kind.alias_instructions() {
+            skill_lines.push(if chinese { "### 如何使用技能" } else { "### How to use skills" }.to_string());
+            if let Some(instructions) = prompt_kind.alias_instructions(chinese) {
                 skill_lines.push(instructions.to_string());
             }
-            skill_lines.push(prompt_kind.usage_instructions().to_string());
+            skill_lines.push(prompt_kind.usage_instructions(chinese).to_string());
         }
         Self {
             prompt_kind,
             skill_root_lines,
             skill_lines,
+            chinese,
         }
     }
 }
@@ -65,6 +68,7 @@ impl ContextualUserFragment for AvailableSkillsInstructions {
             self.prompt_kind,
             &self.skill_root_lines,
             &self.skill_lines,
+            self.chinese,
         ))
     }
 }

@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::app_server_session::AppServerSession;
 use crate::clipboard_paste::normalize_pasted_search_query;
+#[cfg(test)]
 use crate::clock_format::ClockFormat;
 use crate::color::blend;
 use crate::color::is_light;
@@ -94,19 +95,27 @@ use page_loading::PageCwdFilter;
 use page_loading::PageLoadMode;
 use page_loading::PaginationState;
 
+#[cfg(test)]
 #[path = "resume_picker_transcript_preview.rs"]
 mod transcript_preview;
 
+#[cfg(test)]
 pub(crate) use transcript_preview::load_transcript_preview;
 
 const PAGE_SIZE: usize = 25;
 const LOAD_NEAR_THRESHOLD: usize = 5;
 const RESUME_PREVIEW_TURNS: usize = 6;
+#[cfg(test)]
 const SESSION_META_INDENT_WIDTH: usize = 2;
+#[cfg(test)]
 const SESSION_META_DATE_WIDTH: usize = 12;
+#[cfg(test)]
 const SESSION_META_FIELD_GAP_WIDTH: usize = 2;
+#[cfg(test)]
 const SESSION_META_MIN_CWD_WIDTH: usize = 30;
+#[cfg(test)]
 const SESSION_META_MAX_CWD_WIDTH: usize = 72;
+#[cfg(test)]
 const SESSION_META_BRANCH_ICON: &str = "";
 const SESSION_META_CWD_ICON: &str = "⌁";
 const FOOTER_COMPACT_BREAKPOINT: u16 = 120;
@@ -206,9 +215,6 @@ struct PageLoadRequest {
 
 enum PickerLoadRequest {
     Page(PageLoadRequest),
-    Preview {
-        thread_id: ThreadId,
-    },
     Transcript {
         thread_id: ThreadId,
         cancellation: oneshot::Receiver<()>,
@@ -292,14 +298,6 @@ impl ToolbarControl {
             Self::Sort => Self::Filter,
         }
     }
-
-    fn next(self, action: SessionPickerAction) -> Self {
-        match self {
-            Self::Filter if matches!(action, SessionPickerAction::Resume) => Self::Status,
-            Self::Filter | Self::Status => Self::Sort,
-            Self::Sort => Self::Filter,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -341,10 +339,6 @@ enum BackgroundEvent {
         request_token: usize,
         search_token: Option<usize>,
         page: std::io::Result<PickerPage>,
-    },
-    Preview {
-        thread_id: ThreadId,
-        preview: std::io::Result<Vec<TranscriptPreviewLine>>,
     },
     Transcript {
         thread_id: ThreadId,
@@ -813,11 +807,6 @@ fn spawn_app_server_page_loader(
                         page,
                     });
                 }
-                PickerLoadRequest::Preview { thread_id } => {
-                    let preview =
-                        load_transcript_preview(&mut app_server, thread_id, config.as_ref()).await;
-                    let _ = bg_tx.send(BackgroundEvent::Preview { thread_id, preview });
-                }
                 PickerLoadRequest::Transcript {
                     thread_id,
                     cancellation,
@@ -936,6 +925,7 @@ impl Drop for AltScreenGuard<'_> {
 
 struct PickerState {
     backend_id: crate::backend_id::BackendId,
+    #[cfg(test)]
     clock_format: ClockFormat,
     use_theme_colors: bool,
     copy_on_select: bool,
@@ -979,6 +969,7 @@ struct PickerState {
     inline_error: Option<String>,
     archive_state: archive::ArchiveState,
     expanded_thread_id: Option<ThreadId>,
+    #[cfg(test)]
     transcript_previews: HashMap<ThreadId, TranscriptPreviewState>,
     transcript_cells: HashMap<ThreadId, SessionTranscriptState>,
     pending_transcript_open: Option<ThreadId>,
@@ -1004,11 +995,10 @@ enum SearchState {
     Active { token: usize },
 }
 
+#[cfg(test)]
 #[derive(Clone)]
 enum TranscriptPreviewState {
-    Loading,
     Loaded(Vec<TranscriptPreviewLine>),
-    Failed,
 }
 
 enum SessionTranscriptState {
@@ -1017,12 +1007,14 @@ enum SessionTranscriptState {
     Failed,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TranscriptPreviewLine {
     speaker: TranscriptPreviewSpeaker,
     text: String,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TranscriptPreviewSpeaker {
     User,
@@ -1170,6 +1162,7 @@ impl PickerState {
     ) -> Self {
         Self {
             backend_id,
+            #[cfg(test)]
             clock_format: ClockFormat::system(),
             use_theme_colors: true,
             copy_on_select: false,
@@ -1212,6 +1205,7 @@ impl PickerState {
             inline_error: None,
             archive_state: archive::ArchiveState::default(),
             expanded_thread_id: None,
+            #[cfg(test)]
             transcript_previews: HashMap::new(),
             transcript_cells: HashMap::new(),
             pending_transcript_open: None,
@@ -1765,16 +1759,6 @@ impl PickerState {
                 let completed_token = pending.search_token.or(search_token);
                 self.continue_search_if_token_matches(completed_token);
             }
-            BackgroundEvent::Preview { thread_id, preview } => {
-                self.transcript_previews.insert(
-                    thread_id,
-                    match preview {
-                        Ok(lines) => TranscriptPreviewState::Loaded(lines),
-                        Err(_) => TranscriptPreviewState::Failed,
-                    },
-                );
-                self.request_frame();
-            }
             BackgroundEvent::Transcript {
                 thread_id,
                 transcript,
@@ -2185,10 +2169,6 @@ impl PickerState {
 
     fn focus_previous_toolbar_control(&mut self) {
         self.toolbar_focus = self.toolbar_focus.previous(self.action);
-    }
-
-    fn focus_next_toolbar_control(&mut self) {
-        self.toolbar_focus = self.toolbar_focus.next(self.action);
     }
 
     fn change_focused_toolbar_value(&mut self, direction: ToolbarValueDirection) {
@@ -3124,6 +3104,8 @@ fn footer_hints_width(
             .sum::<usize>()
 }
 
+/// Legacy list rendering retained for picker snapshot regressions.
+#[cfg(test)]
 fn render_list(frame: &mut crate::custom_terminal::Frame, area: Rect, state: &PickerState) {
     if area.height == 0 {
         return;
@@ -3389,6 +3371,7 @@ fn more_line(label: &'static str) -> Line<'static> {
     .into()
 }
 
+#[cfg(test)]
 fn render_session_lines(
     row: &Row,
     state: &PickerState,
@@ -3407,6 +3390,7 @@ fn render_session_lines(
     }
 }
 
+#[cfg(test)]
 fn render_comfortable_session_lines(
     row: &Row,
     state: &PickerState,
@@ -3460,6 +3444,7 @@ fn render_comfortable_session_lines(
     lines
 }
 
+#[cfg(test)]
 fn apply_session_row_background(
     lines: Vec<Line<'static>>,
     style: Style,
@@ -3497,6 +3482,7 @@ fn apply_line_background(mut line: Line<'static>, style: Style, width: u16) -> L
     line
 }
 
+#[cfg(test)]
 fn render_dense_session_lines(
     row: &Row,
     state: &PickerState,
@@ -3531,6 +3517,7 @@ fn render_dense_session_lines(
     lines
 }
 
+#[cfg(test)]
 struct DenseSummaryInput<'a> {
     thread_id: Option<ThreadId>,
     use_theme_colors: bool,
@@ -3542,6 +3529,7 @@ struct DenseSummaryInput<'a> {
     width: u16,
 }
 
+#[cfg(test)]
 fn dense_summary_line(input: DenseSummaryInput<'_>) -> Line<'static> {
     let marker_width = input.marker.width();
     let available = (input.width as usize).saturating_sub(marker_width);
@@ -3569,11 +3557,13 @@ fn dense_summary_line(input: DenseSummaryInput<'_>) -> Line<'static> {
     apply_line_background(line, row_style, input.width)
 }
 
+#[cfg(test)]
 struct DenseColumns {
     date_width: usize,
     title_width: usize,
 }
 
+#[cfg(test)]
 fn dense_columns(width: usize) -> DenseColumns {
     let date_width = SESSION_META_DATE_WIDTH;
     DenseColumns {
@@ -3634,6 +3624,7 @@ fn session_title_span(
     if is_selected { title.bold() } else { title }
 }
 
+#[cfg(test)]
 fn render_footer_lines(
     sort_key: ThreadSortKey,
     created: &str,
@@ -3657,12 +3648,14 @@ fn render_footer_lines(
     pack_footer_parts(parts, width)
 }
 
+#[cfg(test)]
 enum FooterPart {
     Date(String),
     Branch(Option<String>),
     Cwd(Option<String>),
 }
 
+#[cfg(test)]
 impl FooterPart {
     fn text(&self) -> &str {
         match self {
@@ -3682,6 +3675,7 @@ impl FooterPart {
     }
 }
 
+#[cfg(test)]
 fn pack_footer_parts(parts: Vec<FooterPart>, width: u16) -> Vec<Line<'static>> {
     let available_width = width as usize;
     if available_width <= SESSION_META_INDENT_WIDTH {
@@ -3714,6 +3708,7 @@ fn pack_footer_parts(parts: Vec<FooterPart>, width: u16) -> Vec<Line<'static>> {
     lines
 }
 
+#[cfg(test)]
 fn cwd_column_width(width: usize) -> usize {
     let available = width.saturating_sub(
         SESSION_META_INDENT_WIDTH + SESSION_META_DATE_WIDTH + 2 * SESSION_META_FIELD_GAP_WIDTH,
@@ -3721,6 +3716,7 @@ fn cwd_column_width(width: usize) -> usize {
     (available / 2).clamp(SESSION_META_MIN_CWD_WIDTH, SESSION_META_MAX_CWD_WIDTH)
 }
 
+#[cfg(test)]
 fn footer_parts_width(parts: &[FooterPart], cwd_width: usize) -> usize {
     let content_width: usize = parts
         .iter()
@@ -3730,6 +3726,7 @@ fn footer_parts_width(parts: &[FooterPart], cwd_width: usize) -> usize {
     SESSION_META_INDENT_WIDTH + content_width
 }
 
+#[cfg(test)]
 fn footer_part_width(part: &FooterPart, padded: bool, cwd_width: usize) -> usize {
     let prefix_width = part.prefix().map_or(0, UnicodeWidthStr::width);
     let prefix_gap_width = usize::from(part.prefix().is_some() && !part.text().is_empty());
@@ -3742,6 +3739,7 @@ fn footer_part_width(part: &FooterPart, padded: bool, cwd_width: usize) -> usize
     }
 }
 
+#[cfg(test)]
 fn footer_line(parts: Vec<FooterPart>, width: usize, cwd_width: usize) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = vec!["  ".into()];
     let mut remaining_width = width.saturating_sub(SESSION_META_INDENT_WIDTH);
@@ -3773,6 +3771,7 @@ fn footer_line(parts: Vec<FooterPart>, width: usize, cwd_width: usize) -> Line<'
     spans.into()
 }
 
+#[cfg(test)]
 fn push_footer_part(
     spans: &mut Vec<Span<'static>>,
     part: FooterPart,
@@ -3816,6 +3815,7 @@ fn push_footer_part(
     used_width + rendered_text_width
 }
 
+#[cfg(test)]
 fn render_transcript_preview_lines(
     row: &Row,
     state: &PickerState,
@@ -3826,34 +3826,6 @@ fn render_transcript_preview_lines(
         return details;
     };
     let preview_lines = match state.transcript_previews.get(&thread_id) {
-        Some(TranscriptPreviewState::Loading) => {
-            vec![
-                vec![
-                    "  │ ".set_style(secondary_text_style()),
-                    crate::i18n::ui_text(
-                        "Loading recent transcript...",
-                        "正在加载最近的对话记录…",
-                    )
-                        .set_style(secondary_text_style())
-                        .italic(),
-                ]
-                .into(),
-            ]
-        }
-        Some(TranscriptPreviewState::Failed) => vec![
-            vec![
-                "  │ ".set_style(secondary_text_style()),
-                crate::i18n::ui_text(
-                    "Could not load transcript preview",
-                    "无法加载对话记录预览",
-                )
-                    .set_style(crate::style::status_style(
-                        crate::style::StatusTone::Failure,
-                    ))
-                    .italic(),
-            ]
-            .into(),
-        ],
         Some(TranscriptPreviewState::Loaded(lines)) => {
             render_conversation_preview_lines(lines, width, row.cwd.as_deref())
         }
@@ -3863,6 +3835,7 @@ fn render_transcript_preview_lines(
     details
 }
 
+#[cfg(test)]
 fn render_expanded_session_details(
     row: &Row,
     state: &PickerState,
@@ -3927,6 +3900,7 @@ fn render_expanded_session_details(
     ]
 }
 
+#[cfg(test)]
 fn render_conversation_preview_lines(
     lines: &[TranscriptPreviewLine],
     width: u16,
@@ -3966,6 +3940,7 @@ fn render_conversation_preview_lines(
         .collect()
 }
 
+#[cfg(test)]
 fn render_transcript_content_lines(
     line: &TranscriptPreviewLine,
     width: u16,
@@ -3998,6 +3973,7 @@ fn render_transcript_content_lines(
     adaptive_wrap_lines(lines, RtOptions::new(content_width.max(/*other*/ 1)))
 }
 
+#[cfg(test)]
 fn conversation_content_line(mut line: Line<'static>, style: Style) -> Line<'static> {
     line.style = line.style.patch(style);
     for span in &mut line.spans {
@@ -4006,12 +3982,14 @@ fn conversation_content_line(mut line: Line<'static>, style: Style) -> Line<'sta
     line
 }
 
+#[cfg(test)]
 fn prefix_transcript_line(prefix: &'static str, line: Line<'static>) -> Line<'static> {
     let mut spans = vec![prefix.set_style(transcript_prefix_style(&line))];
     spans.extend(line.spans);
     Line::from(spans).style(line.style)
 }
 
+#[cfg(test)]
 fn transcript_prefix_style(line: &Line<'_>) -> Style {
     let style = line
         .spans
@@ -4022,6 +4000,7 @@ fn transcript_prefix_style(line: &Line<'_>) -> Style {
     connector_style_from_content(style)
 }
 
+#[cfg(test)]
 fn connector_style_from_content(style: Style) -> Style {
     Style {
         fg: style.fg,
@@ -4030,10 +4009,12 @@ fn connector_style_from_content(style: Style) -> Style {
     }
 }
 
+#[cfg(test)]
 fn conversation_assistant_style() -> Style {
     secondary_text_style()
 }
 
+#[cfg(test)]
 fn conversation_user_style() -> Style {
     Style::default()
         .fg(readable_color_on(Color::Reset, /*background*/ None))
@@ -4041,6 +4022,7 @@ fn conversation_user_style() -> Style {
         .italic()
 }
 
+#[cfg(test)]
 fn expanded_detail_line(label: &'static str, value: &str, width: u16) -> Line<'static> {
     const LABEL_WIDTH: usize = 10;
     let prefix_width = 4;
@@ -4057,6 +4039,7 @@ fn expanded_detail_line(label: &'static str, value: &str, width: u16) -> Line<'s
     .into()
 }
 
+#[cfg(test)]
 fn expanded_time_detail_line(
     label: &'static str,
     reference: DateTime<Utc>,
@@ -4114,6 +4097,7 @@ pub(crate) fn format_relative_time(reference: DateTime<Utc>, ts: Option<DateTime
     }
 }
 
+#[cfg(test)]
 fn format_relative_time_long(reference: DateTime<Utc>, ts: DateTime<Utc>) -> String {
     let seconds = (reference - ts).num_seconds().max(0);
     if seconds == 0 {
@@ -4133,6 +4117,7 @@ fn format_relative_time_long(reference: DateTime<Utc>, ts: DateTime<Utc>) -> Str
     plural_time(hours / 24, crate::i18n::ui_text("day", "天"))
 }
 
+#[cfg(test)]
 fn plural_time(value: i64, unit: &str) -> String {
     if value == 1 {
         if crate::i18n::is_chinese(crate::i18n::current_language()) {
@@ -4147,6 +4132,7 @@ fn plural_time(value: i64, unit: &str) -> String {
     }
 }
 
+#[cfg(test)]
 fn format_timestamp(ts: DateTime<Utc>, clock_format: ClockFormat) -> String {
     ts.format(match clock_format {
         ClockFormat::TwelveHour => "%Y-%m-%d %-I:%M:%S %p",
@@ -6200,7 +6186,7 @@ session_picker_view = "dense"
         let recorded_requests: Arc<Mutex<Vec<ThreadId>>> = Arc::new(Mutex::new(Vec::new()));
         let request_sink = recorded_requests.clone();
         let loader: PickerLoader = Arc::new(move |request| {
-            if let PickerLoadRequest::Preview { thread_id } = request {
+            if let PickerLoadRequest::TranscriptPreview { thread_id, .. } = request {
                 request_sink.lock().unwrap().push(thread_id);
             }
         });

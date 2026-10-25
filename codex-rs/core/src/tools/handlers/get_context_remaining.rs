@@ -19,19 +19,27 @@ use serde_json::json;
 #[derive(Debug, Clone)]
 struct GetContextRemainingOutput {
     tokens_left: Option<i64>,
+    language: codex_prompts::PromptLanguage,
 }
 
 impl GetContextRemainingOutput {
-    fn new(tokens_left: Option<i64>) -> Self {
-        Self { tokens_left }
+    fn new(tokens_left: Option<i64>, language: codex_prompts::PromptLanguage) -> Self {
+        Self {
+            tokens_left,
+            language,
+        }
     }
 
     fn fragment(&self) -> ContentItem {
         match self.tokens_left {
             Some(tokens_left) => {
-                crate::context::TokenBudgetRemainingContext::new(tokens_left).render()
+                crate::context::TokenBudgetRemainingContext::new(tokens_left)
+                    .with_language(self.language)
+                    .render()
             }
-            None => crate::context::TokenBudgetRemainingContext::unknown().render(),
+            None => crate::context::TokenBudgetRemainingContext::unknown()
+                .with_language(self.language)
+                .render(),
         }
     }
 }
@@ -101,6 +109,10 @@ impl ToolExecutor<ToolInvocation> for GetContextRemainingHandler {
 
             Ok(boxed_tool_output(GetContextRemainingOutput::new(
                 token_status.base_window_tokens_remaining,
+                codex_prompts::PromptLanguage::from_chinese(
+                    invocation.turn.config.tui_language.effective()
+                        == codex_config::types::TuiLanguage::Chinese,
+                ),
             )))
         })
     }

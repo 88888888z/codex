@@ -505,6 +505,7 @@ impl AvailableSkillsRender {
     pub(crate) fn into_fragment(
         self,
         include_skills_usage_instructions: bool,
+        chinese: bool,
     ) -> Option<AvailableSkillsInstructions> {
         (self.preserve_empty_fragment || !self.skill_lines.is_empty()).then(|| {
             AvailableSkillsInstructions::from_skill_lines(
@@ -512,6 +513,7 @@ impl AvailableSkillsRender {
                 self.skill_root_lines,
                 self.skill_lines,
                 include_skills_usage_instructions,
+                chinese,
             )
         })
     }
@@ -968,7 +970,7 @@ fn available_skills_fragment(
         include_skills_usage_instructions,
         /*alias_plan*/ None,
     )?
-    .into_fragment(include_skills_usage_instructions)
+    .into_fragment(include_skills_usage_instructions, /*chinese*/ false)
 }
 
 fn build_aliased_catalog(
@@ -1054,12 +1056,12 @@ fn aliased_metadata_overhead_cost(
 ) -> usize {
     let empty_skill_lines: &[String] = &[];
     let absolute_body =
-        render_available_skills_body(SkillPromptKind::Unaliased, &[], empty_skill_lines);
+        render_available_skills_body(SkillPromptKind::Unaliased, &[], empty_skill_lines, false);
     let aliased_body =
-        render_available_skills_body(prompt_kind, skill_root_lines, empty_skill_lines);
+        render_available_skills_body(prompt_kind, skill_root_lines, empty_skill_lines, false);
     let alias_instruction_cost = if include_skills_usage_instructions {
         prompt_kind
-            .alias_instructions()
+            .alias_instructions(false)
             .map_or(0, |instructions| metadata_line_cost(budget, instructions))
     } else {
         0

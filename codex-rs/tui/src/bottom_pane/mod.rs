@@ -2380,6 +2380,7 @@ impl BottomPane {
         self.request_redraw();
     }
 
+    #[cfg(test)]
     pub(crate) fn attach_image(&mut self, path: PathBuf) {
         if !self.has_active_view() {
             self.composer.attach_image(path);

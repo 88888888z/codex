@@ -14,6 +14,8 @@ use codex_utils_output_truncation::approx_bytes_for_tokens;
 use tracing::warn;
 
 pub const BASE_INSTRUCTIONS: &str = include_str!("../prompt.md");
+/// Complete Chinese replacement for model-owned default instructions.
+pub const BASE_INSTRUCTIONS_ZH_CN: &str = include_str!("../prompt.zh-CN.md");
 const PERSONALITY_SECTION_HEADER: &str = "# Personality";
 
 pub fn with_config_overrides(mut model: ModelInfo, config: &ModelsManagerConfig) -> ModelInfo {

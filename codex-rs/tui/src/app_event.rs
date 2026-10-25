@@ -862,9 +862,6 @@ pub(crate) enum AppEvent {
         result: Result<ConnectorsSnapshot, String>,
     },
 
-    /// Result of computing a `/diff` command.
-    DiffResult(PathBuf, String),
-
     /// Plain unified diff used by the structured diff review surface.
     DiffReviewResult(PathBuf, String),
 

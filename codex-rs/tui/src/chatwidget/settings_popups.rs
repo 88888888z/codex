@@ -19,7 +19,11 @@ impl ChatWidget {
             TuiLanguage::Chinese => "简体中文",
             TuiLanguage::English | TuiLanguage::Auto => "English",
         };
-        let title = crate::i18n::text(effective, "Select Interface Language", "选择界面语言");
+        let title = crate::i18n::text(
+            effective,
+            "Select Interface and Response Language",
+            "选择界面与回复语言",
+        );
         let subtitle = if crate::i18n::is_chinese(effective) {
             format!(
                 "当前设置：{current_label} · 实际生效：{effective_label}。切换后立即生效并保存到后续会话。"

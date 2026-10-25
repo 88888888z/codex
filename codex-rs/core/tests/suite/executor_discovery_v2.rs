@@ -562,6 +562,7 @@ async fn check_acquisition(enabled: bool, supported: bool) -> Result<()> {
             ),
         )),
         |config: &Config| codex_skills_extension::SkillsExtensionConfig {
+            chinese: false,
             include_instructions: true,
             max_context_tokens: config.skill_max_context_tokens,
             bundled_skills_enabled: false,
@@ -1085,6 +1086,7 @@ async fn auth_rotation_refreshes_plugin_acceptance_before_merged_skills() -> Res
                 ),
             )),
         |_config: &Config| SkillsExtensionConfig {
+            chinese: false,
             include_instructions: true,
             max_context_tokens: None,
             bundled_skills_enabled: false,

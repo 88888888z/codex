@@ -365,36 +365,6 @@ impl LayoutCache {
         layout
     }
 
-    fn has_visible_content(
-        &mut self,
-        cell: &Arc<dyn HistoryCell>,
-        width: u16,
-        presentation: CellPresentation,
-        render: impl FnOnce() -> TextLayout,
-    ) -> bool {
-        let source = Arc::downgrade(cell);
-        let animation_tick = cell.transcript_animation_tick();
-        if let Some(index) = self.entries.iter().position(|entry| {
-            entry.width == width
-                && entry.presentation.expanded == presentation.expanded
-                && entry.presentation.disclosure == presentation.disclosure
-                && entry.presentation.detailed == presentation.detailed
-                && entry.presentation.image_protocol == presentation.image_protocol
-                && entry.source.ptr_eq(&source)
-                && (entry.rendered_frame == self.frame
-                    || (cell.has_stable_transcript_height()
-                        && entry.animation_tick == animation_tick))
-        }) {
-            let visible = self.entries[index].layout.row_count() > 0;
-            if index + 1 != self.entries.len() {
-                let entry = self.entries.remove(index);
-                self.entries.push(entry);
-            }
-            return visible;
-        }
-        self.get(cell, width, presentation, render).row_count() > 0
-    }
-
     pub(super) fn clear(&mut self) {
         self.entries.clear();
     }

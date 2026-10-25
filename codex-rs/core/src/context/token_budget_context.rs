@@ -6,6 +6,7 @@ use crate::context::world_state::WorldStateUpdate;
 use codex_context_fragments::AnnotatedContent;
 use codex_context_fragments::message_from_parts;
 use codex_protocol::AgentPath;
+use codex_prompts::PromptLanguage;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ContentItemKind;
 use codex_protocol::models::ResponseItem;
@@ -150,17 +151,27 @@ impl ContextualUserFragment for ContextWindowGuidance {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TokenBudgetRemainingContext {
     tokens_left: Option<i64>,
+    language: PromptLanguage,
 }
 
 impl TokenBudgetRemainingContext {
     pub(crate) fn new(tokens_left: i64) -> Self {
         Self {
             tokens_left: Some(tokens_left),
+            language: PromptLanguage::English,
         }
     }
 
     pub(crate) fn unknown() -> Self {
-        Self { tokens_left: None }
+        Self {
+            tokens_left: None,
+            language: PromptLanguage::English,
+        }
+    }
+
+    pub(crate) fn with_language(mut self, language: PromptLanguage) -> Self {
+        self.language = language;
+        self
     }
 }
 
@@ -183,10 +194,22 @@ impl ContextualUserFragment for TokenBudgetRemainingContext {
 
     fn body(&self) -> ContentItem {
         input_text(match self.tokens_left {
-            Some(tokens_left) => {
-                format!("You have {tokens_left} tokens left in this context window.")
-            }
-            None => "You have unknown tokens left in this context window.".to_string(),
+            Some(tokens_left) => match self.language {
+                PromptLanguage::English => {
+                    format!("You have {tokens_left} tokens left in this context window.")
+                }
+                PromptLanguage::Chinese => {
+                    format!("当前上下文窗口还剩 {tokens_left} 个 token。")
+                }
+            },
+            None => match self.language {
+                PromptLanguage::English => {
+                    "You have unknown tokens left in this context window.".to_string()
+                }
+                PromptLanguage::Chinese => {
+                    "当前上下文窗口剩余 token 数未知。".to_string()
+                }
+            },
         })
     }
 }

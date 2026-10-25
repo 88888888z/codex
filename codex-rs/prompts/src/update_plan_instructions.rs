@@ -10,6 +10,7 @@ pub fn without_update_plan_instructions(instructions: &str) -> String {
         if matches!(
             line,
             "## Planning"
+                | "## 计划"
                 | "## `update_plan`"
                 | "## Plan tool"
                 | "## Plan Mode vs update_plan tool"

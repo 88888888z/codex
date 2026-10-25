@@ -38,6 +38,17 @@ const SKILLS_HOW_TO_USE_WITH_HOST_ALIASES: &str = r###"- Discovery: The list abo
   - Avoid deep reference-chasing: prefer opening only files directly linked from `SKILL.md` unless you're blocked.
   - When variants exist (frameworks, providers, domains), pick only the relevant reference file(s) and note that choice.
 - Safety and fallback: If a skill can't be applied cleanly (missing files, unclear instructions), state the issue, pick the next-best approach, and continue."###;
+const SKILLS_INTRO_ZH_CN: &str = "技能是通过 `SKILL.md` 提供的一组指令。下面是当前可用的技能，每项包含名称、说明和来源定位信息。路径和资源标识符保持原文。";
+const RESOURCE_ALIAS_INSTRUCTIONS_ZH_CN: &str = "- 根别名：可以将简短的包定位符直接传给 `skills.read`，它会根据 `### 技能根目录` 自动解析别名。";
+const SKILLS_USAGE_ZH_CN: &str = r###"- 发现：上面的列表是当前会话可用技能（名称 + 说明 + 路径或定位符）。
+- 触发规则：如果用户通过 `$SkillName` 或普通文本点名某个技能，或者任务明显匹配某个技能说明，本轮必须使用该技能。多个提及意味着全部使用。用户未在本轮再次提及时，不要沿用上一轮技能。
+- 缺失或阻塞：点名的技能不存在或来源无法读取时，简要说明并采用最佳替代方案。
+- 渐进读取：决定使用技能后，必须先完整读取对应 `SKILL.md`。分页读取时继续到 EOF。技能引用的其他资源也通过同一来源机制读取。
+- 禁止委派：主代理必须自行读取、理解和应用技能说明，不能把读取、摘要或解释技能指令的工作交给子代理。子代理仍可执行技能允许的实际任务。
+- 复用资源：优先运行或修改技能提供的脚本，并复用其 assets 和模板，不要重新创建。
+- 组合技能：多个技能适用时只选择覆盖当前任务所需的最小集合，并说明使用顺序。
+- 上下文控制：只读取当前任务需要的文件，不要加载无关脚本、资源或深层引用。
+- 失败处理：技能无法正常应用时说明问题，选择下一最佳方案并继续。"###;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SkillPromptKind {
@@ -56,7 +67,10 @@ impl SkillPromptKind {
         }
     }
 
-    fn intro(self) -> &'static str {
+    fn intro(self, chinese: bool) -> &'static str {
+        if chinese {
+            return SKILLS_INTRO_ZH_CN;
+        }
         match self {
             Self::Unaliased => SKILLS_INTRO_WITH_SOURCE_LOCATORS,
             Self::HostAliases => SKILLS_INTRO_WITH_HOST_ALIASES,
@@ -64,7 +78,10 @@ impl SkillPromptKind {
         }
     }
 
-    pub(crate) fn usage_instructions(self) -> &'static str {
+    pub(crate) fn usage_instructions(self, chinese: bool) -> &'static str {
+        if chinese {
+            return SKILLS_USAGE_ZH_CN;
+        }
         match self {
             Self::Unaliased | Self::ResourceAliases | Self::ResourceAliasesV2 => {
                 SKILLS_HOW_TO_USE_WITH_SOURCE_LOCATORS
@@ -73,9 +90,13 @@ impl SkillPromptKind {
         }
     }
 
-    pub(crate) fn alias_instructions(self) -> Option<&'static str> {
+    pub(crate) fn alias_instructions(self, chinese: bool) -> Option<&'static str> {
         match self {
-            Self::ResourceAliases | Self::ResourceAliasesV2 => Some(RESOURCE_ALIAS_INSTRUCTIONS),
+            Self::ResourceAliases | Self::ResourceAliasesV2 => Some(if chinese {
+                RESOURCE_ALIAS_INSTRUCTIONS_ZH_CN
+            } else {
+                RESOURCE_ALIAS_INSTRUCTIONS
+            }),
             Self::Unaliased | Self::HostAliases => None,
         }
     }
@@ -85,14 +106,19 @@ pub(crate) fn render_available_skills_body(
     prompt_kind: SkillPromptKind,
     skill_root_lines: &[String],
     skill_lines: &[String],
+    chinese: bool,
 ) -> String {
     let mut lines: Vec<String> = Vec::new();
-    lines.push("## Skills".to_string());
-    lines.push(prompt_kind.intro().to_string());
+    lines.push(if chinese { "## 技能" } else { "## Skills" }.to_string());
+    lines.push(prompt_kind.intro(chinese).to_string());
     if !skill_root_lines.is_empty() {
-        lines.push("### Skill roots".to_string());
+        lines.push(if chinese { "### 技能根目录" } else { "### Skill roots" }.to_string());
         if prompt_kind == SkillPromptKind::ResourceAliasesV2 {
-            lines.push("For each alias listed below, this mapping replaces any earlier mapping for that alias. Use it for subsequent skill calls.".to_string());
+            lines.push(if chinese {
+                "下面列出的别名映射会替换该别名之前的映射，并用于后续技能调用。".to_string()
+            } else {
+                "For each alias listed below, this mapping replaces any earlier mapping for that alias. Use it for subsequent skill calls.".to_string()
+            });
         }
         lines.extend(skill_root_lines.iter().cloned());
     }
@@ -100,12 +126,14 @@ pub(crate) fn render_available_skills_body(
         .iter()
         .any(|line| line.contains("(executor package: ") || line.contains("(cloud package: "))
     {
-        lines.push(
+        lines.push(if chinese {
+            "使用 `skills.read({\"package\":\"<package>\"})` 直接读取技能包的 `SKILL.md`，根别名会自动解析。读取包内其他文件时，使用同一 `package`，并把完整的 `skill://` 标识符作为 `resource`。如果未提供包，使用 `skills.list` 查找。".to_string()
+        } else {
             "Read a skill package directly with `skills.read({\"package\":\"<package>\"})` to read its `SKILL.md`; root aliases are resolved automatically. To read another file from that skill, use the same `package` and pass the file's complete `skill://` identifier as `resource`. If the package is not provided, use `skills.list` to find it."
-                .to_string(),
-        );
+                .to_string()
+        });
     }
-    lines.push("### Available skills".to_string());
+    lines.push(if chinese { "### 可用技能" } else { "### Available skills" }.to_string());
     lines.extend(skill_lines.iter().cloned());
 
     format!("\n{}\n", lines.join("\n"))

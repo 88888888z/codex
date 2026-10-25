@@ -6,6 +6,7 @@ use crate::context::ContextualUserFragment;
 use crate::context::RealtimeEndInstructions;
 use crate::context::RealtimeStartInstructions;
 use crate::context::RealtimeStartWithInstructions;
+use codex_prompts::PromptLanguage;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -15,6 +16,7 @@ pub(crate) struct RealtimeState {
     snapshot: RealtimeSnapshot,
     start_instructions: Option<String>,
     end_instructions: Option<String>,
+    language: PromptLanguage,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -32,13 +34,21 @@ impl RealtimeState {
             snapshot: RealtimeSnapshot { active },
             start_instructions: start_instructions.map(str::to_string),
             end_instructions: end_instructions.map(str::to_string),
+            language: PromptLanguage::English,
         }
+    }
+
+    pub(crate) fn with_language(mut self, language: PromptLanguage) -> Self {
+        self.language = language;
+        self
     }
 
     fn render_start(&self) -> Box<dyn ContextualUserFragment> {
         match self.start_instructions.as_deref() {
             Some(instructions) => Box::new(RealtimeStartWithInstructions::new(instructions)),
-            None => Box::new(RealtimeStartInstructions),
+            None => Box::new(RealtimeStartInstructions {
+                language: self.language,
+            }),
         }
     }
 
@@ -49,7 +59,9 @@ impl RealtimeState {
                 Some(instructions) => {
                     Box::new(RealtimeEndInstructions::with_instructions(instructions))
                 }
-                None => Box::new(RealtimeEndInstructions::new()),
+                None => Box::new(
+                    RealtimeEndInstructions::new().with_language(self.language),
+                ),
             }),
             (false, false) | (true, true) => None,
         }

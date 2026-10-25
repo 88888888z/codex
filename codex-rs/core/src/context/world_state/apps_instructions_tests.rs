@@ -3,6 +3,7 @@ use crate::context::ContextualUserFragment;
 use crate::context::world_state::PreviousSectionState;
 use crate::context::world_state::test_support::render_section_cases;
 use codex_protocol::models::ResponseItem;
+use codex_prompts::PromptLanguage;
 use pretty_assertions::assert_eq;
 
 #[test]
@@ -30,7 +31,9 @@ fn snapshots() {
 fn legacy_guidance_is_not_injected_again() {
     let mut world_state = super::super::WorldState::default();
     world_state.add_section(AppsInstructionsState::new(/*available*/ true));
-    let legacy: ResponseItem = ContextualUserFragment::into(AppsInstructions);
+    let legacy: ResponseItem = ContextualUserFragment::into(AppsInstructions {
+        language: PromptLanguage::English,
+    });
 
     assert!(
         world_state
@@ -45,7 +48,9 @@ fn persisted_guidance_is_restored_only_when_missing_from_history() {
     let mut world_state = super::super::WorldState::default();
     world_state.add_section(AppsInstructionsState::new(/*available*/ true));
     let snapshot = world_state.render_full().0;
-    let retained: ResponseItem = ContextualUserFragment::into(AppsInstructions);
+    let retained: ResponseItem = ContextualUserFragment::into(AppsInstructions {
+        language: PromptLanguage::English,
+    });
 
     assert_eq!(
         world_state

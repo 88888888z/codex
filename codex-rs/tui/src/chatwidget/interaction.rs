@@ -303,6 +303,7 @@ impl ChatWidget {
     ///
     /// When the model does not advertise image support, we keep the draft unchanged and surface a
     /// warning event so users can switch models or remove attachments.
+    #[cfg(test)]
     pub(crate) fn attach_image(&mut self, path: PathBuf) {
         if !self.current_model_supports_images() {
             self.add_to_history(history_cell::new_warning_event(

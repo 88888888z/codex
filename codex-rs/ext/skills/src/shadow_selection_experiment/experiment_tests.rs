@@ -77,6 +77,7 @@ async fn turn_input_and_history_advance_while_ranking_is_blocked()
     );
     let registry = builder.build();
     let config = SkillsExtensionConfig {
+        chinese: false,
         include_instructions: false,
         max_context_tokens: None,
         bundled_skills_enabled: false,

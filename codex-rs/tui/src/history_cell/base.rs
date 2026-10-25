@@ -30,6 +30,7 @@ pub(crate) struct WebHyperlinkHistoryCell {
 }
 
 impl WebHyperlinkHistoryCell {
+    #[cfg(test)]
     pub(crate) fn new(lines: Vec<Line<'static>>) -> Self {
         Self {
             lines: crate::terminal_hyperlinks::annotate_web_urls(lines),

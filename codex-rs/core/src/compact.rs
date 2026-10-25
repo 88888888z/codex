@@ -61,6 +61,8 @@ use tracing::error;
 
 pub use codex_prompts::SUMMARIZATION_PROMPT;
 pub use codex_prompts::SUMMARY_PREFIX;
+use codex_prompts::SUMMARIZATION_PROMPT_ZH_CN;
+use codex_prompts::SUMMARY_PREFIX_ZH_CN;
 const COMPACT_USER_MESSAGE_MAX_TOKENS: usize = 20_000;
 
 pub(crate) struct SplitRetainedTurns {
@@ -178,7 +180,15 @@ pub(crate) async fn run_inline_auto_compact_task(
         .config
         .compact_prompt
         .as_deref()
-        .unwrap_or(SUMMARIZATION_PROMPT)
+        .unwrap_or_else(|| {
+            if turn_context.config.tui_language.effective()
+                == codex_config::types::TuiLanguage::Chinese
+            {
+                SUMMARIZATION_PROMPT_ZH_CN
+            } else {
+                SUMMARIZATION_PROMPT
+            }
+        })
         .to_string();
     let input = vec![UserInput::Text {
         text: prompt,
@@ -459,7 +469,14 @@ async fn run_compact_task_inner_impl(
     } else {
         get_last_assistant_message_from_turn(history_snapshot.raw_items()).unwrap_or_default()
     };
-    let summary_text = format!("{SUMMARY_PREFIX}\n{summary_suffix}");
+    let summary_prefix = if turn_context.config.tui_language.effective()
+        == codex_config::types::TuiLanguage::Chinese
+    {
+        SUMMARY_PREFIX_ZH_CN
+    } else {
+        SUMMARY_PREFIX
+    };
+    let summary_text = format!("{summary_prefix}\n{summary_suffix}");
     let user_messages = collect_annotated_user_messages(&older_history);
 
     let mut new_history = build_compacted_history_with_retained_turns(
@@ -680,7 +697,9 @@ fn compacted_user_message<'a>(
 }
 
 pub(crate) fn is_summary_message(message: &str) -> bool {
-    message.starts_with(format!("{SUMMARY_PREFIX}\n").as_str())
+    [SUMMARY_PREFIX, SUMMARY_PREFIX_ZH_CN]
+        .into_iter()
+        .any(|prefix| message.starts_with(format!("{prefix}\n").as_str()))
 }
 
 pub(crate) fn is_real_user_or_agent_message(item: &ResponseItem) -> bool {

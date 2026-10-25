@@ -2826,6 +2826,7 @@ async fn spawn_agent_can_fork_parent_thread_history_with_sanitized_items() {
     let replacement_fragment = ModelInstructions {
         model: None,
         instructions: Some("Updated model instructions.".to_string()),
+        language: codex_prompts::PromptLanguage::English,
     }
     .render()
     .expect_text();
@@ -3281,6 +3282,7 @@ async fn spawn_agent_fork_strips_parent_usage_hints_from_compacted_history(marke
         max_concurrency: 2,
         wait_agent_enabled: false,
         expose_model_overrides: false,
+        language: codex_prompts::PromptLanguage::English,
     };
     let parent_task = InterAgentCommunication::new(
         AgentPath::root(),
@@ -3861,6 +3863,7 @@ async fn spawn_agent_full_fork_legacy_compaction_rebuilds_child_instructions_onc
             rollout_response_item(ContextualUserFragment::into(ModelInstructions {
                 model: None,
                 instructions: Some("Updated model instructions.".to_string()),
+                language: codex_prompts::PromptLanguage::English,
             })),
         ]);
         rollout_items.push(rollout_response_item(ContextualUserFragment::into(

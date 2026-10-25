@@ -10,6 +10,7 @@ use codex_prompts::ResolvedModelMessages;
 use codex_protocol::config_types::ModeKind;
 use codex_protocol::config_types::Settings;
 use codex_protocol::models::ResponseItem;
+use codex_prompts::PromptLanguage;
 use codex_protocol::openai_models::CollaborationModeMessages;
 use codex_protocol::openai_models::ModelMessages;
 use codex_protocol_test_support::ContentItemTestExt;
@@ -52,6 +53,7 @@ fn instruction_updates_are_applied_once_in_retained_history() {
             ResolvedModelMessages::bundled().collaboration_modes(),
             /*update_plan_enabled*/ true,
             /*custom_model_catalog*/ false,
+            PromptLanguage::English,
         ));
         let expected: ResponseItem = ContextualUserFragment::into(CollaborationModeInstructions {
             instructions: instructions.unwrap_or_default().to_string(),
@@ -105,6 +107,7 @@ fn catalog_collaboration_messages_select_mode_variant() {
                 messages,
                 /*update_plan_enabled*/ true,
                 /*custom_model_catalog*/ false,
+                PromptLanguage::English,
             );
 
             assert_eq!(state.instructions.as_deref(), Some(expected));
@@ -123,6 +126,7 @@ fn empty_catalog_collaboration_message_suppresses_legacy_instructions() {
         messages,
         /*update_plan_enabled*/ true,
         /*custom_model_catalog*/ false,
+        PromptLanguage::English,
     );
 
     assert_eq!(
@@ -148,6 +152,7 @@ fn missing_catalog_collaboration_message_uses_legacy_instructions() {
             messages,
             /*update_plan_enabled*/ true,
             /*custom_model_catalog*/ false,
+            PromptLanguage::English,
         );
         assert_eq!(
             state.instructions.as_deref(),
@@ -172,6 +177,7 @@ fn legacy_collaboration_mode_snapshots_refresh_catalog_messages_once() {
                 messages,
                 /*update_plan_enabled*/ true,
                 /*custom_model_catalog*/ false,
+                PromptLanguage::English,
             );
 
             assert_eq!(
@@ -217,5 +223,6 @@ fn collaboration_mode_state(mode: ModeKind, instructions: &str) -> Collaboration
         ResolvedModelMessages::bundled().collaboration_modes(),
         /*update_plan_enabled*/ true,
         /*custom_model_catalog*/ false,
+        PromptLanguage::English,
     )
 }

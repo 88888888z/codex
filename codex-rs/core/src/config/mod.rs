@@ -2953,7 +2953,17 @@ pub(crate) fn resolve_token_budget_config(
     let reminder_message_template = token_budget_config
         .and_then(|config| config.reminder_message_template.clone())
         .unwrap_or_else(|| {
-            ResolvedModelMessages::bundled()
+            ResolvedModelMessages::bundled_with_language(
+                codex_prompts::PromptLanguage::from_chinese(
+                    config_toml
+                        .tui
+                        .as_ref()
+                        .map(|tui| tui.language)
+                        .unwrap_or(TuiLanguage::Chinese)
+                        .effective()
+                        == TuiLanguage::Chinese,
+                ),
+            )
                 .token_budget_reminder_template()
                 .to_owned()
         });

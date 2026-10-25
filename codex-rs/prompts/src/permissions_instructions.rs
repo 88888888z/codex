@@ -6,10 +6,14 @@
 use crate::ResolvedMessage;
 use crate::ResolvedModelMessages;
 use crate::model_messages::permissions::DANGER_FULL_ACCESS_TEMPLATE;
+use crate::model_messages::permissions::DANGER_FULL_ACCESS_TEMPLATE_ZH_CN;
 use crate::model_messages::permissions::READ_ONLY_TEMPLATE;
+use crate::model_messages::permissions::READ_ONLY_TEMPLATE_ZH_CN;
 use crate::model_messages::permissions::ResolvedApprovalMessages;
 use crate::model_messages::permissions::ResolvedPermissionMessages;
 use crate::model_messages::permissions::WORKSPACE_WRITE_TEMPLATE;
+use crate::model_messages::permissions::WORKSPACE_WRITE_TEMPLATE_ZH_CN;
+use crate::PromptLanguage;
 use codex_context_fragments::ContextualUserFragment;
 use codex_execpolicy::Policy;
 use codex_protocol::config_types::ApprovalsReviewer;
@@ -33,15 +37,25 @@ mod writable_roots;
 
 const REQUEST_PERMISSION_RULE: &str =
     include_str!("../templates/permissions/approval_policy/on_request_rule_request_permission.md");
+const REQUEST_PERMISSION_RULE_ZH_CN: &str =
+    include_str!("../templates/permissions/approval_policy/on_request_rule_request_permission.zh-CN.md");
 const REQUEST_PERMISSIONS_TOOL: &str = "# request_permissions Tool\n\nThe built-in `request_permissions` tool is available in this session. Invoke it when you need to request additional `network` or `file_system` permissions before later shell-like commands need them. Request only the specific permissions required for the task.";
+const REQUEST_PERMISSIONS_TOOL_ZH_CN: &str = "# request_permissions 工具\n\n当前会话提供内置 `request_permissions` 工具。如果后续 shell 类命令需要额外的 `network` 或 `file_system` 权限，应提前调用该工具。只请求完成任务所需的具体权限。";
 const AUTO_REVIEW_SUFFIX: &str = "`approvals_reviewer` is `auto_review`: Sandbox escalations with require_escalated will be reviewed for compliance with the policy. If a rejection happens, you should proceed only with a materially safer alternative, or inform the user of the risk and send a final message to ask for approval.";
+const AUTO_REVIEW_SUFFIX_ZH_CN: &str = "`approvals_reviewer` 为 `auto_review`：使用 require_escalated 的沙箱提权会接受策略合规审查。如果请求被拒绝，只能采用明显更安全的替代方案，或向用户说明风险并发送最终消息请求批准。";
 const GRANULAR_INTRO: &str = "# Approval Requests\n\nApproval policy is `granular`. Categories set to `false` are automatically rejected instead of prompting the user.";
+const GRANULAR_INTRO_ZH_CN: &str = "# 审批请求\n\n审批策略为 `granular`。设为 `false` 的类别会自动拒绝，不提示用户。";
 const GRANULAR_PROMPTED_CATEGORIES: &str =
     "These approval categories may still prompt the user when needed:";
+const GRANULAR_PROMPTED_CATEGORIES_ZH_CN: &str =
+    "以下审批类别在需要时仍可能提示用户：";
 const GRANULAR_REJECTED_CATEGORIES: &str =
     "These approval categories are automatically rejected instead of prompting the user:";
+const GRANULAR_REJECTED_CATEGORIES_ZH_CN: &str =
+    "以下审批类别会自动拒绝，不提示用户：";
 const MAX_PERMISSION_PATH_BYTES: usize = 32 * 1024;
 const OMITTED_PERMISSION_PATHS: &str = "Additional permission paths/globs are omitted. All restrictions still apply; do not use escalation or additional permissions to bypass omitted read denials.";
+const OMITTED_PERMISSION_PATHS_ZH_CN: &str = "部分额外的权限路径或通配模式已省略。所有限制仍然有效，不得通过提权或额外权限绕过被省略的读取限制。";
 
 static DANGER_FULL_ACCESS: LazyLock<Template> = LazyLock::new(|| {
     Template::parse(DANGER_FULL_ACCESS_TEMPLATE.trim_end())
@@ -54,6 +68,18 @@ static WORKSPACE_WRITE: LazyLock<Template> = LazyLock::new(|| {
 static READ_ONLY: LazyLock<Template> = LazyLock::new(|| {
     Template::parse(READ_ONLY_TEMPLATE.trim_end())
         .unwrap_or_else(|err| panic!("read-only sandbox template must parse: {err}"))
+});
+static DANGER_FULL_ACCESS_ZH_CN: LazyLock<Template> = LazyLock::new(|| {
+    Template::parse(DANGER_FULL_ACCESS_TEMPLATE_ZH_CN.trim_end())
+        .unwrap_or_else(|err| panic!("Chinese danger-full-access template must parse: {err}"))
+});
+static WORKSPACE_WRITE_ZH_CN: LazyLock<Template> = LazyLock::new(|| {
+    Template::parse(WORKSPACE_WRITE_TEMPLATE_ZH_CN.trim_end())
+        .unwrap_or_else(|err| panic!("Chinese workspace-write template must parse: {err}"))
+});
+static READ_ONLY_ZH_CN: LazyLock<Template> = LazyLock::new(|| {
+    Template::parse(READ_ONLY_TEMPLATE_ZH_CN.trim_end())
+        .unwrap_or_else(|err| panic!("Chinese read-only template must parse: {err}"))
 });
 
 #[derive(Debug, Clone, Copy)]
@@ -101,8 +127,12 @@ impl PermissionsInstructions {
         context: PermissionsRenderContext<'_>,
         approval_context: ApprovalPromptContext<'_>,
     ) -> Self {
-        let mut remaining_path_bytes =
-            MAX_PERMISSION_PATH_BYTES - OMITTED_PERMISSION_PATHS.len() - 1;
+        let language = approval_context.messages.language;
+        let omitted_paths = match language {
+            PromptLanguage::English => OMITTED_PERMISSION_PATHS,
+            PromptLanguage::Chinese => OMITTED_PERMISSION_PATHS_ZH_CN,
+        };
+        let mut remaining_path_bytes = MAX_PERMISSION_PATH_BYTES - omitted_paths.len() - 1;
         let mut paths_omitted = false;
         let mut bounded_paths = |paths: &[String]| {
             paths
@@ -151,7 +181,7 @@ impl PermissionsInstructions {
             append_section(&mut text, &denied_reads);
         }
         if paths_omitted {
-            append_section(&mut text, OMITTED_PERMISSION_PATHS);
+            append_section(&mut text, omitted_paths);
         }
         if !text.ends_with('\n') {
             text.push('\n');
@@ -296,6 +326,7 @@ fn approval_text(
     request_permissions_tool_enabled: bool,
 ) -> String {
     let messages = approval_context.messages;
+    let language = messages.language;
     let selected = match approval_policy {
         AskForApproval::OnRequest => match approval_context.reviewer {
             ApprovalsReviewer::User => messages.on_request,
@@ -303,7 +334,10 @@ fn approval_text(
         },
         AskForApproval::Never => messages.never,
         AskForApproval::UnlessTrusted => messages.unless_trusted,
-        AskForApproval::Granular(_) => ResolvedMessage::Bundled(GRANULAR_INTRO),
+        AskForApproval::Granular(_) => ResolvedMessage::Bundled(match language {
+            PromptLanguage::English => GRANULAR_INTRO,
+            PromptLanguage::Chinese => GRANULAR_INTRO_ZH_CN,
+        }),
     };
     let prefix_template = approval_context.permission_messages.approved_prefixes;
     let render_prefixes =
@@ -330,20 +364,33 @@ fn approval_text(
         AskForApproval::Never => return base.to_string(),
         AskForApproval::UnlessTrusted => {
             if request_permissions_tool_enabled {
-                format!("{base}\n\n{REQUEST_PERMISSIONS_TOOL}")
+                let tool = match language {
+                    PromptLanguage::English => REQUEST_PERMISSIONS_TOOL,
+                    PromptLanguage::Chinese => REQUEST_PERMISSIONS_TOOL_ZH_CN,
+                };
+                format!("{base}\n\n{tool}")
             } else {
                 base.to_string()
             }
         }
         AskForApproval::OnRequest => {
             let rule = if exec_permission_approvals_enabled {
-                REQUEST_PERMISSION_RULE
+                match language {
+                    PromptLanguage::English => REQUEST_PERMISSION_RULE,
+                    PromptLanguage::Chinese => REQUEST_PERMISSION_RULE_ZH_CN,
+                }
             } else {
                 base
             };
             let mut sections = vec![rule.to_string()];
             if request_permissions_tool_enabled {
-                sections.push(REQUEST_PERMISSIONS_TOOL.to_string());
+                sections.push(
+                    match language {
+                        PromptLanguage::English => REQUEST_PERMISSIONS_TOOL,
+                        PromptLanguage::Chinese => REQUEST_PERMISSIONS_TOOL_ZH_CN,
+                    }
+                    .to_string(),
+                );
             }
             sections.extend(render_prefixes());
             sections.join("\n\n")
@@ -353,11 +400,18 @@ fn approval_text(
             render_prefixes(),
             exec_permission_approvals_enabled,
             request_permissions_tool_enabled,
+            language,
         ),
     };
 
     if approval_context.reviewer == ApprovalsReviewer::AutoReview {
-        format!("{text}\n\n{AUTO_REVIEW_SUFFIX}")
+        format!(
+            "{text}\n\n{}",
+            match language {
+                PromptLanguage::English => AUTO_REVIEW_SUFFIX,
+                PromptLanguage::Chinese => AUTO_REVIEW_SUFFIX_ZH_CN,
+            }
+        )
     } else {
         text
     }
@@ -368,10 +422,25 @@ fn sandbox_text(
     network_access: NetworkAccess,
     messages: ResolvedPermissionMessages<'_>,
 ) -> String {
-    let (selected, template) = match mode {
-        SandboxMode::DangerFullAccess => (messages.danger_full_access, &DANGER_FULL_ACCESS),
-        SandboxMode::WorkspaceWrite => (messages.workspace_write, &WORKSPACE_WRITE),
-        SandboxMode::ReadOnly => (messages.read_only, &READ_ONLY),
+    let (selected, template) = match (messages.language, mode) {
+        (PromptLanguage::English, SandboxMode::DangerFullAccess) => {
+            (messages.danger_full_access, &DANGER_FULL_ACCESS)
+        }
+        (PromptLanguage::English, SandboxMode::WorkspaceWrite) => {
+            (messages.workspace_write, &WORKSPACE_WRITE)
+        }
+        (PromptLanguage::English, SandboxMode::ReadOnly) => {
+            (messages.read_only, &READ_ONLY)
+        }
+        (PromptLanguage::Chinese, SandboxMode::DangerFullAccess) => {
+            (messages.danger_full_access, &DANGER_FULL_ACCESS_ZH_CN)
+        }
+        (PromptLanguage::Chinese, SandboxMode::WorkspaceWrite) => {
+            (messages.workspace_write, &WORKSPACE_WRITE_ZH_CN)
+        }
+        (PromptLanguage::Chinese, SandboxMode::ReadOnly) => {
+            (messages.read_only, &READ_ONLY_ZH_CN)
+        }
     };
     let network_access = network_access.to_string();
     match selected {
@@ -411,6 +480,7 @@ fn granular_instructions(
     approved_command_prefixes: Option<String>,
     exec_permission_approvals_enabled: bool,
     request_permissions_tool_enabled: bool,
+    language: PromptLanguage,
 ) -> String {
     let sandbox_approval_prompts_allowed = granular_config.allows_sandbox_approval();
     let shell_permission_requests_available =
@@ -446,27 +516,43 @@ fn granular_instructions(
         .map(|&(_, category)| format!("- {category}"))
         .collect::<Vec<_>>();
 
-    let mut sections = vec![GRANULAR_INTRO.to_string()];
+    let (intro, prompted_header, rejected_header, request_rule, request_tool) = match language {
+        PromptLanguage::English => (
+            GRANULAR_INTRO,
+            GRANULAR_PROMPTED_CATEGORIES,
+            GRANULAR_REJECTED_CATEGORIES,
+            REQUEST_PERMISSION_RULE,
+            REQUEST_PERMISSIONS_TOOL,
+        ),
+        PromptLanguage::Chinese => (
+            GRANULAR_INTRO_ZH_CN,
+            GRANULAR_PROMPTED_CATEGORIES_ZH_CN,
+            GRANULAR_REJECTED_CATEGORIES_ZH_CN,
+            REQUEST_PERMISSION_RULE_ZH_CN,
+            REQUEST_PERMISSIONS_TOOL_ZH_CN,
+        ),
+    };
+    let mut sections = vec![intro.to_string()];
 
     if !prompted_categories.is_empty() {
         sections.push(format!(
-            "{GRANULAR_PROMPTED_CATEGORIES}\n{}",
+            "{prompted_header}\n{}",
             prompted_categories.join("\n")
         ));
     }
     if !rejected_categories.is_empty() {
         sections.push(format!(
-            "{GRANULAR_REJECTED_CATEGORIES}\n{}",
+            "{rejected_header}\n{}",
             rejected_categories.join("\n")
         ));
     }
 
     if shell_permission_requests_available {
-        sections.push(REQUEST_PERMISSION_RULE.to_string());
+        sections.push(request_rule.to_string());
     }
 
     if request_permissions_tool_prompts_allowed {
-        sections.push(REQUEST_PERMISSIONS_TOOL.to_string());
+        sections.push(request_tool.to_string());
     }
 
     sections.extend(approved_command_prefixes);

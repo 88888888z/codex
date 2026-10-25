@@ -5,6 +5,7 @@ use crate::session::step_context::StepContext;
 use codex_prompts::ResolvedMessage;
 use codex_prompts::ResolvedModelMessages;
 use codex_prompts::ResolvedMultiAgentMessages;
+use codex_prompts::PromptLanguage;
 use codex_protocol::config_types::MultiAgentMode;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::protocol::MultiAgentVersion;
@@ -18,7 +19,11 @@ pub(super) fn usage_hint_text(step_context: &StepContext) -> Option<MultiAgentRo
     }
 
     let multi_agent_messages =
-        ResolvedModelMessages::from_model(&step_context.settings.model_info).multi_agent();
+        ResolvedModelMessages::from_model_with_language(
+            &step_context.settings.model_info,
+            prompt_language(step_context),
+        )
+        .multi_agent();
     let snapshot = resolve_usage_hints(
         &turn_context.config.multi_agent_v2,
         multi_agent_messages,
@@ -59,6 +64,7 @@ pub(crate) fn resolve_usage_hints(
             max_concurrency: config.max_concurrent_threads_per_session,
             wait_agent_enabled: config.wait_agent_enabled,
             expose_model_overrides: config.expose_spawn_agent_model_overrides,
+            language: multi_agent_messages.language,
         })
     };
 
@@ -82,7 +88,11 @@ pub(crate) fn effective_multi_agent_mode(step_context: &StepContext) -> Option<M
     }
 
     let multi_agent_messages =
-        ResolvedModelMessages::from_model(&settings.model_info).multi_agent();
+        ResolvedModelMessages::from_model_with_language(
+            &settings.model_info,
+            prompt_language(step_context),
+        )
+        .multi_agent();
     let hint = turn_context
         .config
         .multi_agent_v2
@@ -118,4 +128,11 @@ pub(crate) fn effective_multi_agent_mode(step_context: &StepContext) -> Option<M
         | SessionSource::Unknown => Some(multi_agent_mode),
         SessionSource::Internal(_) | SessionSource::SubAgent(_) => None,
     }
+}
+
+fn prompt_language(step_context: &StepContext) -> PromptLanguage {
+    PromptLanguage::from_chinese(
+        step_context.turn.config.tui_language.effective()
+            == codex_config::types::TuiLanguage::Chinese,
+    )
 }

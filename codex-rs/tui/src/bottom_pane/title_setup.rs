@@ -340,6 +340,7 @@ impl TerminalTitleSetupView {
     /// main TUI still warns about them when rendering the actual title, but the
     /// picker itself only exposes the selectable items it can meaningfully
     /// preview and persist.
+    #[cfg(test)]
     pub(crate) fn new(
         title_items: Option<&[String]>,
         preview_data: StatusSurfacePreviewData,

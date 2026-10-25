@@ -93,6 +93,7 @@ impl SkillProvider for Provider {
 fn state() -> SkillsThreadState {
     SkillsThreadState::new(
         SkillsExtensionConfig {
+            chinese: false,
             include_instructions: true,
             max_context_tokens: None,
             bundled_skills_enabled: false,

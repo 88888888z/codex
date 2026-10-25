@@ -250,6 +250,7 @@ pub(crate) const fn ctrl(key: KeyCode) -> KeyBinding {
     KeyBinding::new(key, KeyModifiers::CONTROL)
 }
 
+#[cfg(test)]
 pub(crate) const fn ctrl_alt(key: KeyCode) -> KeyBinding {
     KeyBinding::new(key, KeyModifiers::CONTROL.union(KeyModifiers::ALT))
 }

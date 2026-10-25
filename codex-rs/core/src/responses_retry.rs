@@ -70,9 +70,15 @@ pub(crate) async fn handle_response_stream_error(
     {
         let model_info = &step_context.settings.model_info;
         let guidance = ContentFilterGuidance {
-            text: codex_prompts::ResolvedModelMessages::from_model(model_info)
-                .content_filter_guidance()
-                .to_string(),
+            text: codex_prompts::ResolvedModelMessages::from_model_with_language(
+                model_info,
+                codex_prompts::PromptLanguage::from_chinese(
+                    turn_context.config.tui_language.effective()
+                        == codex_config::types::TuiLanguage::Chinese,
+                ),
+            )
+            .content_filter_guidance()
+            .to_string(),
         };
         sess.record_conversation_items(
             turn_context,

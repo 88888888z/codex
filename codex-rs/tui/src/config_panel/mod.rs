@@ -271,16 +271,6 @@ impl ConfigSection {
         Self::TextSelection,
     ];
 
-    fn title(self) -> &'static str {
-        match self {
-            Self::Appearance => "Appearance",
-            Self::Notifications => "Notifications",
-            Self::Input => "Input",
-            Self::Sessions => "Sessions",
-            Self::TextSelection => "Text selection",
-        }
-    }
-
     fn title_for(self, language: TuiLanguage) -> &'static str {
         match self {
             Self::Appearance => crate::i18n::text(language, "Appearance", "外观"),

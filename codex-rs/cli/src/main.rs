@@ -2211,6 +2211,8 @@ async fn run_debug_prompt_input_command(
     );
     codex_skills_extension::install(&mut extensions, |config: &Config| {
         codex_skills_extension::SkillsExtensionConfig {
+            chinese: config.tui_language.effective()
+                == codex_config::types::TuiLanguage::Chinese,
             include_instructions: config.include_skill_instructions,
             max_context_tokens: config.skill_max_context_tokens,
             bundled_skills_enabled: config.bundled_skills_enabled(),

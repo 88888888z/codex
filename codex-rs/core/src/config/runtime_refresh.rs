@@ -177,6 +177,7 @@ impl Config {
         }
         if !matches!(scope, RuntimeConfigRefresh::Mcp) {
             config.tool_suggest = resolve_tool_suggest_config_from_layer_stack(&layers);
+            config.tui_language = incoming.tui_language;
         }
         config.config_layer_stack = layers
             .with_mcp_ema_cancellation(self.config_layer_stack.mcp_ema_cancellation().clone());

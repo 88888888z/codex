@@ -10,7 +10,9 @@ mod review_request;
 mod update_plan_instructions;
 
 pub use compact::SUMMARIZATION_PROMPT;
+pub use compact::SUMMARIZATION_PROMPT_ZH_CN;
 pub use compact::SUMMARY_PREFIX;
+pub use compact::SUMMARY_PREFIX_ZH_CN;
 pub use guardian_instructions::GuardianClassifierInstructions;
 pub use guardian_instructions::GuardianPolicyInstructions;
 pub use guardian_instructions::render_guardian_rejection;
@@ -25,13 +27,36 @@ pub use multi_agent_instructions::MultiAgentRoleInstructions;
 pub use permissions_instructions::ApprovalPromptContext;
 pub use permissions_instructions::PermissionsInstructions;
 pub use realtime::BACKEND_PROMPT;
+pub use realtime::BACKEND_PROMPT_ZH_CN;
 pub use realtime::END_INSTRUCTIONS;
+pub use realtime::END_INSTRUCTIONS_ZH_CN;
 pub use realtime::START_INSTRUCTIONS;
+pub use realtime::START_INSTRUCTIONS_ZH_CN;
 pub use review_exit::render_review_exit_interrupted;
+pub use review_exit::render_review_exit_interrupted_with_language;
 pub use review_exit::render_review_exit_success;
+pub use review_exit::render_review_exit_success_with_language;
 pub use review_request::REVIEW_PROMPT;
+pub use review_request::REVIEW_PROMPT_ZH_CN;
 pub use review_request::ResolvedReviewRequest;
 pub use review_request::resolve_review_request;
+pub use review_request::resolve_review_request_with_language;
 pub use review_request::review_prompt;
+pub use review_request::review_prompt_with_language;
 pub use review_request::user_facing_hint;
 pub use update_plan_instructions::without_update_plan_instructions;
+
+/// Language used for bundled prompt text. Catalog and user overrides remain unchanged.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PromptLanguage {
+    #[default]
+    English,
+    Chinese,
+}
+
+impl PromptLanguage {
+    /// Map a boolean Chinese-language selection to the prompt language.
+    pub fn from_chinese(chinese: bool) -> Self {
+        if chinese { Self::Chinese } else { Self::English }
+    }
+}

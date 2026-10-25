@@ -12,6 +12,7 @@ use codex_protocol::openai_models::ModelMessages;
 use codex_protocol::openai_models::ToolMessage;
 use permissions::ResolvedApprovalMessages;
 use permissions::ResolvedPermissionMessages;
+use crate::PromptLanguage;
 
 mod collaboration;
 mod guardian;
@@ -51,12 +52,20 @@ impl<'a> ResolvedMessage<'a> {
 }
 
 const REQUEST_USER_INPUT_ASYNC_DESCRIPTION: &str = "Ask the user one or more questions during ongoing work. Use this tool only to request missing information, preferences, constraints, clarification, or approval. The tool returns immediately without ending the turn or waiting for a reply; any reply arrives asynchronously as a new user message. Keep questions concise, self-contained, and easy to understand, using a level of detail appropriate to the user and task. The UI always allows a free-text answer, including when suggested options are provided. A preselected option is not submitted automatically.";
+const REQUEST_USER_INPUT_ASYNC_DESCRIPTION_ZH_CN: &str = "在工作过程中向用户提出一个或多个问题。仅用于获取缺失信息、偏好、约束、澄清或审批。工具会立即返回，不会结束当前回合或等待回复；用户回复会作为新的用户消息异步到达。问题应简洁、完整、易懂，并根据用户和任务调整详细程度。即使提供了建议选项，界面也始终允许自由文本回答。预选选项不会被自动提交。";
 const REMINDER_MESSAGE_TEMPLATE: &str = concat!(
     "Your context window is nearly exhausted (only {n_remaining} tokens remaining) and will be automatically reset for you soon. ",
     "Once reset, message items in current context window will be cleared in the new window, but notes and history items will be persistent across windows."
 );
+const REMINDER_MESSAGE_TEMPLATE_ZH_CN: &str = concat!(
+    "当前上下文窗口即将耗尽，仅剩 {n_remaining} 个 token，系统很快会自动重置上下文。",
+    "重置后，当前窗口中的消息项会从新窗口移除，但笔记和历史记录仍会跨窗口保留。"
+);
 const PERSISTENT_INSTRUCTIONS: &str = include_str!("../templates/persistent_mode.md");
+const PERSISTENT_INSTRUCTIONS_ZH_CN: &str =
+    include_str!("../templates/persistent_mode.zh-CN.md");
 const CONTENT_FILTER_GUIDANCE: &str = "Your previous response was blocked by a content filter. Do not treat this as a transient failure or try to reproduce or work around the blocked content through repeated attempts, altered formatting, splitting, encoding, tools, subagents, or later wakes. Briefly explain the limitation and offer a permitted alternative. Continue unrelated authorized work.";
+const CONTENT_FILTER_GUIDANCE_ZH_CN: &str = "你上一条回复被内容过滤器拦截。不要把这次拦截视为临时故障，也不要通过反复尝试、改写格式、拆分内容、编码、工具、子代理或后续唤醒来复现或绕过被拦截的内容。简要说明限制，并提供允许的替代方案。继续处理其他已获授权的无关工作。";
 const MAX_CONTENT_FILTER_GUIDANCE_BYTES: usize = 512;
 
 /// Resolves model-owned text from catalog overrides or bundled defaults, one family at a time.
@@ -67,6 +76,7 @@ const MAX_CONTENT_FILTER_GUIDANCE_BYTES: usize = 512;
 #[derive(Debug, Clone, Copy)]
 pub struct ResolvedModelMessages<'a> {
     catalog_messages: Option<&'a ModelMessages>,
+    language: PromptLanguage,
 }
 
 impl<'a> ResolvedModelMessages<'a> {
@@ -74,6 +84,15 @@ impl<'a> ResolvedModelMessages<'a> {
     pub fn from_model(model_info: &'a ModelInfo) -> Self {
         Self {
             catalog_messages: model_info.model_messages.as_ref(),
+            language: PromptLanguage::English,
+        }
+    }
+
+    /// Borrows messages with the requested language for bundled defaults.
+    pub fn from_model_with_language(model_info: &'a ModelInfo, language: PromptLanguage) -> Self {
+        Self {
+            catalog_messages: model_info.model_messages.as_ref(),
+            language,
         }
     }
 
@@ -81,6 +100,15 @@ impl<'a> ResolvedModelMessages<'a> {
     pub fn bundled() -> Self {
         Self {
             catalog_messages: None,
+            language: PromptLanguage::English,
+        }
+    }
+
+    /// Resolves bundled defaults in the requested language.
+    pub fn bundled_with_language(language: PromptLanguage) -> Self {
+        Self {
+            catalog_messages: None,
+            language,
         }
     }
 
@@ -92,17 +120,19 @@ impl<'a> ResolvedModelMessages<'a> {
 
     /// Resolves approval messages and their bundled alternatives.
     pub(crate) fn approvals(self) -> ResolvedApprovalMessages<'a> {
-        ResolvedApprovalMessages::new(
+        ResolvedApprovalMessages::new_with_language(
             self.catalog_messages
                 .and_then(|messages| messages.approvals.as_ref()),
+            self.language,
         )
     }
 
     /// Resolves permission templates without preparing runtime permission facts.
     pub(crate) fn permissions(self) -> ResolvedPermissionMessages<'a> {
-        ResolvedPermissionMessages::new(
+        ResolvedPermissionMessages::new_with_language(
             self.catalog_messages
                 .and_then(|messages| messages.permissions.as_ref()),
+            self.language,
         )
     }
 
@@ -111,6 +141,7 @@ impl<'a> ResolvedModelMessages<'a> {
         ResolvedCollaborationModeMessages::new(
             self.catalog_messages
                 .and_then(|messages| messages.collaboration_modes.as_ref()),
+            self.language,
         )
     }
 
@@ -119,6 +150,7 @@ impl<'a> ResolvedModelMessages<'a> {
         ResolvedMultiAgentMessages::new(
             self.catalog_messages
                 .and_then(|messages| messages.multi_agent.as_ref()),
+            self.language,
         )
     }
 
@@ -127,19 +159,23 @@ impl<'a> ResolvedModelMessages<'a> {
         ResolvedAutoReviewMessages::new(
             self.catalog_messages
                 .and_then(|messages| messages.auto_review.as_ref()),
+            self.language,
         )
     }
 
     /// Resolves classifier instructions from catalog text or the bundled default.
     pub fn guardian_classifier_instructions(&self) -> &'a str {
-        guardian::classifier_instructions(self.catalog_messages)
+        guardian::classifier_instructions(self.catalog_messages, self.language)
     }
 
     /// Resolves reminder text without selecting or validating runtime budget settings.
     pub fn token_budget_reminder_template(&self) -> &'a str {
         self.catalog_messages
             .and_then(|messages| messages.token_budget.as_ref())
-            .map_or(REMINDER_MESSAGE_TEMPLATE, |messages| {
+            .map_or_else(|| match self.language {
+                PromptLanguage::English => REMINDER_MESSAGE_TEMPLATE,
+                PromptLanguage::Chinese => REMINDER_MESSAGE_TEMPLATE_ZH_CN,
+            }, |messages| {
                 messages.reminder_message_template.as_str()
             })
     }
@@ -177,7 +213,10 @@ impl<'a> ResolvedModelMessages<'a> {
             .and_then(|messages| messages.tools.as_ref())
             .and_then(|tools| tools.send_user_message_async.as_ref())
             .and_then(|tool| tool.description.as_deref())
-            .unwrap_or(REQUEST_USER_INPUT_ASYNC_DESCRIPTION)
+            .unwrap_or(match self.language {
+                PromptLanguage::English => REQUEST_USER_INPUT_ASYNC_DESCRIPTION,
+                PromptLanguage::Chinese => REQUEST_USER_INPUT_ASYNC_DESCRIPTION_ZH_CN,
+            })
     }
 
     /// Selects the asynchronous user-input schema; parsing belongs to the tool consumer.
@@ -244,6 +283,7 @@ impl<'a> ResolvedModelMessages<'a> {
             self.catalog_messages
                 .and_then(|messages| messages.tools.as_ref())
                 .and_then(|tools| tools.incremental_tools.as_ref()),
+            self.language,
         )
     }
 
@@ -266,7 +306,10 @@ impl<'a> ResolvedModelMessages<'a> {
     pub fn persistent_instructions(&self) -> &'a str {
         self.catalog_messages
             .and_then(|messages| messages.persistent_instructions.as_deref())
-            .unwrap_or(PERSISTENT_INSTRUCTIONS)
+            .unwrap_or(match self.language {
+                PromptLanguage::English => PERSISTENT_INSTRUCTIONS,
+                PromptLanguage::Chinese => PERSISTENT_INSTRUCTIONS_ZH_CN,
+            })
     }
 
     /// Resolves bounded recovery guidance, falling back without truncating instructions.
@@ -276,6 +319,9 @@ impl<'a> ResolvedModelMessages<'a> {
             .filter(|text| {
                 !text.trim().is_empty() && text.len() <= MAX_CONTENT_FILTER_GUIDANCE_BYTES
             })
-            .unwrap_or(CONTENT_FILTER_GUIDANCE)
+            .unwrap_or(match self.language {
+                PromptLanguage::English => CONTENT_FILTER_GUIDANCE,
+                PromptLanguage::Chinese => CONTENT_FILTER_GUIDANCE_ZH_CN,
+            })
     }
 }

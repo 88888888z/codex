@@ -9,7 +9,13 @@ pub(crate) fn render_apps_section(connectors: &[AppInfo]) -> Option<String> {
     connectors
         .iter()
         .any(|connector| connector.is_accessible && connector.is_enabled)
-        .then(|| AppsInstructions.render().expect_text())
+        .then(|| {
+            AppsInstructions {
+                language: codex_prompts::PromptLanguage::English,
+            }
+            .render()
+            .expect_text()
+        })
 }
 
 #[cfg(test)]

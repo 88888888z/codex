@@ -3626,6 +3626,7 @@ fn default_config() -> TestConfig {
 
 fn skills_extension_config(config: &TestConfig) -> SkillsExtensionConfig {
     SkillsExtensionConfig {
+        chinese: false,
         include_instructions: config.include_instructions,
         max_context_tokens: None,
         bundled_skills_enabled: config.bundled_skills_enabled,

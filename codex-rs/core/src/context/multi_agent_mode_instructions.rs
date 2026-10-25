@@ -1,4 +1,5 @@
 use super::ContextualUserFragment;
+use codex_prompts::PromptLanguage;
 use codex_prompts::ResolvedModelMessages;
 use codex_protocol::config_types::MultiAgentMode;
 use codex_protocol::models::ContentItem;
@@ -10,10 +11,14 @@ use codex_protocol::protocol::MULTI_AGENT_MODE_OPEN_TAG;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MultiAgentModeInstructions {
     multi_agent_mode: MultiAgentMode,
+    language: PromptLanguage,
 }
 
 impl MultiAgentModeInstructions {
-    pub(super) fn from_mode(multi_agent_mode: MultiAgentMode) -> Option<Self> {
+    pub(super) fn from_mode(
+        multi_agent_mode: MultiAgentMode,
+        language: PromptLanguage,
+    ) -> Option<Self> {
         if matches!(
             &multi_agent_mode,
             MultiAgentMode::Custom(hint_text) if hint_text.is_empty()
@@ -21,7 +26,10 @@ impl MultiAgentModeInstructions {
             return None;
         }
 
-        Some(Self { multi_agent_mode })
+        Some(Self {
+            multi_agent_mode,
+            language,
+        })
     }
 }
 
@@ -45,7 +53,8 @@ impl ContextualUserFragment for MultiAgentModeInstructions {
     fn body(&self) -> ContentItem {
         // `effective_multi_agent_mode` carries configured and catalog overrides as `Custom`.
         // The other variants explicitly select bundled text.
-        let bundled = ResolvedModelMessages::bundled().multi_agent();
+        let bundled =
+            ResolvedModelMessages::bundled_with_language(self.language).multi_agent();
         input_text(
             match &self.multi_agent_mode {
                 MultiAgentMode::Custom(hint_text) => hint_text.as_str(),

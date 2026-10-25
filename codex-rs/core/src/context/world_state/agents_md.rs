@@ -5,17 +5,21 @@ use super::WorldStateUpdate;
 use crate::agents_md::LoadedAgentsMd;
 use crate::context::ContextualUserFragment;
 use crate::context::UserInstructions;
+use codex_prompts::PromptLanguage;
 use serde::Deserialize;
 use serde::Serialize;
 
 const REPLACEMENT_NOTICE: &str =
     "These AGENTS.md instructions replace all previously provided AGENTS.md instructions.";
 const REMOVAL_NOTICE: &str = "The previously provided AGENTS.md instructions no longer apply.";
+const REPLACEMENT_NOTICE_ZH_CN: &str = "以下 AGENTS.md 指令将替换之前提供的全部 AGENTS.md 指令。";
+const REMOVAL_NOTICE_ZH_CN: &str = "之前提供的 AGENTS.md 指令不再生效。";
 
 /// The AGENTS.md instructions currently visible to the model.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct AgentsMdState {
     instructions: Option<UserInstructions>,
+    language: PromptLanguage,
 }
 
 /// Persisted model-visible AGENTS.md state, without filesystem provenance.
@@ -29,7 +33,13 @@ impl AgentsMdState {
     pub(crate) fn new(loaded: Option<&LoadedAgentsMd>) -> Self {
         Self {
             instructions: loaded.map(LoadedAgentsMd::contextual_user_fragment),
+            language: PromptLanguage::English,
         }
+    }
+
+    pub(crate) fn with_language(mut self, language: PromptLanguage) -> Self {
+        self.language = language;
+        self
     }
 }
 
@@ -64,12 +74,23 @@ impl WorldStateSection for AgentsMdState {
         let instructions = match (&self.instructions, previous_may_contain_instructions) {
             (Some(instructions), true) => UserInstructions {
                 directory: instructions.directory.clone(),
-                text: format!("{REPLACEMENT_NOTICE}\n\n{}", instructions.text),
+                text: format!(
+                    "{}\n\n{}",
+                    match self.language {
+                        PromptLanguage::English => REPLACEMENT_NOTICE,
+                        PromptLanguage::Chinese => REPLACEMENT_NOTICE_ZH_CN,
+                    },
+                    instructions.text
+                ),
             },
             (Some(instructions), false) => instructions.clone(),
             (None, true) => UserInstructions {
                 directory: None,
-                text: REMOVAL_NOTICE.to_string(),
+                text: match self.language {
+                    PromptLanguage::English => REMOVAL_NOTICE,
+                    PromptLanguage::Chinese => REMOVAL_NOTICE_ZH_CN,
+                }
+                .to_string(),
             },
             (None, false) => return (Some(current), Vec::new()),
         };

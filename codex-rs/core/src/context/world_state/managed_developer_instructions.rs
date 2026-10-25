@@ -5,6 +5,7 @@ use super::WorldStateSection;
 use super::WorldStateUpdate;
 use crate::context::ContextualUserFragment;
 use codex_config::Sourced;
+use codex_prompts::PromptLanguage;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ContentItemKind;
 use codex_protocol::models::ContentItemMetadata;
@@ -19,6 +20,8 @@ const MAX_MANAGED_DEVELOPER_INSTRUCTIONS_TOKENS: usize = 10_000;
 const REPLACEMENT_NOTICE: &str = "These managed developer instructions replace all previously provided managed developer instructions.";
 const REMOVAL_NOTICE: &str =
     "The previously provided managed developer instructions no longer apply.";
+const REPLACEMENT_NOTICE_ZH_CN: &str = "以下受管开发者指令将替换之前提供的全部受管开发者指令。";
+const REMOVAL_NOTICE_ZH_CN: &str = "之前提供的受管开发者指令不再生效。";
 
 /// A requirements-owned developer message, kept separate from client instructions.
 #[derive(Clone, Debug)]
@@ -88,6 +91,7 @@ pub(crate) fn validate_managed_developer_instructions(
 #[derive(Clone, Debug)]
 pub(crate) struct ManagedDeveloperInstructionsState {
     instructions: Option<ManagedDeveloperInstructions>,
+    language: PromptLanguage,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,7 +107,13 @@ impl ManagedDeveloperInstructionsState {
                 .map(|requirement| ManagedDeveloperInstructions {
                     instructions: requirement.value.clone(),
                 }),
+            language: PromptLanguage::English,
         }
+    }
+
+    pub(crate) fn with_language(mut self, language: PromptLanguage) -> Self {
+        self.language = language;
+        self
     }
 }
 
@@ -144,10 +154,21 @@ impl WorldStateSection for ManagedDeveloperInstructionsState {
         let fragment = match (&self.instructions, previous_had_instructions) {
             (Some(instructions), false) => instructions.clone(),
             (Some(instructions), true) => ManagedDeveloperInstructions {
-                instructions: format!("{REPLACEMENT_NOTICE}\n\n{}", instructions.instructions),
+                instructions: format!(
+                    "{}\n\n{}",
+                    match self.language {
+                        PromptLanguage::English => REPLACEMENT_NOTICE,
+                        PromptLanguage::Chinese => REPLACEMENT_NOTICE_ZH_CN,
+                    },
+                    instructions.instructions
+                ),
             },
             (None, true) => ManagedDeveloperInstructions {
-                instructions: REMOVAL_NOTICE.to_string(),
+                instructions: match self.language {
+                    PromptLanguage::English => REMOVAL_NOTICE,
+                    PromptLanguage::Chinese => REMOVAL_NOTICE_ZH_CN,
+                }
+                .to_string(),
             },
             (None, false) => return (Some(current), Vec::new()),
         };

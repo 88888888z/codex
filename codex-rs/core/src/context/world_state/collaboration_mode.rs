@@ -6,6 +6,7 @@ use super::WorldStateUpdate;
 use crate::context::ContextualUserFragment;
 use codex_prompts::ResolvedCollaborationModeMessages;
 use codex_prompts::ResolvedModelMessages;
+use codex_prompts::PromptLanguage;
 use codex_prompts::without_update_plan_instructions;
 use codex_protocol::config_types::CollaborationMode;
 use codex_protocol::config_types::ModeKind;
@@ -30,6 +31,7 @@ impl CollaborationModeState {
         messages: ResolvedCollaborationModeMessages<'_>,
         update_plan_enabled: bool,
         custom_model_catalog: bool,
+        language: PromptLanguage,
     ) -> Self {
         let catalog_instructions = match collaboration_mode.mode {
             ModeKind::Default => messages.default,
@@ -55,7 +57,8 @@ impl CollaborationModeState {
                     // preset or custom text. Compare whole strings against bundled presets
                     // only to recognize built-in text whose disabled update_plan guidance
                     // we can strip; custom instructions stay unchanged.
-                    let bundled = ResolvedModelMessages::bundled().collaboration_modes();
+                    let bundled = ResolvedModelMessages::bundled_with_language(language)
+                        .collaboration_modes();
                     instructions == bundled.default.text() || instructions == bundled.plan.text()
                 }
             };

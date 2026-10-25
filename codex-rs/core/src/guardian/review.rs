@@ -131,7 +131,12 @@ pub(super) async fn guardian_review_session_config(
         .thread_extension_data
         .get::<codex_guardian_reviewer::ReviewerConfig<crate::config::Config>>()
         .ok_or_else(|| anyhow::anyhow!("Guardian reviewer configuration is not installed"))?;
-    let model_messages = ResolvedModelMessages::from_model(&guardian_model_info);
+    let model_messages = ResolvedModelMessages::from_model_with_language(
+        &guardian_model_info,
+        codex_prompts::PromptLanguage::from_chinese(
+            turn.config.tui_language.effective() == codex_config::types::TuiLanguage::Chinese,
+        ),
+    );
     let mut spawn_config = build_guardian_review_session_config(
         (reviewer_config.0)(turn.config.as_ref())?,
         live_network_config,

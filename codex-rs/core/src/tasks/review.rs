@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use codex_prompts::render_review_exit_interrupted;
-use codex_prompts::render_review_exit_success;
+use codex_prompts::render_review_exit_interrupted_with_language;
+use codex_prompts::render_review_exit_success_with_language;
 use codex_protocol::ResponseItemId;
 use codex_protocol::config_types::WebSearchMode;
 use codex_protocol::items::ExitedReviewModeItem;
@@ -116,7 +116,14 @@ async fn start_review_conversation(
     let _ = sub_agent_config.features.disable(Feature::MultiAgentV2);
 
     // Set explicit review rubric for the sub-agent
-    sub_agent_config.base_instructions = Some(crate::REVIEW_PROMPT.to_string());
+    sub_agent_config.base_instructions = Some(
+        if config.tui_language.effective() == codex_config::types::TuiLanguage::Chinese {
+            codex_prompts::REVIEW_PROMPT_ZH_CN
+        } else {
+            codex_prompts::REVIEW_PROMPT
+        }
+        .to_string(),
+    );
     sub_agent_config.base_instructions_provenance = Some(BaseInstructionsProvenance::Custom);
     sub_agent_config.permissions.approval_policy = Constrained::allow_only(AskForApproval::Never);
 
@@ -214,6 +221,7 @@ pub(crate) async fn exit_review_mode(
     review_output: Option<ReviewOutputEvent>,
     ctx: Arc<TurnContext>,
 ) {
+    let language = review_prompt_language(ctx.as_ref());
     let (user_message, assistant_message) = if let Some(out) = review_output.clone() {
         let mut findings_str = String::new();
         let text = out.overall_explanation.trim();
@@ -224,14 +232,20 @@ pub(crate) async fn exit_review_mode(
             let block = format_review_findings_block(&out.findings, /*selection*/ None);
             findings_str.push_str(&format!("\n{block}"));
         }
-        let rendered = render_review_exit_success(&findings_str);
+        let rendered = render_review_exit_success_with_language(&findings_str, language);
         let assistant_message = render_review_output_text(&out);
         (rendered, assistant_message)
     } else {
-        let rendered = render_review_exit_interrupted();
-        let assistant_message =
-            "Review was interrupted. Please re-run /review and wait for it to complete."
-                .to_string();
+        let rendered = render_review_exit_interrupted_with_language(language);
+        let assistant_message = match language {
+            codex_prompts::PromptLanguage::English => {
+                "Review was interrupted. Please re-run /review and wait for it to complete."
+            }
+            codex_prompts::PromptLanguage::Chinese => {
+                "审查已中断。请重新运行 /review，并等待审查完成。"
+            }
+        }
+        .to_string();
         (rendered, assistant_message)
     };
 
@@ -283,4 +297,10 @@ pub(crate) async fn exit_review_mode(
     session
         .ensure_rollout_materialized(PersistContext::Standard)
         .await;
+}
+
+fn review_prompt_language(ctx: &TurnContext) -> codex_prompts::PromptLanguage {
+    codex_prompts::PromptLanguage::from_chinese(
+        ctx.config.tui_language.effective() == codex_config::types::TuiLanguage::Chinese,
+    )
 }

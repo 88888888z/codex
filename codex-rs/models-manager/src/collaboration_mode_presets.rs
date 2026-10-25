@@ -1,10 +1,17 @@
 use codex_prompts::ResolvedModelMessages;
+use codex_prompts::PromptLanguage;
 use codex_protocol::config_types::CollaborationModeMask;
 use codex_protocol::config_types::ModeKind;
 use codex_protocol::openai_models::ReasoningEffort;
 
 pub fn builtin_collaboration_mode_presets() -> Vec<CollaborationModeMask> {
-    let messages = ResolvedModelMessages::bundled().collaboration_modes();
+    builtin_collaboration_mode_presets_for_language(PromptLanguage::English)
+}
+
+pub fn builtin_collaboration_mode_presets_for_language(
+    language: PromptLanguage,
+) -> Vec<CollaborationModeMask> {
+    let messages = ResolvedModelMessages::bundled_with_language(language).collaboration_modes();
     vec![
         CollaborationModeMask {
             name: ModeKind::Plan.display_name().to_string(),

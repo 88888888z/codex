@@ -71,6 +71,7 @@ use codex_analytics::TurnCodexErrorFact;
 use codex_async_utils::OrCancelExt;
 use codex_attachment_store::AttachmentStore;
 use codex_attachment_store::InlineAttachmentStore;
+use codex_config::types::TuiLanguage;
 use codex_connectors::connector_runtime_context_key;
 use codex_context_fragments::RenderedFragment;
 use codex_exec_server::Environment;
@@ -1600,10 +1601,11 @@ impl Session {
 
     pub(crate) async fn get_estimated_token_count(
         &self,
-        turn_context: &TurnContext,
+        _turn_context: &TurnContext,
     ) -> Option<i64> {
         let history = self.clone_history().await;
-        history.estimate_token_count(turn_context)
+        let base_instructions = self.get_prompt_base_instructions().await;
+        history.estimate_token_count_with_base_instructions(&base_instructions)
     }
 
     pub(crate) async fn get_base_instructions(&self) -> BaseInstructions {
@@ -1618,20 +1620,27 @@ impl Session {
     pub(crate) async fn get_prompt_base_instructions(&self) -> BaseInstructions {
         let config = self.get_config().await;
         let instructions = self.get_base_instructions().await;
-        if !config.update_plan_enabled
-            && config.model_catalog.is_none()
-            && matches!(
-                instructions.provenance,
-                Some(BaseInstructionsProvenance::Model { .. })
-            )
-        {
-            BaseInstructions {
-                text: codex_prompts::without_update_plan_instructions(&instructions.text),
-                ..instructions
+        let mut instructions = instructions;
+        if matches!(
+            instructions.provenance,
+            Some(BaseInstructionsProvenance::Model { .. })
+        ) {
+            // Use one maintained Chinese template instead of mixing translated and
+            // model-specific English sections in the same system prompt.
+            let uses_chinese_default =
+                config.tui_language.effective() == TuiLanguage::Chinese;
+            if uses_chinese_default {
+                instructions.text =
+                    codex_models_manager::model_info::BASE_INSTRUCTIONS_ZH_CN.to_string();
             }
-        } else {
-            instructions
+            if !config.update_plan_enabled
+                && (uses_chinese_default || config.model_catalog.is_none())
+            {
+                instructions.text =
+                    codex_prompts::without_update_plan_instructions(&instructions.text);
+            }
         }
+        instructions
     }
 
     // Merges connector IDs into the session-level explicit connector selection.
@@ -1932,7 +1941,7 @@ impl Session {
             AutoCompactTokenLimitScope::BodyAfterPrefix
         ) {
             let history = self.clone_history().await;
-            let base_instructions = self.get_base_instructions().await;
+            let base_instructions = self.get_prompt_base_instructions().await;
             history.estimate_token_count_with_base_instructions(&base_instructions)
         } else {
             None
@@ -5281,7 +5290,7 @@ impl Session {
 
     pub(crate) async fn recompute_token_usage(&self, turn_context: &TurnContext) {
         let history = self.clone_history().await;
-        let base_instructions = self.get_base_instructions().await;
+        let base_instructions = self.get_prompt_base_instructions().await;
         let Some(estimated_total_tokens) =
             history.estimate_token_count_with_base_instructions(&base_instructions)
         else {

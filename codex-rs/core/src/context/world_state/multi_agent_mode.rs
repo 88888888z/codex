@@ -6,6 +6,7 @@ use super::WorldStateUpdate;
 use super::multi_agent_usage_hint::MultiAgentUsageHintState;
 use crate::context::ContextualUserFragment;
 use crate::context::multi_agent_mode_instructions::MultiAgentModeInstructions;
+use codex_prompts::PromptLanguage;
 use codex_protocol::config_types::MultiAgentMode;
 use codex_protocol::models::ContentItemMetadata;
 use codex_protocol::models::ContentItemNamespace;
@@ -20,6 +21,8 @@ const MULTI_AGENT_MODE_MAX_TOKENS: usize = 400;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub(crate) struct MultiAgentModeState {
     mode: Option<MultiAgentMode>,
+    #[serde(skip)]
+    language: PromptLanguage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     usage_hint_hash: Option<WorldStateHash>,
     #[serde(skip)]
@@ -27,7 +30,7 @@ pub(crate) struct MultiAgentModeState {
 }
 
 impl MultiAgentModeState {
-    pub(crate) fn new(mode: Option<MultiAgentMode>) -> Self {
+    pub(crate) fn new(mode: Option<MultiAgentMode>, language: PromptLanguage) -> Self {
         Self {
             mode: mode.map(|mode| match mode {
                 MultiAgentMode::Custom(hint_text) => MultiAgentMode::Custom(truncate_text(
@@ -36,6 +39,7 @@ impl MultiAgentModeState {
                 )),
                 mode @ (MultiAgentMode::ExplicitRequestOnly | MultiAgentMode::Proactive) => mode,
             }),
+            language,
             usage_hint_hash: None,
             namespace: None,
         }
@@ -75,6 +79,7 @@ impl WorldStateSection for MultiAgentModeState {
         let mode = match (&self.mode, previous) {
             (Some(mode), PreviousSectionState::Known(previous))
                 if previous.mode.as_ref() == Some(mode)
+                    && previous.language == self.language
                     && previous.usage_hint_hash == self.usage_hint_hash =>
             {
                 return (None, Vec::new());
@@ -91,7 +96,7 @@ impl WorldStateSection for MultiAgentModeState {
             }
         };
 
-        let fragment = MultiAgentModeInstructions::from_mode(mode).map(|instructions| {
+        let fragment = MultiAgentModeInstructions::from_mode(mode, self.language).map(|instructions| {
             Box::new(instructions.with_metadata(ContentItemMetadata::tool(self.namespace.clone())))
                 as Box<dyn ContextualUserFragment>
         });

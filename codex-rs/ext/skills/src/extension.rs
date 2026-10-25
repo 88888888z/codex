@@ -93,6 +93,7 @@ fn render_catalog(
     include_skills_usage_instructions: bool,
     policy: SkillCatalogRenderPolicy,
     budget: SkillMetadataBudget,
+    chinese: bool,
 ) -> RenderedCatalog {
     render_prepared_catalog(
         extension_metrics,
@@ -106,6 +107,7 @@ fn render_catalog(
             include_skills_usage_instructions,
             /*alias_plan*/ None,
         ),
+        chinese,
     )
 }
 
@@ -115,6 +117,7 @@ fn render_prepared_catalog(
     include_skills_usage_instructions: bool,
     budget: SkillMetadataBudget,
     rendered: Option<AvailableSkillsRender>,
+    chinese: bool,
 ) -> RenderedCatalog {
     let Some(rendered) = rendered else {
         record_catalog_render(
@@ -127,7 +130,7 @@ fn render_prepared_catalog(
     };
     record_catalog_render(extension_metrics, catalog_surface, budget, &rendered.report);
     let warning_message = rendered.report.warning_message();
-    let fragment = rendered.into_fragment(include_skills_usage_instructions);
+    let fragment = rendered.into_fragment(include_skills_usage_instructions, chinese);
     RenderedCatalog {
         fragment,
         warning_message,
@@ -239,6 +242,7 @@ where
                 include_usage,
                 SkillCatalogRenderPolicy::ExtensionCompatible,
                 skill_metadata_budget(/*context_window*/ None, config.max_context_tokens),
+                config.chinese,
             );
             if let Some(message) = rendered.warning_message {
                 self.emit_warning(thread_store.level_id(), /*turn_id*/ None, message);
@@ -418,6 +422,7 @@ where
                     include_usage,
                     SkillCatalogRenderPolicy::ExtensionCompatible,
                     metadata_budget,
+                    config.chinese,
                 );
                 if let Some(message) = rendered.warning_message {
                     self.emit_warning(thread_store.level_id(), Some(&input.turn_id), message);

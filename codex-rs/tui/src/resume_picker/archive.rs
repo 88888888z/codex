@@ -101,7 +101,6 @@ impl PickerState {
         self.all_rows.retain(|row| row.thread_id != Some(thread_id));
         // Keep the seen-row key as a tombstone so an older page that is already
         // in flight cannot put the archived session back into the picker.
-        self.transcript_previews.remove(&thread_id);
         self.transcript_cells.remove(&thread_id);
         if self.expanded_thread_id == Some(thread_id) {
             self.expanded_thread_id = None;

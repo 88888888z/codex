@@ -369,6 +369,7 @@ impl StatusLineSetupView {
     ///
     /// Items from `status_line_items` are shown first (in order) and marked as
     /// enabled. Remaining items are appended and marked as disabled.
+    #[cfg(test)]
     pub(crate) fn new(
         status_line_items: Option<&[String]>,
         use_theme_colors: bool,

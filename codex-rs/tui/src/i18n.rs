@@ -22,20 +22,7 @@ pub(crate) fn ui_text(english: &'static str, chinese: &'static str) -> &'static 
 
 /// Resolve `auto` from the conventional POSIX locale variables.
 pub(crate) fn effective_language(language: TuiLanguage) -> TuiLanguage {
-    match language {
-        TuiLanguage::Auto => {
-            let locale = ["LC_ALL", "LC_MESSAGES", "LANG"]
-                .into_iter()
-                .find_map(|name| std::env::var(name).ok().filter(|value| !value.is_empty()));
-            match locale {
-                Some(locale) if locale.to_ascii_lowercase().starts_with("zh") => {
-                    TuiLanguage::Chinese
-                }
-                _ => TuiLanguage::English,
-            }
-        }
-        explicit => explicit,
-    }
+    language.effective()
 }
 
 pub(crate) fn is_chinese(language: TuiLanguage) -> bool {

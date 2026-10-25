@@ -10,6 +10,7 @@ use crate::context::BaseInstructionsFragment;
 use crate::context::ContextualUserFragment;
 use crate::context::ModelInstructions;
 use crate::context::ModelSwitchInstructions;
+use codex_prompts::PromptLanguage;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -32,6 +33,7 @@ pub(crate) struct ModelInstructionsState {
     /// Ordinary-window fallback when the saved model snapshot is unavailable.
     previous_model: Option<String>,
     instructions: String,
+    language: PromptLanguage,
 }
 
 impl ModelInstructionsState {
@@ -40,7 +42,13 @@ impl ModelInstructionsState {
             snapshot: ModelInstructionsSnapshot::ModelOnly(model.to_string()),
             previous_model: previous_model.map(str::to_string),
             instructions,
+            language: PromptLanguage::English,
         }
+    }
+
+    pub(crate) fn with_language(mut self, language: PromptLanguage) -> Self {
+        self.language = language;
+        self
     }
 
     pub(crate) fn for_incremental_tools(model: &str, instructions: String) -> Self {
@@ -53,6 +61,7 @@ impl ModelInstructionsState {
             },
             previous_model: None,
             instructions: instructions.0,
+            language: PromptLanguage::English,
         }
     }
 }
@@ -121,10 +130,14 @@ impl WorldStateSection for ModelInstructionsState {
             Some(Box::new(ModelInstructions {
                 model: model_changed.then(|| model.clone()),
                 instructions: instructions_changed.then(|| self.instructions.clone()),
+                language: self.language,
             }))
         } else {
             (model_changed && !self.instructions.is_empty()).then(|| {
-                Box::new(ModelSwitchInstructions::new(self.instructions.clone()))
+                Box::new(ModelSwitchInstructions::new_with_language(
+                    self.instructions.clone(),
+                    self.language,
+                ))
                     as Box<dyn ContextualUserFragment>
             })
         };

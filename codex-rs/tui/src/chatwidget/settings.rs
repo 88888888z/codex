@@ -300,6 +300,7 @@ impl ChatWidget {
         crate::i18n::set_current_language(language);
         self.config_panel_tui.language = language;
         self.local_settings.tui.language = language;
+        self.config.tui_language = language;
         self.normal_placeholder_text = crate::i18n::placeholder(language).to_string();
         self.side_placeholder_text = crate::i18n::side_placeholder(language).to_string();
         let placeholder = if self.active_side_conversation {

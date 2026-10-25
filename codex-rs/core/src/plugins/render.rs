@@ -13,7 +13,13 @@ const TRUNCATED_PLUGIN_INSTRUCTIONS_SUFFIX: &str =
 
 #[cfg(test)]
 pub(crate) fn render_plugins_section(plugins: &[PluginCapabilitySummary]) -> Option<String> {
-    (!plugins.is_empty()).then(|| AvailablePluginsInstructions.render().expect_text())
+    (!plugins.is_empty()).then(|| {
+        AvailablePluginsInstructions {
+            language: codex_prompts::PromptLanguage::English,
+        }
+        .render()
+        .expect_text()
+    })
 }
 
 pub(crate) fn render_explicit_plugin_instructions(

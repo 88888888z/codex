@@ -19,7 +19,7 @@ use crate::session::turn_input;
 use crate::config::Config;
 use crate::context::ContextualUserFragment;
 use crate::context::GuardianApprovedAction;
-use crate::review_prompts::resolve_review_request;
+use crate::review_prompts::resolve_review_request_with_language;
 use crate::session::spawn_review_thread;
 use crate::tasks::CompactTask;
 use crate::tasks::UserShellCommandMode;
@@ -415,7 +415,14 @@ pub async fn review(
     sess.maybe_emit_model_warnings_for_turn(turn_context.as_ref())
         .await;
     #[allow(deprecated)]
-    match resolve_review_request(review_request, &turn_context.cwd) {
+    match resolve_review_request_with_language(
+        review_request,
+        &turn_context.cwd,
+        codex_prompts::PromptLanguage::from_chinese(
+            turn_context.config.tui_language.effective()
+                == codex_config::types::TuiLanguage::Chinese,
+        ),
+    ) {
         Ok(resolved) => {
             spawn_review_thread(
                 Arc::clone(sess),

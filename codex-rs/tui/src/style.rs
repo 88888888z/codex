@@ -154,11 +154,6 @@ pub(crate) fn history_prompt_style() -> Style {
     Style::default()
 }
 
-/// A quiet outline keeps submitted prompts distinct without competing with their content.
-pub(crate) fn history_prompt_border_style() -> Style {
-    history_prompt_style().patch(hairline_style())
-}
-
 pub fn proposed_plan_style() -> Style {
     proposed_plan_style_for(default_bg())
 }

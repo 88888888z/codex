@@ -281,6 +281,7 @@ fn subtitle_available_width(terminal_width: Option<u16>) -> usize {
     }
 }
 
+#[cfg(test)]
 fn theme_picker_subtitle(codex_home: Option<&Path>, terminal_width: Option<u16>) -> String {
     theme_picker_subtitle_for_language(codex_home, terminal_width, TuiLanguage::English)
 }
@@ -327,6 +328,7 @@ fn theme_picker_subtitle_for_language(
 /// preselects it; otherwise the picker falls back to the configured name (or
 /// adaptive default) so opening the picker without a persisted preference still
 /// highlights the most likely intended entry.
+#[cfg(test)]
 pub(crate) fn build_theme_picker_params(
     current_name: Option<&str>,
     codex_home: Option<&Path>,

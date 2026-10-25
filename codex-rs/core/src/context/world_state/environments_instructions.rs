@@ -4,22 +4,40 @@ use super::WorldStateSection;
 use super::WorldStateUpdate;
 use crate::context::ContextualUserFragment;
 use crate::context::EnvironmentsInstructions;
+use codex_prompts::PromptLanguage;
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub(crate) struct EnvironmentsInstructionsSnapshot {
+    enabled: bool,
+    chinese: bool,
+}
 
 /// Whether generic execution-environment guidance should be visible to the model.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct EnvironmentsInstructionsState {
     enabled: bool,
+    language: PromptLanguage,
 }
 
 impl EnvironmentsInstructionsState {
     pub(crate) fn new(enabled: bool) -> Self {
-        Self { enabled }
+        Self {
+            enabled,
+            language: PromptLanguage::English,
+        }
+    }
+
+    pub(crate) fn with_language(mut self, language: PromptLanguage) -> Self {
+        self.language = language;
+        self
     }
 }
 
 impl WorldStateSection for EnvironmentsInstructionsState {
     const ID: &'static str = "environments_instructions";
-    type Snapshot = bool;
+    type Snapshot = EnvironmentsInstructionsSnapshot;
 
     fn matches_legacy_fragment(role: &str, text: &str) -> bool {
         role == "developer" && EnvironmentsInstructions::matches_text(text)
@@ -37,9 +55,12 @@ impl WorldStateSection for EnvironmentsInstructionsState {
         &self,
         previous: PreviousSectionState<'_, Self::Snapshot>,
     ) -> SectionTransition<Self::Snapshot> {
-        let current = self.enabled;
+        let current = EnvironmentsInstructionsSnapshot {
+            enabled: self.enabled,
+            chinese: self.language == PromptLanguage::Chinese,
+        };
         if !self.enabled
-            || matches!(previous, PreviousSectionState::Known(previous) if *previous)
+            || matches!(previous, PreviousSectionState::Known(previous) if previous == &current)
             || matches!(previous, PreviousSectionState::Unknown)
         {
             return (Some(current), Vec::new());
@@ -47,7 +68,9 @@ impl WorldStateSection for EnvironmentsInstructionsState {
 
         (
             Some(current),
-            vec![WorldStateUpdate::fragment(EnvironmentsInstructions)],
+            vec![WorldStateUpdate::fragment(EnvironmentsInstructions {
+                language: self.language,
+            })],
         )
     }
 }

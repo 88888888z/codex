@@ -24,6 +24,20 @@ const NO_HOST_SKILLS_BODY: &str =
     "\n## Host skills update\nNo host skills are currently available.\n";
 const HIDDEN_HOST_SKILLS_BODY: &str = "\n## Host skills update\nHost skills are not listed automatically. Explicit skill mentions can still be resolved when available.\n";
 const OMITTED_HOST_SKILLS_BODY: &str = "\n## Host skills update\nHost skills are available but omitted from the model-visible skills list because the skills context budget was exceeded.\n";
+const NO_EXECUTOR_SKILLS_BODY_ZH_CN: &str =
+    "\n## 技能更新\n当前所选环境没有可用技能。\n";
+const HIDDEN_EXECUTOR_SKILLS_BODY_ZH_CN: &str =
+    "\n## 技能更新\n当前不会自动列出所选环境技能。显式提到可用技能时仍可解析并加载。\n";
+const NO_CLOUD_SKILLS_BODY_ZH_CN: &str =
+    "\n## 云端技能更新\n当前没有可用云端技能。\n";
+const HIDDEN_CLOUD_SKILLS_BODY_ZH_CN: &str =
+    "\n## 云端技能更新\n当前不会自动列出云端技能。显式提到可用技能时仍可解析并加载。\n";
+const NO_HOST_SKILLS_BODY_ZH_CN: &str =
+    "\n## 主机技能更新\n当前没有可用主机技能。\n";
+const HIDDEN_HOST_SKILLS_BODY_ZH_CN: &str =
+    "\n## 主机技能更新\n当前不会自动列出主机技能。显式提到可用技能时仍可解析并加载。\n";
+const OMITTED_HOST_SKILLS_BODY_ZH_CN: &str =
+    "\n## 主机技能更新\n有可用主机技能，但由于技能上下文预算超限而未显示。\n";
 
 pub(crate) type CatalogRenderCallback = Box<dyn Fn() + Send + Sync>;
 
@@ -43,6 +57,7 @@ pub(crate) fn executor_skills_world_state_section(
     include_instructions: bool,
     previous_snapshot: Option<&serde_json::Value>,
     on_render: CatalogRenderCallback,
+    chinese: bool,
 ) -> WorldStateSectionContribution {
     // Remember display history, not execution authority. Discovery still determines `body`
     // on every step, including when no selected-environment skills are available.
@@ -94,8 +109,20 @@ pub(crate) fn executor_skills_world_state_section(
                 None if matches!(previous, PreviousWorldStateSection::Absent) => {
                     return (Some(snapshot.clone()), None);
                 }
-                None if !include_instructions => HIDDEN_EXECUTOR_SKILLS_BODY,
-                None => NO_EXECUTOR_SKILLS_BODY,
+                None if !include_instructions => {
+                    if chinese {
+                        HIDDEN_EXECUTOR_SKILLS_BODY_ZH_CN
+                    } else {
+                        HIDDEN_EXECUTOR_SKILLS_BODY
+                    }
+                }
+                None => {
+                    if chinese {
+                        NO_EXECUTOR_SKILLS_BODY_ZH_CN
+                    } else {
+                        NO_EXECUTOR_SKILLS_BODY
+                    }
+                }
             };
             on_render();
             (
@@ -127,6 +154,7 @@ pub(crate) fn cloud_skills_world_state_section(
     enabled: bool,
     allocation: CatalogBudgetAllocation,
     on_render: CatalogRenderCallback,
+    chinese: bool,
 ) -> WorldStateSectionContribution {
     skills_world_state_section(
         CLOUD_SKILLS_WORLD_STATE_ID,
@@ -136,11 +164,23 @@ pub(crate) fn cloud_skills_world_state_section(
             enabled: Some(enabled),
             allocation: Some(allocation),
         },
-        NO_CLOUD_SKILLS_BODY,
-        if enabled {
-            HIDDEN_CLOUD_SKILLS_BODY
+        if chinese {
+            NO_CLOUD_SKILLS_BODY_ZH_CN
         } else {
             NO_CLOUD_SKILLS_BODY
+        },
+        if enabled {
+            if chinese {
+                HIDDEN_CLOUD_SKILLS_BODY_ZH_CN
+            } else {
+                HIDDEN_CLOUD_SKILLS_BODY
+            }
+        } else {
+            if chinese {
+                NO_CLOUD_SKILLS_BODY_ZH_CN
+            } else {
+                NO_CLOUD_SKILLS_BODY
+            }
         },
         on_render,
     )
@@ -212,10 +252,18 @@ pub(crate) fn host_skills_world_state_section(
     include_instructions: bool,
     report: &SkillRenderReport,
     on_render: CatalogRenderCallback,
+    chinese: bool,
 ) -> WorldStateSectionContribution {
     let body = body.or_else(|| {
         (report.included_count == 0 && report.omitted_count > 0)
-            .then(|| OMITTED_HOST_SKILLS_BODY.to_string())
+            .then(|| {
+                if chinese {
+                    OMITTED_HOST_SKILLS_BODY_ZH_CN
+                } else {
+                    OMITTED_HOST_SKILLS_BODY
+                }
+                .to_string()
+            })
     });
     let retained_fragment = body
         .as_ref()
@@ -229,8 +277,16 @@ pub(crate) fn host_skills_world_state_section(
             enabled: None,
             allocation: None,
         },
-        NO_HOST_SKILLS_BODY,
-        HIDDEN_HOST_SKILLS_BODY,
+        if chinese {
+            NO_HOST_SKILLS_BODY_ZH_CN
+        } else {
+            NO_HOST_SKILLS_BODY
+        },
+        if chinese {
+            HIDDEN_HOST_SKILLS_BODY_ZH_CN
+        } else {
+            HIDDEN_HOST_SKILLS_BODY
+        },
         on_render,
     );
     match retained_fragment {
