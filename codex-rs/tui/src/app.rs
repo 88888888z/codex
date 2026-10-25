@@ -214,6 +214,7 @@ mod backend_banner_fallback;
 mod backend_events;
 pub(crate) mod backend_sessions;
 mod background_requests;
+mod budget;
 mod composer_hints;
 mod config_panel;
 mod config_persistence;

@@ -63,6 +63,8 @@ impl App {
                     | AppEvent::RewindFilesRestored { .. }
                     | AppEvent::OpenFilePicker { .. }
                     | AppEvent::AttachFileContext { .. }
+                    | AppEvent::OpenBudget
+                    | AppEvent::CompactBudgetContext
                     | AppEvent::OpenWarnings
                     | AppEvent::StatusLineSetup { .. }
                     | AppEvent::StatusLineSetupCancelled
@@ -1410,6 +1412,13 @@ impl App {
             } => {
                 self.chat_widget
                     .insert_file_context(placeholder, payload);
+                tui.frame_requester().schedule_frame();
+            }
+            AppEvent::OpenBudget => {
+                self.open_budget_overlay(tui)?;
+            }
+            AppEvent::CompactBudgetContext => {
+                self.compact_from_budget();
                 tui.frame_requester().schedule_frame();
             }
             AppEvent::RollbackDiffFile { cwd, path, status } => {

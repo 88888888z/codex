@@ -54,6 +54,7 @@ pub enum SlashCommand {
     Export,
     Raw,
     Tui,
+    Budget,
     Diff,
     Files,
     Checkpoint,
@@ -121,6 +122,7 @@ impl SlashCommand {
                 SlashCommand::Export => "将对话导出为 Markdown",
                 SlashCommand::Raw => "切换原始回滚模式，便于复制终端文本",
                 SlashCommand::Tui => "选择下次启动时的 TUI 模式",
+                SlashCommand::Budget => "查看上下文 token 预算并压缩会话",
                 SlashCommand::Diff => "显示 Git 差异（包括未跟踪文件）",
                 SlashCommand::Files => "浏览文件并选择附加给 AI 的行范围",
                 SlashCommand::Checkpoint => "保存当前工作区检查点",
@@ -188,6 +190,7 @@ impl SlashCommand {
             SlashCommand::Export => "export the conversation as markdown",
             SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
             SlashCommand::Tui => "choose the TUI mode for the next launch",
+            SlashCommand::Budget => "inspect the context token budget and compact",
             SlashCommand::Diff => "show git diff (including untracked files)",
             SlashCommand::Files => "browse files and attach selected line ranges",
             SlashCommand::Checkpoint => "save the current workspace checkpoint",
@@ -329,6 +332,7 @@ impl SlashCommand {
                 | SlashCommand::Raw
                 | SlashCommand::Language
                 | SlashCommand::Provider
+                | SlashCommand::Budget
                 | SlashCommand::Files
                 | SlashCommand::Checkpoint
                 | SlashCommand::Rewind
@@ -357,6 +361,7 @@ impl SlashCommand {
             | SlashCommand::Plan
             | SlashCommand::Cd
             | SlashCommand::Clear
+            | SlashCommand::Budget
             | SlashCommand::Files
             | SlashCommand::Checkpoint
             | SlashCommand::Rewind

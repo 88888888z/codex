@@ -911,6 +911,12 @@ pub(crate) enum AppEvent {
         payload: String,
     },
 
+    /// Open the context-budget inspector.
+    OpenBudget,
+
+    /// Compact the conversation from the budget inspector.
+    CompactBudgetContext,
+
     /// Restore one changed file selected in the structured diff review.
     RollbackDiffFile {
         cwd: PathBuf,

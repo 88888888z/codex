@@ -394,23 +394,7 @@ impl ChatWidget {
                 self.submit_user_message(INIT_PROMPT.to_string().into());
             }
             SlashCommand::Compact => {
-                if self.blocks_direct_input {
-                    self.add_error_message(PARENT_OWNED_INPUT_MESSAGE.to_string());
-                    return;
-                }
-                self.clear_token_usage();
-                if !self.bottom_pane.is_task_running() {
-                    self.bottom_pane.set_task_running(/*running*/ true);
-                }
-                self.bottom_pane.ensure_status_indicator();
-                self.set_status(
-                    compaction::COMPACTION_HEADER.to_string(),
-                    Some(compaction::COMPACTION_DETAILS.to_string()),
-                    StatusDetailsCapitalization::Preserve,
-                    STATUS_DETAILS_DEFAULT_MAX_LINES,
-                );
-                self.input_queue.user_turn_pending_start = true;
-                self.app_event_tx.compact();
+                self.compact_context();
             }
             SlashCommand::Recap => {
                 let Some(thread_id) = self.thread_id else {
@@ -561,6 +545,7 @@ impl ChatWidget {
                 self.emit_raw_output_mode_changed(enabled);
             }
             SlashCommand::Tui => self.show_tui_mode_picker(),
+            SlashCommand::Budget => self.app_event_tx.send(AppEvent::OpenBudget),
             SlashCommand::Files => {
                 self.app_event_tx.send(AppEvent::OpenFilePicker {
                     cwd: self
@@ -1024,6 +1009,9 @@ impl ChatWidget {
                 self.handle_provider_command_args(trimmed);
                 self.app_event_tx.send(AppEvent::SettingsSelectionClosed);
             }
+            SlashCommand::Budget => self.add_error_message(
+                crate::i18n::ui_text("Usage: /budget", "用法：/budget").to_string(),
+            ),
             SlashCommand::Files => {
                 self.app_event_tx.send(AppEvent::OpenFilePicker {
                     cwd: self
@@ -1498,6 +1486,7 @@ impl ChatWidget {
             | SlashCommand::Statusline
             | SlashCommand::Config
             | SlashCommand::Theme
+            | SlashCommand::Budget
             | SlashCommand::Language
             | SlashCommand::Provider
             | SlashCommand::Tui => QueueDrain::Stop,

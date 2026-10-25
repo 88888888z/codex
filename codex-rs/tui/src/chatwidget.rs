@@ -1779,6 +1779,44 @@ impl ChatWidget {
         self.bottom_pane.insert_str(text);
     }
 
+    pub(crate) fn context_budget_usage(&self) -> (Option<i64>, Option<i64>) {
+        self.token_info
+            .as_ref()
+            .map(|info| (Some(self.context_used_tokens(info)), self.context_window_size(info)))
+            .unwrap_or((None, None))
+    }
+
+    pub(crate) fn composer_attachment_count(&self) -> usize {
+        self.bottom_pane.composer_local_images().len()
+            + self.bottom_pane.remote_image_urls().len()
+    }
+
+    pub(crate) fn compact_context(&mut self) -> bool {
+        if self.blocks_direct_input {
+            self.add_error_message(PARENT_OWNED_INPUT_MESSAGE.to_string());
+            return false;
+        }
+        if self.bottom_pane.is_task_running() {
+            self.add_error_message(
+                "Wait for the current task to finish before compacting the conversation."
+                    .to_string(),
+            );
+            return false;
+        }
+        self.clear_token_usage();
+        self.bottom_pane.set_task_running(/*running*/ true);
+        self.bottom_pane.ensure_status_indicator();
+        self.set_status(
+            compaction::COMPACTION_HEADER.to_string(),
+            Some(compaction::COMPACTION_DETAILS.to_string()),
+            StatusDetailsCapitalization::Preserve,
+            STATUS_DETAILS_DEFAULT_MAX_LINES,
+        );
+        self.input_queue.user_turn_pending_start = true;
+        self.app_event_tx.compact();
+        true
+    }
+
     pub(crate) fn insert_file_context(&mut self, placeholder: String, payload: String) {
         self.bottom_pane.insert_file_context(placeholder, payload);
         self.request_redraw();

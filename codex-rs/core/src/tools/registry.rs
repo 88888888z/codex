@@ -973,6 +973,9 @@ impl ToolRegistry {
                     &result.payload,
                     result.result.as_ref(),
                 );
+                result.result =
+                    crate::tool_output_receipt::maybe_wrap_tool_output(&invocation, result.result)
+                        .await;
                 Ok(result)
             }
             Err(err) => {

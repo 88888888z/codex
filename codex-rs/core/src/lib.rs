@@ -39,6 +39,7 @@ mod compact_remote_v2;
 mod compact_retained_tool_outputs;
 mod compact_token_budget;
 mod thread_startup_metadata;
+mod tool_output_receipt;
 pub use codex_network_proxy::EnvironmentNetworkPolicy;
 pub use codex_network_proxy::NetworkDomainPermission;
 pub use codex_network_proxy::NetworkDomainPermissionEntry;
