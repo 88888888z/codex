@@ -106,6 +106,50 @@ pub(super) async fn run_main_inner(
         }
     };
 
+    let workspace_start = match cli.cwd.as_ref() {
+        Some(cwd) => cwd.clone(),
+        None => std::env::current_dir()?,
+    };
+    let workspace_set = if explicit_remote_endpoint.is_none() {
+        crate::workspace_set::WorkspaceSet::discover(&workspace_start)
+            .map_err(std::io::Error::other)?
+    } else {
+        None
+    };
+    if let Some(workspace_set) = workspace_set.as_ref() {
+        if cli.shared.worktree {
+            return Err(std::io::Error::other(
+                "`--worktree` cannot be combined with a multi-project workspace set.",
+            ));
+        }
+        let launched_from_manifest_root = std::fs::canonicalize(&workspace_start)
+            .ok()
+            .is_some_and(|launch_dir| {
+                workspace_set
+                    .manifest_path
+                    .parent()
+                    .is_some_and(|parent| parent == launch_dir.as_path())
+            });
+        if cli.cwd.is_none()
+            && launched_from_manifest_root
+            && let Some(primary) = workspace_set
+                .roots
+                .iter()
+                .find(|root| root.write)
+                .or_else(|| workspace_set.roots.first())
+        {
+            cli.cwd = Some(primary.path.clone());
+        }
+        for root in workspace_set.writable_roots() {
+            if cli.cwd.as_deref() == Some(root) {
+                continue;
+            }
+            if !cli.add_dir.iter().any(|existing| existing.as_path() == root) {
+                cli.add_dir.push(root.to_path_buf());
+            }
+        }
+    }
+
     // A bound socket at the default path may be an SSH forward. Keep a verified
     // endpoint so replacing the advertised alias cannot redirect local config.
     let explicit_local_daemon_socket = match &explicit_remote_endpoint {

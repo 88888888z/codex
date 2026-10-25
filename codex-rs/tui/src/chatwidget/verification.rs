@@ -7,6 +7,22 @@ use crate::verification::VerificationCommand;
 use crate::verification::VerificationOutcome;
 use crate::verification::VerificationReport;
 use crate::workspace_command::WorkspaceCommand;
+use crate::workspace_set::WorkspaceSet;
+
+struct ScopedVerificationCommand {
+    project: Option<String>,
+    cwd: std::path::PathBuf,
+    command: VerificationCommand,
+}
+
+impl ScopedVerificationCommand {
+    fn label(&self) -> String {
+        self.project.as_ref().map_or_else(
+            || self.command.label.clone(),
+            |project| format!("@{project} · {}", self.command.label),
+        )
+    }
+}
 
 #[derive(Default)]
 pub(super) struct VerificationState {
@@ -27,7 +43,40 @@ impl super::ChatWidget {
             .current_cwd
             .clone()
             .unwrap_or_else(|| self.config.cwd.to_path_buf());
-        let commands = crate::verification::detect_commands(&cwd);
+        let workspace_set = match WorkspaceSet::discover(&cwd) {
+            Ok(workspace_set) => workspace_set,
+            Err(error) => {
+                self.add_error_message(error);
+                return;
+            }
+        };
+        let commands = workspace_set.as_ref().map_or_else(
+            || {
+                crate::verification::detect_commands(&cwd)
+                    .into_iter()
+                    .map(|command| ScopedVerificationCommand {
+                        project: None,
+                        cwd: cwd.clone(),
+                        command,
+                    })
+                    .collect::<Vec<_>>()
+            },
+            |workspace_set| {
+                workspace_set
+                    .roots
+                    .iter()
+                    .flat_map(|root| {
+                        crate::verification::detect_commands(&root.path)
+                            .into_iter()
+                            .map(|command| ScopedVerificationCommand {
+                                project: Some(root.id.clone()),
+                                cwd: root.path.clone(),
+                                command,
+                            })
+                    })
+                    .collect::<Vec<_>>()
+            },
+        );
         if commands.is_empty() {
             self.add_info_message(
                 crate::i18n::ui_text(
@@ -62,10 +111,11 @@ impl super::ChatWidget {
         let selected = if args.eq_ignore_ascii_case("all") {
             commands
         } else {
-            let Some(command) = commands
+            let selected = commands
                 .into_iter()
-                .find(|command| command.name.eq_ignore_ascii_case(args))
-            else {
+                .filter(|command| command.command.name.eq_ignore_ascii_case(args))
+                .collect::<Vec<_>>();
+            if selected.is_empty() {
                 self.add_error_message(
                     crate::i18n::ui_text(
                         "Unknown verification command. Run /verify to list available checks.",
@@ -74,8 +124,8 @@ impl super::ChatWidget {
                     .to_string(),
                 );
                 return;
-            };
-            vec![command]
+            }
+            selected
         };
         let Some(runner) = self.workspace_command_runner.clone() else {
             self.add_error_message(
@@ -92,7 +142,7 @@ impl super::ChatWidget {
         self.bottom_pane.set_verification_indicator(None);
         let labels = selected
             .iter()
-            .map(|command| command.label.clone())
+            .map(ScopedVerificationCommand::label)
             .collect::<Vec<_>>()
             .join(", ");
         self.add_info_message(
@@ -113,8 +163,14 @@ impl super::ChatWidget {
         let thread_id = self.thread_id;
         tokio::spawn(async move {
             let mut outcomes = Vec::with_capacity(selected.len());
-            for command in selected {
+            for scoped in selected {
                 let started = Instant::now();
+                let label = scoped.label();
+                let ScopedVerificationCommand {
+                    project: _,
+                    cwd,
+                    command,
+                } = scoped;
                 let command_text = command.argv.join(" ");
                 let result = runner
                     .run(
@@ -142,7 +198,7 @@ impl super::ChatWidget {
                     ),
                 };
                 outcomes.push(VerificationOutcome {
-                    label: command.label,
+                    label,
                     command: command_text,
                     success,
                     exit_code,
@@ -195,9 +251,7 @@ impl super::ChatWidget {
 
     pub(crate) fn verification_summary(&self) -> String {
         let summary = self.verification.report.as_ref().map_or_else(
-            || {
-                crate::i18n::ui_text("No verification run yet.", "尚未运行验证。").to_string()
-            },
+            || crate::i18n::ui_text("No verification run yet.", "尚未运行验证。").to_string(),
             VerificationReport::handoff_summary,
         );
         if self.verification.stale {
@@ -214,10 +268,10 @@ impl super::ChatWidget {
         }
     }
 
-    fn show_verification_commands(&mut self, commands: &[VerificationCommand]) {
+    fn show_verification_commands(&mut self, commands: &[ScopedVerificationCommand]) {
         let hint = commands
             .iter()
-            .map(|command| format!("/verify {} — {}", command.name, command.label))
+            .map(|command| format!("/verify {} — {}", command.command.name, command.label()))
             .collect::<Vec<_>>()
             .join("\n");
         self.add_info_message(

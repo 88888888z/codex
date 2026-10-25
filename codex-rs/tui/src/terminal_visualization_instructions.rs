@@ -16,25 +16,34 @@ pub(crate) fn with_terminal_visualization_instructions(
     config: &Config,
     control_instructions: Option<String>,
 ) -> Option<String> {
-    if !config
+    let mut instructions = control_instructions.or_else(|| config.developer_instructions.clone());
+    if config
         .features
         .enabled(Feature::TerminalVisualizationInstructions)
     {
-        return control_instructions;
+        let visualization_instructions = match config.tui_language.effective() {
+            codex_config::types::TuiLanguage::Chinese => TERMINAL_VISUALIZATION_INSTRUCTIONS_ZH_CN,
+            codex_config::types::TuiLanguage::English | codex_config::types::TuiLanguage::Auto => {
+                TERMINAL_VISUALIZATION_INSTRUCTIONS
+            }
+        };
+        instructions = Some(match instructions.as_deref() {
+            Some(existing) if !existing.trim().is_empty() => {
+                format!("{existing}\n\n{visualization_instructions}")
+            }
+            _ => visualization_instructions.to_string(),
+        });
     }
-
-    let existing_instructions =
-        control_instructions.or_else(|| config.developer_instructions.clone());
-    let visualization_instructions = match config.tui_language.effective() {
-        codex_config::types::TuiLanguage::Chinese => TERMINAL_VISUALIZATION_INSTRUCTIONS_ZH_CN,
-        codex_config::types::TuiLanguage::English | codex_config::types::TuiLanguage::Auto => {
-            TERMINAL_VISUALIZATION_INSTRUCTIONS
-        }
+    if let Ok(Some(workspace_set)) =
+        crate::workspace_set::WorkspaceSet::discover(config.cwd.as_path())
+    {
+        let workspace_instructions = workspace_set.prompt_instructions(config.tui_language);
+        instructions = Some(match instructions.as_deref() {
+            Some(existing) if !existing.trim().is_empty() => {
+                format!("{existing}\n\n{workspace_instructions}")
+            }
+            _ => workspace_instructions,
+        });
     };
-    Some(match existing_instructions.as_deref() {
-        Some(existing) if !existing.trim().is_empty() => {
-            format!("{existing}\n\n{visualization_instructions}")
-        }
-        _ => visualization_instructions.to_string(),
-    })
+    instructions
 }

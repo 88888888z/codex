@@ -142,6 +142,7 @@ mod permission_discovery;
 mod terminal_image;
 mod provider_profiles;
 mod security_setup;
+mod workspace_set;
 mod worktree_browser;
 pub use custom_terminal::Terminal;
 mod assistant_directives;
@@ -267,6 +268,7 @@ mod update_versions;
 mod updates;
 #[cfg(any(not(debug_assertions), test))]
 mod updates_cache;
+mod usage_cost;
 mod user_prompt;
 mod version;
 mod verification;

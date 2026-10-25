@@ -1388,6 +1388,28 @@ impl App {
                     }
                 }
             }
+            AppEvent::CreateWorkspaceSet { parent, roots } => {
+                match crate::workspace_set::WorkspaceSet::create(&parent, &roots) {
+                    Ok(workspace_set) => {
+                        let projects = workspace_set
+                            .roots
+                            .iter()
+                            .map(|root| format!("@{}", root.id))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        self.chat_widget.add_info_message(
+                            format!(
+                                "已创建项目集 {}：{}",
+                                workspace_set.manifest_path.display(),
+                                projects
+                            ),
+                            Some("重启 Codex 后应用新的项目范围。".to_string()),
+                        );
+                    }
+                    Err(error) => self.chat_widget.add_error_message(error),
+                }
+                tui.frame_requester().schedule_frame();
+            }
             AppEvent::AttachFileContext {
                 placeholder,
                 payload,

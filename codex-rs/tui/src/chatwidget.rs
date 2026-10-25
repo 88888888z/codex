@@ -315,6 +315,7 @@ use self::skills::find_skill_mentions_with_tool_mentions;
 use self::skills::is_app_mentionable;
 mod plugin_catalog;
 mod plugins;
+mod projects;
 mod provider;
 use self::plugins::PluginInstallAuthFlowState;
 use self::plugins::PluginListFetchState;
@@ -568,6 +569,7 @@ pub(crate) struct ChatWidget {
     #[cfg(any(target_os = "windows", test))]
     pub(crate) windows_sandbox_elevated_setup_complete: bool,
     token_info: Option<TokenUsageInfo>,
+    session_usage_cost: crate::usage_cost::SessionUsageCost,
     token_usage_pending: bool,
     // Status and polling use account usage reads; response streams may identify meters differently.
     rate_limit_snapshots_by_limit_id: BTreeMap<String, RateLimitSnapshotDisplay>,
@@ -1112,6 +1114,9 @@ impl ChatWidget {
 
     fn apply_token_info(&mut self, info: TokenUsageInfo) {
         self.token_usage_pending = false;
+        let model = self.current_model().to_string();
+        self.session_usage_cost
+            .observe(&info.total_token_usage, &model);
         self.bottom_pane
             .set_context_window_pending(/*pending*/ false);
         let context_window = self.context_window_size(&info);
@@ -1120,6 +1125,13 @@ impl ChatWidget {
         self.bottom_pane
             .set_context_window(percent, Some(used_tokens), context_window);
         self.token_info = Some(info);
+    }
+
+    pub(crate) fn estimated_session_cost(
+        &self,
+    ) -> Option<crate::usage_cost::ModelCostEstimate> {
+        self.session_usage_cost
+            .estimate(&self.local_settings.tui.model_pricing)
     }
 
     fn context_window_size(&self, info: &TokenUsageInfo) -> Option<i64> {

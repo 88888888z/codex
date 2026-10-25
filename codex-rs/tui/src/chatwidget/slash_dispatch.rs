@@ -562,6 +562,9 @@ impl ChatWidget {
                     path: None,
                 });
             }
+            SlashCommand::Projects => {
+                self.show_workspace_projects();
+            }
             SlashCommand::Checkpoint => {
                 self.app_event_tx.send(AppEvent::CreateRewindCheckpoint {
                     cwd: self
@@ -1463,6 +1466,7 @@ impl ChatWidget {
             | SlashCommand::Verify
             | SlashCommand::Handoff
             | SlashCommand::Files
+            | SlashCommand::Projects
             | SlashCommand::Checkpoint
             | SlashCommand::Rewind
             | SlashCommand::App

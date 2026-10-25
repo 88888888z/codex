@@ -12,12 +12,7 @@ use crate::style::StatusTone;
 use crate::style::accent_color;
 use crate::style::accent_style;
 use crate::style::status_style;
-use chrono::Datelike;
-use chrono::FixedOffset;
-use chrono::Timelike;
-use chrono::Utc;
-use chrono::Weekday;
-use codex_config::types::TuiModelPricing;
+use crate::usage_cost::ModelCostEstimate;
 use crossterm::event::MouseEvent;
 use ratatui::buffer::Buffer;
 use ratatui::style::Modifier;
@@ -71,11 +66,6 @@ struct ToolReceipt {
     detail: String,
     status: String,
     tone: StatusTone,
-}
-
-struct ModelCostEstimate {
-    amount: f64,
-    currency: String,
 }
 
 impl WorkbenchColumns {
@@ -132,14 +122,7 @@ impl App {
             .saturating_sub(cached_tokens)
             .max(0);
         let output_tokens = token_usage.output_tokens.max(0);
-        let estimated_cost = self
-            .local_settings
-            .tui
-            .model_pricing
-            .get(self.chat_widget.current_model())
-            .map(|pricing| {
-                estimate_model_cost(pricing, cached_tokens, uncached_tokens, output_tokens)
-            });
+        let estimated_cost = self.chat_widget.estimated_session_cost();
         WorkbenchSnapshot {
             chinese: crate::i18n::is_chinese(crate::i18n::current_language()),
             model: self.chat_widget.model_display_name().to_string(),
@@ -590,59 +573,10 @@ fn format_duration(duration: Duration) -> String {
     }
 }
 
-fn estimate_model_cost(
-    pricing: &TuiModelPricing,
-    cached_tokens: i64,
-    uncached_tokens: i64,
-    output_tokens: i64,
-) -> ModelCostEstimate {
-    let normalized = |price: f64| {
-        if price.is_finite() {
-            price.max(0.0)
-        } else {
-            0.0
-        }
-    };
-    let multiplier = if is_beijing_peak_time() {
-        normalized(pricing.peak_multiplier)
-    } else {
-        1.0
-    };
-    let amount = (cached_tokens.max(0) as f64 * normalized(pricing.cache_hit)
-        + uncached_tokens.max(0) as f64 * normalized(pricing.cache_miss)
-        + output_tokens.max(0) as f64 * normalized(pricing.output))
-        * multiplier
-        / 1_000_000.0;
-    ModelCostEstimate {
-        amount,
-        currency: if pricing.currency.trim().is_empty() {
-            "$".to_string()
-        } else {
-            pricing.currency.clone()
-        },
-    }
-}
-
 fn format_cost(cost: &ModelCostEstimate) -> String {
     if cost.amount >= 1.0 {
         format!("{}{:.4}", cost.currency, cost.amount)
     } else {
         format!("{}{:.6}", cost.currency, cost.amount)
     }
-}
-
-fn is_beijing_peak_time() -> bool {
-    let Some(offset) = FixedOffset::east_opt(8 * 60 * 60) else {
-        return false;
-    };
-    is_peak_datetime(&Utc::now().with_timezone(&offset))
-}
-
-fn is_peak_datetime(now: &chrono::DateTime<FixedOffset>) -> bool {
-    if matches!(now.weekday(), Weekday::Sat | Weekday::Sun) {
-        return false;
-    }
-    let seconds = now.num_seconds_from_midnight();
-    (9 * 60 * 60..12 * 60 * 60).contains(&seconds)
-        || (14 * 60 * 60..18 * 60 * 60).contains(&seconds)
 }

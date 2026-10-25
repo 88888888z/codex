@@ -40,6 +40,7 @@ pub enum SlashCommand {
     Resume,
     Fork,
     Worktree,
+    Projects,
     App,
     Init,
     Compact,
@@ -120,6 +121,7 @@ impl SlashCommand {
                 SlashCommand::Clear => "清空终端并开始新对话",
                 SlashCommand::Fork => "复制当前对话",
                 SlashCommand::Worktree => "在新的 worktree 中开始或继续对话",
+                SlashCommand::Projects => "查看多项目工作区并浏览项目文件",
                 SlashCommand::App => "在桌面应用中继续当前会话",
                 SlashCommand::Quit | SlashCommand::Exit => "退出 Codex",
                 SlashCommand::Copy => "复制上一条回复或其部分内容",
@@ -192,6 +194,7 @@ impl SlashCommand {
             SlashCommand::Clear => "clear the terminal and start a new chat",
             SlashCommand::Fork => "fork the current chat",
             SlashCommand::Worktree => "start or continue a conversation in a new worktree",
+            SlashCommand::Projects => "inspect the multi-project workspace and browse project files",
             SlashCommand::App => "continue this session in the Desktop app",
             SlashCommand::Quit | SlashCommand::Exit => "exit Codex",
             SlashCommand::Copy => "copy the last response or part of it",
@@ -313,6 +316,7 @@ impl SlashCommand {
                 | SlashCommand::Diff
                 | SlashCommand::Files
                 | SlashCommand::Mention
+                | SlashCommand::Projects
                 | SlashCommand::Status
                 | SlashCommand::Daemon
                 | SlashCommand::Warnings
@@ -355,6 +359,7 @@ impl SlashCommand {
                 | SlashCommand::Verify
                 | SlashCommand::Tools
                 | SlashCommand::Files
+                | SlashCommand::Projects
                 | SlashCommand::Checkpoint
                 | SlashCommand::Rewind
         )
@@ -400,6 +405,7 @@ impl SlashCommand {
             | SlashCommand::Raw
             | SlashCommand::Rename
             | SlashCommand::Mention
+            | SlashCommand::Projects
             | SlashCommand::Skills
             | SlashCommand::Tools
             | SlashCommand::Hooks

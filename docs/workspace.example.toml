@@ -1,0 +1,17 @@
+# Copy this file to <projects-parent>/.codex/workspace.toml.
+name = "company"
+
+[[roots]]
+id = "web"
+path = "./web"
+write = true
+
+[[roots]]
+id = "api"
+path = "./api"
+write = true
+
+[[roots]]
+id = "shared"
+path = "./shared"
+write = false

@@ -910,6 +910,12 @@ pub(crate) enum AppEvent {
         path: Option<String>,
     },
 
+    /// Create `.codex/workspace.toml` from explicitly selected child projects.
+    CreateWorkspaceSet {
+        parent: PathBuf,
+        roots: Vec<PathBuf>,
+    },
+
     /// Insert a user-selected file range into the composer as bounded context.
     AttachFileContext {
         placeholder: String,
