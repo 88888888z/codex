@@ -497,20 +497,20 @@ impl DiffReviewOverlay {
                         .map(|file| self.display_path(file))
                         .unwrap_or_default();
                     if chinese {
-                        format!("回滚 {file}？y 确认 · n/Esc 取消")
+                        format!("回滚 {file}？再按 r 确认 · n/Esc 取消")
                     } else {
-                        format!("Rollback {file}? y confirm · n/Esc cancel")
+                        format!("Rollback {file}? press r again to confirm · n/Esc cancel")
                     }
                 }
                 RollbackConfirm::All => {
                     if chinese {
                         format!(
-                            "回滚全部 {} 个文件？y 确认 · n/Esc 取消",
+                            "回滚全部 {} 个文件？再按 R 确认 · n/Esc 取消",
                             self.data.files.len()
                         )
                     } else {
                         format!(
-                            "Rollback all {} files? y confirm · n/Esc cancel",
+                            "Rollback all {} files? press R again to confirm · n/Esc cancel",
                             self.data.files.len()
                         )
                     }
@@ -560,8 +560,14 @@ impl DiffReviewOverlay {
 
     fn handle_key(&mut self, tui: &mut tui::Tui, key: KeyEvent) -> Result<()> {
         if let Some(confirm) = self.confirm {
+            let execute = matches!(
+                (confirm, key.code),
+                (RollbackConfirm::File, KeyCode::Char('r'))
+                    | (RollbackConfirm::All, KeyCode::Char('R'))
+                    | (_, KeyCode::Char('y'))
+            );
             match key.code {
-                KeyCode::Char('y') => {
+                _ if execute => {
                     self.confirm = None;
                     match confirm {
                         RollbackConfirm::File => self.rollback_selected(),

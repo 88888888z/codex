@@ -5,8 +5,9 @@
 //! untracked files. When the current directory is not inside a Git
 //! repository, the function returns `Ok((false, String::new()))`.
 
-use std::path::Path;
 use std::path::Component;
+use std::path::Path;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::diff_review::DiffFileStatus;
@@ -56,10 +57,7 @@ pub(crate) async fn get_git_diff(
     cwd: &Path,
 ) -> Result<(bool, String), String> {
     get_git_diff_with_color(
-        runner,
-        cwd,
-        /*color*/ true,
-        /*include_staged*/ false,
+        runner, cwd, /*color*/ true, /*include_staged*/ false,
     )
     .await
 }
@@ -70,10 +68,7 @@ pub(crate) async fn get_git_diff_plain(
     cwd: &Path,
 ) -> Result<(bool, String), String> {
     get_git_diff_with_color(
-        runner,
-        cwd,
-        /*color*/ false,
-        /*include_staged*/ true,
+        runner, cwd, /*color*/ false, /*include_staged*/ true,
     )
     .await
 }
@@ -170,6 +165,7 @@ pub(crate) async fn rollback_diff_file(
     status: DiffFileStatus,
 ) -> Result<(), String> {
     validate_relative_path(path)?;
+    let path = resolve_rollback_path(runner, cwd, path).await?;
     let path = path
         .to_str()
         .ok_or_else(|| "diff path is not valid UTF-8".to_string())?;
@@ -195,10 +191,7 @@ pub(crate) async fn rollback_diff_file(
         if output.success() {
             return Ok(());
         }
-        return Err(format!(
-            "git clean failed with status {}",
-            output.exit_code
-        ));
+        return Err(git_command_error("git clean", &output));
     }
 
     let output = run_git_command(
@@ -219,10 +212,35 @@ pub(crate) async fn rollback_diff_file(
     if output.success() {
         Ok(())
     } else {
-        Err(format!(
-            "git restore failed with status {}",
-            output.exit_code
-        ))
+        Err(git_command_error("git restore", &output))
+    }
+}
+
+async fn resolve_rollback_path(
+    runner: &dyn WorkspaceCommandExecutor,
+    cwd: &Path,
+    path: &Path,
+) -> Result<PathBuf, String> {
+    let cwd_path = cwd.join(path);
+    if cwd_path.exists() {
+        return Ok(cwd_path);
+    }
+    let root = run_git_capture_stdout(
+        runner,
+        cwd,
+        FsmonitorOverride::Disabled,
+        &["rev-parse", "--show-toplevel"],
+    )
+    .await?;
+    Ok(PathBuf::from(root.trim()).join(path))
+}
+
+fn git_command_error(action: &str, output: &WorkspaceCommandOutput) -> String {
+    let detail = output.stderr.trim();
+    if detail.is_empty() {
+        format!("{action} failed with status {}", output.exit_code)
+    } else {
+        format!("{action} failed with status {}: {detail}", output.exit_code)
     }
 }
 
