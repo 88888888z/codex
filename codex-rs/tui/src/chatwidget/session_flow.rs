@@ -92,6 +92,10 @@ impl ChatWidget {
         let previous_thread_id = self.thread_id;
         let connector_scope_changed = previous_thread_id != Some(session.thread_id)
             || self.config.cwd.as_path() != session.cwd.as_path();
+        if previous_thread_id.is_some() && connector_scope_changed {
+            self.reset_pinned_context_state();
+            self.reset_verification_state();
+        }
         self.thread_id = Some(session.thread_id);
         self.daybreak_enabled = self.config.features.enabled(Feature::CliDaybreak)
             && session.daybreak_enabled

@@ -331,6 +331,7 @@ mod permission_discovery;
 mod permission_popups;
 mod permission_shortcuts;
 mod permissions_menu;
+mod pinned_context;
 pub(crate) use self::permissions_menu::auto_review_available;
 pub(crate) use self::permissions_menu::cyber_model_approval_reviewer;
 mod backend_banners;
@@ -389,6 +390,7 @@ use self::status_state::TerminalTitleStatusKind;
 mod status_controls;
 mod status_surface_commands;
 mod status_surfaces;
+mod verification;
 use self::status_surface_commands::StatusSurfaceOverrides;
 mod streaming;
 use self::status_surfaces::CachedProjectRootName;
@@ -638,6 +640,8 @@ pub(crate) struct ChatWidget {
     mcp_startup_pending_next_round_saw_starting: bool,
     connectors: ConnectorsState,
     ide_context: IdeContextState,
+    pinned_context: pinned_context::PinnedContextState,
+    verification: verification::VerificationState,
     plugins_cache: PluginsCacheState,
     plugins_fetch_state: PluginListFetchState,
     plugin_remote_sections_loading: bool,

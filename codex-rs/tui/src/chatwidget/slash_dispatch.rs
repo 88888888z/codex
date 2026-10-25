@@ -546,6 +546,13 @@ impl ChatWidget {
             }
             SlashCommand::Tui => self.show_tui_mode_picker(),
             SlashCommand::Budget => self.app_event_tx.send(AppEvent::OpenBudget),
+            SlashCommand::Pin => self.handle_pin_command_args(""),
+            SlashCommand::Verify => self.handle_verify_command_args(""),
+            SlashCommand::Handoff => {
+                self.app_event_tx.send(AppEvent::GenerateHandoff {
+                    destination: crate::app_event::HandoffDestination::Default,
+                });
+            }
             SlashCommand::Files => {
                 self.app_event_tx.send(AppEvent::OpenFilePicker {
                     cwd: self
@@ -1012,6 +1019,17 @@ impl ChatWidget {
             SlashCommand::Budget => self.add_error_message(
                 crate::i18n::ui_text("Usage: /budget", "用法：/budget").to_string(),
             ),
+            SlashCommand::Pin => self.handle_pin_command_args(trimmed),
+            SlashCommand::Verify => self.handle_verify_command_args(trimmed),
+            SlashCommand::Handoff => {
+                let destination = if trimmed.eq_ignore_ascii_case("clipboard") {
+                    crate::app_event::HandoffDestination::Clipboard
+                } else {
+                    crate::app_event::HandoffDestination::File(PathBuf::from(trimmed))
+                };
+                self.app_event_tx
+                    .send(AppEvent::GenerateHandoff { destination });
+            }
             SlashCommand::Files => {
                 self.app_event_tx.send(AppEvent::OpenFilePicker {
                     cwd: self
@@ -1432,6 +1450,9 @@ impl ChatWidget {
             | SlashCommand::Vim
             | SlashCommand::Daybreak
             | SlashCommand::Diff
+            | SlashCommand::Pin
+            | SlashCommand::Verify
+            | SlashCommand::Handoff
             | SlashCommand::Files
             | SlashCommand::Checkpoint
             | SlashCommand::Rewind

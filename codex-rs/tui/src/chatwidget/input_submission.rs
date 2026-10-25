@@ -240,6 +240,7 @@ impl ChatWidget {
             };
             return (app_command.is_some(), app_command);
         }
+        self.mark_verification_stale();
 
         for image_url in &remote_image_urls {
             items.push(UserInput::Image {
@@ -422,6 +423,12 @@ impl ChatWidget {
         }
 
         self.maybe_apply_ide_context(&mut items);
+        if let Some(pinned_context) = self.pinned_context_prompt() {
+            crate::user_prompt::apply_prompt_context_to_user_input(
+                &pinned_context,
+                &mut items,
+            );
+        }
         crate::task_mentions::apply_task_references(&mut items, &mention_bindings, self.thread_id);
 
         let collaboration_mode = if self.collaboration_modes_enabled() {

@@ -59,6 +59,7 @@ use crate::chatwidget::ThreadUsageOutcome;
 use crate::chatwidget::UserMessage;
 use crate::experimental_features::FeatureWriteResult;
 use crate::goal_files::GoalDraft;
+use crate::verification::VerificationReport;
 use codex_app_server_protocol::AskForApproval;
 use codex_config::types::ApprovalsReviewer;
 use codex_features::Feature;
@@ -88,6 +89,13 @@ pub(crate) enum VoiceControl {
 pub(crate) enum AgentsOverviewAction {
     Archive,
     Delete,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum HandoffDestination {
+    Default,
+    Clipboard,
+    File(PathBuf),
 }
 
 /// Whether a managed checkout starts fresh or preserves the current conversation.
@@ -916,6 +924,17 @@ pub(crate) enum AppEvent {
 
     /// Compact the conversation from the budget inspector.
     CompactBudgetContext,
+
+    /// Generate a task handoff from the conversation and workspace state.
+    GenerateHandoff {
+        destination: HandoffDestination,
+    },
+
+    /// Completed `/verify` run.
+    VerificationFinished {
+        thread_id: Option<ThreadId>,
+        report: VerificationReport,
+    },
 
     /// Restore one changed file selected in the structured diff review.
     RollbackDiffFile {

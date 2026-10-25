@@ -65,6 +65,8 @@ impl App {
                     | AppEvent::AttachFileContext { .. }
                     | AppEvent::OpenBudget
                     | AppEvent::CompactBudgetContext
+                    | AppEvent::GenerateHandoff { .. }
+                    | AppEvent::VerificationFinished { .. }
                     | AppEvent::OpenWarnings
                     | AppEvent::StatusLineSetup { .. }
                     | AppEvent::StatusLineSetupCancelled
@@ -1416,6 +1418,20 @@ impl App {
             }
             AppEvent::OpenBudget => {
                 self.open_budget_overlay(tui)?;
+            }
+            AppEvent::GenerateHandoff { destination } => {
+                self.chat_widget.add_info_message(
+                    crate::i18n::ui_text("Generating handoff…", "正在生成任务交接…").to_string(),
+                    /*hint*/ None,
+                );
+                if let Err(error) = self.generate_handoff(tui, app_server, destination).await {
+                    self.chat_widget.add_error_message(error);
+                }
+                tui.frame_requester().schedule_frame();
+            }
+            AppEvent::VerificationFinished { thread_id, report } => {
+                self.chat_widget.finish_verification(thread_id, report);
+                tui.frame_requester().schedule_frame();
             }
             AppEvent::CompactBudgetContext => {
                 self.compact_from_budget();

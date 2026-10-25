@@ -55,6 +55,9 @@ pub enum SlashCommand {
     Raw,
     Tui,
     Budget,
+    Pin,
+    Verify,
+    Handoff,
     Diff,
     Files,
     Checkpoint,
@@ -123,6 +126,9 @@ impl SlashCommand {
                 SlashCommand::Raw => "切换原始回滚模式，便于复制终端文本",
                 SlashCommand::Tui => "选择下次启动时的 TUI 模式",
                 SlashCommand::Budget => "查看上下文 token 预算并压缩会话",
+                SlashCommand::Pin => "固定文本、文件或行范围到后续请求",
+                SlashCommand::Verify => "检测并运行项目验证命令",
+                SlashCommand::Handoff => "生成包含上下文、验证和 Git 状态的任务交接",
                 SlashCommand::Diff => "显示 Git 差异（包括未跟踪文件）",
                 SlashCommand::Files => "浏览文件并选择附加给 AI 的行范围",
                 SlashCommand::Checkpoint => "保存当前工作区检查点",
@@ -191,6 +197,11 @@ impl SlashCommand {
             SlashCommand::Raw => "toggle raw scrollback mode for copy-friendly terminal selection",
             SlashCommand::Tui => "choose the TUI mode for the next launch",
             SlashCommand::Budget => "inspect the context token budget and compact",
+            SlashCommand::Pin => "pin text, files, or line ranges into later requests",
+            SlashCommand::Verify => "detect and run project verification commands",
+            SlashCommand::Handoff => {
+                "generate a task handoff with context, verification, and git state"
+            }
             SlashCommand::Diff => "show git diff (including untracked files)",
             SlashCommand::Files => "browse files and attach selected line ranges",
             SlashCommand::Checkpoint => "save the current workspace checkpoint",
@@ -281,6 +292,9 @@ impl SlashCommand {
                 | SlashCommand::Resume
                 | SlashCommand::Files
                 | SlashCommand::Checkpoint
+                | SlashCommand::Pin
+                | SlashCommand::Verify
+                | SlashCommand::Handoff
         )
     }
 
@@ -333,6 +347,8 @@ impl SlashCommand {
                 | SlashCommand::Language
                 | SlashCommand::Provider
                 | SlashCommand::Budget
+                | SlashCommand::Pin
+                | SlashCommand::Verify
                 | SlashCommand::Files
                 | SlashCommand::Checkpoint
                 | SlashCommand::Rewind
@@ -362,6 +378,7 @@ impl SlashCommand {
             | SlashCommand::Cd
             | SlashCommand::Clear
             | SlashCommand::Budget
+            | SlashCommand::Verify
             | SlashCommand::Files
             | SlashCommand::Checkpoint
             | SlashCommand::Rewind
@@ -398,12 +415,14 @@ impl SlashCommand {
             | SlashCommand::Statusline
             | SlashCommand::AutoReview
             | SlashCommand::Ide
+            | SlashCommand::Pin
             | SlashCommand::Language
             | SlashCommand::Provider
             | SlashCommand::Quit
             | SlashCommand::Exit
             | SlashCommand::Side
-            | SlashCommand::Btw => true,
+            | SlashCommand::Btw
+            | SlashCommand::Handoff => true,
             SlashCommand::Rollout => true,
             SlashCommand::TestApproval => true,
             SlashCommand::Agents | SlashCommand::MultiAgents => true,

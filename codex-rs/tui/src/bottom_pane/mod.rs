@@ -638,6 +638,16 @@ impl BottomPane {
         self.request_redraw();
     }
 
+    pub(crate) fn set_verification_indicator(&mut self, success: Option<bool>) {
+        self.composer.set_verification_indicator(success);
+        self.request_redraw();
+    }
+
+    pub(crate) fn set_pinned_context_count(&mut self, count: usize) {
+        self.composer.set_pinned_context_count(count);
+        self.request_redraw();
+    }
+
     pub fn set_worktrees_enabled(&mut self, enabled: bool) {
         self.composer.set_worktrees_enabled(enabled);
         self.request_redraw();

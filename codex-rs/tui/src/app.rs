@@ -228,6 +228,7 @@ mod experimental_features;
 mod file_change_approvals;
 mod history_pagination;
 mod history_ui;
+mod handoff;
 mod input;
 mod link_hover;
 mod loaded_threads;

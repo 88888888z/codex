@@ -468,8 +468,8 @@ impl ExecCell {
 
         out.extend(prefix_hyperlink_lines(
             out_indented,
-            "  └ ".dim(),
-            "    ".into(),
+            "└ ".dim(),
+            "  ".into(),
         ));
         out
     }
@@ -502,10 +502,17 @@ impl ExecCell {
             crate::i18n::ui_text("Ran", "已运行")
         };
 
+        let header_indent: Span<'static> = "".into();
         let header_line = if is_interaction {
-            Line::from(vec![bullet.clone(), " ".into()])
+            Line::from(vec![header_indent, bullet.clone(), " ".into()])
         } else {
-            Line::from(vec![bullet.clone(), " ".into(), title.bold(), " ".into()])
+            Line::from(vec![
+                header_indent,
+                bullet.clone(),
+                " ".into(),
+                title.bold(),
+                " ".into(),
+            ])
         };
         let header_prefix_width = header_line.width();
         let mut header = HyperlinkLine::from(header_line.clone());
@@ -863,9 +870,9 @@ impl ExecDisplayLayout {
 }
 
 const EXEC_DISPLAY_LAYOUT: ExecDisplayLayout = ExecDisplayLayout::new(
-    PrefixedBlock::new("  │ ", "  │ "),
+    PrefixedBlock::new("│ ", "│ "),
     /*command_continuation_max_lines*/ 2,
-    PrefixedBlock::new("  └ ", "    "),
+    PrefixedBlock::new("└ ", "  "),
 );
 
 #[cfg(test)]

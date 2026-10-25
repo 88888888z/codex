@@ -55,6 +55,8 @@ impl AppEventSender {
                     | AppEvent::BackgroundVoiceError { .. }
                     | AppEvent::SyncThreadGitBranch { .. }
                     | AppEvent::RefreshRateLimits { .. }
+                    | AppEvent::GenerateHandoff { .. }
+                    | AppEvent::VerificationFinished { .. }
             )
         {
             return;

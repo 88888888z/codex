@@ -193,6 +193,8 @@ impl ChatWidget {
             mcp_startup_pending_next_round_saw_starting: false,
             connectors: ConnectorsState::default(),
             ide_context: IdeContextState::default(),
+            pinned_context: Default::default(),
+            verification: Default::default(),
             plugins_cache: PluginsCacheState::default(),
             plugins_fetch_state: PluginListFetchState::default(),
             plugin_remote_sections_loading: false,

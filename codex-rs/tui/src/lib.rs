@@ -268,6 +268,7 @@ mod updates;
 mod updates_cache;
 mod user_prompt;
 mod version;
+mod verification;
 mod vim_search;
 mod width;
 mod windows_sandbox;

@@ -766,6 +766,8 @@ impl ChatComposer {
                 collaboration_mode_indicator: None,
                 goal_status_indicator: None,
                 ide_context_active: false,
+                pinned_context_count: 0,
+                verification_indicator: None,
                 status_line_value: None,
                 status_line_hyperlink_url: None,
                 status_line_enabled: false,
@@ -1131,6 +1133,14 @@ impl ChatComposer {
         self.footer.ide_context_active = active;
     }
 
+    pub(crate) fn set_verification_indicator(&mut self, success: Option<bool>) {
+        self.footer.verification_indicator = success;
+    }
+
+    pub(crate) fn set_pinned_context_count(&mut self, count: usize) {
+        self.footer.pinned_context_count = count;
+    }
+
     pub fn set_side_conversation_active(&mut self, active: bool) {
         self.update_slash_command_catalog(|composer| composer.side_conversation_active = active);
     }
@@ -1455,6 +1465,27 @@ impl ChatComposer {
                 spans.push(" | ".dim());
             }
             spans.extend(indicators.spans);
+        }
+        if let Some(success) = self.footer.verification_indicator {
+            if !spans.is_empty() {
+                spans.push(" · ".dim());
+            }
+            spans.push(if success {
+                crate::i18n::ui_text("verify passed", "验证通过").green()
+            } else {
+                crate::i18n::ui_text("verify failed", "验证失败").red()
+            });
+        }
+        if self.footer.pinned_context_count > 0 {
+            if !spans.is_empty() {
+                spans.push(" · ".dim());
+            }
+            let label = if crate::i18n::is_chinese(crate::i18n::current_language()) {
+                format!("已固定 {}", self.footer.pinned_context_count)
+            } else {
+                format!("pinned {}", self.footer.pinned_context_count)
+            };
+            spans.push(label.cyan());
         }
         if spans.is_empty() {
             None

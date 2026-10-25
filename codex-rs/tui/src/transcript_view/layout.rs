@@ -105,18 +105,28 @@ fn cell_content_layout(
             .as_any()
             .is::<crate::history_cell::UserHistoryCell>()
     {
-        layout = layout.with_rounded_frame(
+        layout = layout.with_rounded_frame_padding(
             crate::style::history_prompt_style(),
-            crate::style::history_prompt_border_style(),
+            ratatui::style::Style::default().fg(ratatui::style::Color::White),
+            /*horizontal_padding*/ 2,
         );
     } else if mode == HistoryRenderMode::Rich
         && cell
             .as_any()
             .is::<crate::history_cell::AgentMarkdownCell>()
     {
-        layout = layout.with_rounded_frame(
+        layout = layout.with_rounded_frame_padding(
             ratatui::style::Style::default(),
             crate::style::agent_message_border_style(),
+            /*horizontal_padding*/ 2,
+        );
+    } else if mode == HistoryRenderMode::Rich
+        && cell.as_any().is::<crate::exec_cell::ExecCell>()
+    {
+        layout = layout.with_rounded_frame_padding(
+            ratatui::style::Style::default(),
+            crate::style::hairline_style(),
+            /*horizontal_padding*/ 2,
         );
     }
     if let Some(protocol) = presentation.image_protocol
@@ -269,12 +279,23 @@ impl TranscriptView {
             .disclosure
             .keymap
             .primary_hint(KeymapContext::Global, "open_transcript");
-        presentation.separated = index > 0 && !cell.is_stream_continuation();
+        presentation.separated = index > 0
+            && !cell.is_stream_continuation()
+            && !cell_uses_rounded_frame(cell.as_ref());
         presentation.turn_tip_space = self.turn_tip_key == Some(EntryKey::cell(cell));
         Some(self.cache.get(cell, width, presentation, || {
             cell_content_layout(cell.as_ref(), width, mode, presentation, shortcut)
         }))
     }
+}
+
+fn cell_uses_rounded_frame(cell: &dyn crate::history_cell::HistoryCell) -> bool {
+    cell.as_any()
+        .is::<crate::history_cell::UserHistoryCell>()
+        || cell
+            .as_any()
+            .is::<crate::history_cell::AgentMarkdownCell>()
+        || cell.as_any().is::<crate::exec_cell::ExecCell>()
 }
 
 impl LayoutCache {

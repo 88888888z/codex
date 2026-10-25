@@ -64,6 +64,7 @@ struct DisclosureControl {
 struct PromptFrame {
     fill: Style,
     border: Style,
+    horizontal_padding: usize,
 }
 
 struct TextRow {
@@ -141,7 +142,16 @@ impl TextLayout {
 
     /// Reflow the same displayed content revision, retaining styles, links and disclosure label.
     pub(super) fn rewrap(&self, width: u16) -> Self {
-        let mut layout = Self::from_logical(self.logical.clone(), width);
+        let content_width = self.prompt_frame.as_ref().map_or(width, |frame| {
+            if frame.horizontal_padding > 1 {
+                width.saturating_sub(
+                    u16::try_from(2 * (frame.horizontal_padding + 1)).unwrap_or(u16::MAX),
+                )
+            } else {
+                width
+            }
+        });
+        let mut layout = Self::from_logical(self.logical.clone(), content_width);
         if let Some(control) = &self.disclosure_control {
             layout =
                 layout.with_disclosure_control_at(control.label.clone(), control.source_offset);
@@ -151,7 +161,15 @@ impl TextLayout {
             layout = layout.without_leading_blank_row();
         }
         if let Some(frame) = &self.prompt_frame {
-            layout = layout.with_rounded_frame(frame.fill, frame.border);
+            if frame.horizontal_padding > 1 {
+                layout.width = width;
+            }
+            layout.ensure_frame_rows();
+            layout = layout.with_rounded_frame_inner(
+                frame.fill,
+                frame.border,
+                frame.horizontal_padding,
+            );
         }
         if self.separated {
             layout.with_leading_separator()
@@ -238,11 +256,61 @@ impl TextLayout {
         self
     }
 
-    /// Add a presentation-only rounded frame to submitted prompts.
-    ///
-    /// The frame occupies the blank padding rows already present around user prompts, so it
-    /// changes neither their copyable source nor their searchable text.
-    pub(super) fn with_rounded_frame(mut self, fill: Style, border: Style) -> Self {
+    /// Add a rounded frame while reflowing content for additional horizontal padding.
+    pub(super) fn with_rounded_frame_padding(
+        mut self,
+        fill: Style,
+        border: Style,
+        horizontal_padding: usize,
+    ) -> Self {
+        let outer_width = self.width;
+        let content_width = outer_width.saturating_sub(
+            u16::try_from(2 * (horizontal_padding + 1)).unwrap_or(u16::MAX),
+        );
+        if content_width < 4 {
+            return self;
+        }
+        self = self.rewrap(content_width);
+        self.width = outer_width;
+        self.ensure_frame_rows();
+        self.with_rounded_frame_inner(fill, border, horizontal_padding)
+    }
+
+    fn ensure_frame_rows(&mut self) {
+        let blank_row = |source: usize, width: u16| TextRow {
+            line: HyperlinkLine::from(""),
+            source: source..source,
+            line_end: None,
+            content_width: width,
+            first_column: 0,
+            prefix_columns: 0,
+            tabs: tabs::TabStops::default(),
+        };
+        if !self
+            .rows
+            .first()
+            .is_some_and(|row| line_width(&row.line.line) == 0)
+        {
+            self.rows.insert(/*index*/ 0, blank_row(0, self.width));
+            if let Some(control) = &mut self.disclosure_control {
+                control.row += 1;
+            }
+        }
+        if !self
+            .rows
+            .last()
+            .is_some_and(|row| line_width(&row.line.line) == 0)
+        {
+            self.rows.push(blank_row(self.text.len(), self.width));
+        }
+    }
+
+    fn with_rounded_frame_inner(
+        mut self,
+        fill: Style,
+        border: Style,
+        horizontal_padding: usize,
+    ) -> Self {
         let Some(first) = self
             .rows
             .iter()
@@ -265,27 +333,37 @@ impl TextLayout {
         self.rows[first].line = HyperlinkLine::new(
             Line::from(format!("╭{}╮", "─".repeat(inner_width))).style(border),
         );
+        self.rows[first].content_width = self.width;
         self.rows[last].line = HyperlinkLine::new(
             Line::from(format!("╰{}╯", "─".repeat(inner_width))).style(border),
         );
+        self.rows[last].content_width = self.width;
 
         for row in &mut self.rows[first + 1..last] {
             let content_width = row.line.width();
             let padding = usize::from(self.width)
-                .saturating_sub(/*left*/ 2 + content_width + /*right*/ 2);
-            let mut spans = Vec::with_capacity(row.line.line.spans.len() + 3);
-            spans.push(Span::styled("│ ", border));
+                .saturating_sub(/*borders and insets*/ 2 * (horizontal_padding + 1) + content_width);
+            let mut spans = Vec::with_capacity(row.line.line.spans.len() + 5);
+            spans.push(Span::styled("│", border));
+            spans.push(Span::styled(" ".repeat(horizontal_padding), fill));
             spans.extend(std::mem::take(&mut row.line.line.spans));
             spans.push(Span::styled(" ".repeat(padding), fill));
-            spans.push(Span::styled(" │", border));
+            spans.push(Span::styled(" ".repeat(horizontal_padding), fill));
+            spans.push(Span::styled("│", border));
             row.line.line = Line::from(spans).style(fill);
-            row.first_column += 2;
-            row.prefix_columns += 2;
+            row.content_width = self.width;
+            row.first_column += horizontal_padding + 1;
+            row.prefix_columns += horizontal_padding + 1;
             for hyperlink in &mut row.line.hyperlinks {
-                hyperlink.columns = hyperlink.columns.start + 2..hyperlink.columns.end + 2;
+                hyperlink.columns = hyperlink.columns.start + horizontal_padding + 1
+                    ..hyperlink.columns.end + horizontal_padding + 1;
             }
         }
-        self.prompt_frame = Some(PromptFrame { fill, border });
+        self.prompt_frame = Some(PromptFrame {
+            fill,
+            border,
+            horizontal_padding,
+        });
         self
     }
 
